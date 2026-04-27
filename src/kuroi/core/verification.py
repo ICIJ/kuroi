@@ -84,3 +84,46 @@ def _box_contains(
     ox0, oy0, ox1, oy1 = outer
     ix0, iy0, ix1, iy1 = inner
     return ix0 >= ox0 - tol and iy0 >= oy0 - tol and ix1 <= ox1 + tol and iy1 <= oy1 + tol
+
+
+_METADATA_FIELDS = ("author", "title", "subject", "keywords", "creator", "producer")
+
+
+def scan_metadata(pdf_path: Path) -> list[Leak]:
+    """Flag any non-empty value in the PDF's standard metadata fields.
+
+    A value being present is not automatically a leak in the user's eyes, but
+    in the kuroi workflow the redacted output should have its metadata
+    sanitized — anything left here should surface so the user can decide.
+    """
+    leaks: list[Leak] = []
+    doc = pymupdf.open(str(pdf_path))  # type: ignore[no-untyped-call]
+    try:
+        meta = doc.metadata or {}
+        for field in _METADATA_FIELDS:
+            value = (meta.get(field) or "").strip()
+            if value:
+                leaks.append(
+                    Leak(
+                        page=0,
+                        kind="metadata",
+                        bbox=None,
+                        recovered_text=value,
+                        detail=f"/{field.title()} field contains '{value}'",
+                    )
+                )
+        # XMP metadata is a separate stream; non-empty XMP is worth surfacing.
+        xmp = doc.xref_xml_metadata()  # type: ignore[no-untyped-call]
+        if xmp:
+            leaks.append(
+                Leak(
+                    page=0,
+                    kind="metadata",
+                    bbox=None,
+                    recovered_text=xmp[:200],
+                    detail="XMP metadata stream is non-empty",
+                )
+            )
+    finally:
+        doc.close()  # type: ignore[no-untyped-call]
+    return leaks
