@@ -127,3 +127,27 @@ def scan_metadata(pdf_path: Path) -> list[Leak]:
     finally:
         doc.close()  # type: ignore[no-untyped-call]
     return leaks
+
+
+@dataclass(frozen=True)
+class VerificationReport:
+    passed: bool
+    leaks: tuple[Leak, ...]
+
+    @property
+    def summary(self) -> str:
+        if self.passed:
+            return "no residual leaks"
+        kinds: dict[str, int] = {}
+        for leak in self.leaks:
+            kinds[leak.kind] = kinds.get(leak.kind, 0) + 1
+        parts = [f"{count} {kind}" for kind, count in kinds.items()]
+        return ", ".join(parts)
+
+
+def verify_pdf(pdf_path: Path) -> VerificationReport:
+    """Run every deterministic leak scanner and aggregate results."""
+    leaks: list[Leak] = []
+    leaks.extend(scan_text_under_overlays(pdf_path))
+    leaks.extend(scan_metadata(pdf_path))
+    return VerificationReport(passed=not leaks, leaks=tuple(leaks))

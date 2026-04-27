@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pymupdf
 
-from kuroi.core.verification import scan_metadata, scan_text_under_overlays
+from kuroi.core.verification import scan_metadata, scan_text_under_overlays, verify_pdf
 
 
 def test_scan_text_under_overlays_finds_leak(
@@ -48,3 +48,17 @@ def test_scan_metadata_clean(make_pdf: Callable[..., Path]) -> None:
     leaks = scan_metadata(pdf)
     # Default-empty metadata fields produce no leaks
     assert leaks == []
+
+
+def test_verify_pdf_clean(make_pdf: Callable[..., Path]) -> None:
+    pdf = make_pdf(["body text"])
+    report = verify_pdf(pdf)
+    assert report.passed is True
+    assert report.leaks == ()
+
+
+def test_verify_pdf_fails_on_overlay(make_overlay_pdf: Callable[..., Path]) -> None:
+    pdf = make_overlay_pdf("Hello world", redact_rect=(70.0, 58.0, 130.0, 77.0))
+    report = verify_pdf(pdf)
+    assert report.passed is False
+    assert any(leak.kind == "text_under_overlay" for leak in report.leaks)
