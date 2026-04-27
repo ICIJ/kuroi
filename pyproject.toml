@@ -58,6 +58,7 @@ explicit_package_bases = true
 [[tool.mypy.overrides]]
 module = ["pymupdf.*", "fitz.*"]
 ignore_missing_imports = true
+disallow_untyped_calls = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
