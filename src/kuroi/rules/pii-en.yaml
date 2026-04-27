@@ -1,0 +1,33 @@
+name: pii-en
+display_name: "PII (English)"
+description: "Personal identifiers in English-language documents"
+version: 1
+categories:
+  - id: email
+    label: "email address"
+    detection: regex
+    pattern: '\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'
+    confidence: high
+  - id: ssn_us
+    label: "US SSN"
+    detection: regex
+    pattern: '\b\d{3}-\d{2}-\d{4}\b'
+    confidence: high
+  - id: phone_us
+    label: "US phone number"
+    detection: regex
+    pattern: '\b(?:\+1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b'
+    confidence: medium
+  - id: iban
+    label: "IBAN"
+    detection: regex
+    pattern: '\b[A-Z]{2}\d{2}(?:\s?[A-Z0-9]{4}){2,7}\b'
+    confidence: high
+  - id: person_name
+    label: "person name"
+    detection: llm
+    confidence: medium
+  - id: street_address
+    label: "street address"
+    detection: llm
+    confidence: medium
