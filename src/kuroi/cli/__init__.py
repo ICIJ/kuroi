@@ -31,6 +31,8 @@ def main(
     """kuroi — strip sensitive data from PDFs with LLM assistance."""
 
 
+from kuroi.cli.doctor import doctor_app
 from kuroi.cli.verify import verify_app
 
+app.add_typer(doctor_app, name="doctor", help="Check that everything is working.")
 app.add_typer(verify_app, name="verify", help="Check an already-redacted PDF for leaks.")
