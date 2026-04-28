@@ -21,9 +21,7 @@ def test_create_backup_copies_original_and_writes_manifest(
     assert manifest["timestamp"] == bak.timestamp
 
 
-def test_latest_backup_returns_most_recent(
-    make_pdf: Callable[..., Path], tmp_path: Path
-) -> None:
+def test_latest_backup_returns_most_recent(make_pdf: Callable[..., Path], tmp_path: Path) -> None:
     original = make_pdf(["body"], filename="original.pdf")
     backup_root = tmp_path / "backups"
 
