@@ -33,6 +33,8 @@ def main(
 
 from kuroi.cli.doctor import doctor_app
 from kuroi.cli.verify import verify_app
+import kuroi.cli.run as _run_module
 
 app.add_typer(doctor_app, name="doctor", help="Check that everything is working.")
 app.add_typer(verify_app, name="verify", help="Check an already-redacted PDF for leaks.")
+app.command("run", help="Redact one or more PDFs.")(_run_module.run)

@@ -1,0 +1,121 @@
+"""kuroi run — the canonical redaction command."""
+
+from __future__ import annotations
+
+import shutil
+from pathlib import Path
+
+import typer
+from rich.console import Console
+
+from kuroi.core.audit import AuditLog
+from kuroi.core.backup import create_backup
+from kuroi.core.findings import Finding
+from kuroi.core.pdf import extract_word_index
+from kuroi.core.redaction import apply_redactions
+from kuroi.core.rules import apply_regex_rules, llm_categories, load_rule_set
+from kuroi.core.verification import verify_pdf
+from kuroi.providers.anthropic import AnthropicProvider
+
+console = Console()
+
+
+def run(
+    pdf: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
+    output: Path = typer.Option(..., "-o", "--output"),
+    rules: str = typer.Option("pii", "--rules", help="Comma-separated rule set names."),
+    yes: bool = typer.Option(False, "-y", help="Skip the apply confirmation."),
+    backup_dir: Path = typer.Option(
+        Path.home() / "Documents" / "kuroi-backups",
+        "--backup-dir",
+    ),
+    audit_dir: Path = typer.Option(
+        Path.home() / ".local" / "share" / "kuroi" / "audit",
+        "--audit-dir",
+    ),
+    model: str = typer.Option("claude-opus-4-7", "--model"),
+) -> None:
+    """Redact a PDF using rules and/or instructions, with verification gating."""
+    rule_set_names = tuple(name.strip() for name in rules.split(",") if name.strip())
+    if not rule_set_names:
+        console.print("[red]No rule sets specified.[/]")
+        raise typer.Exit(code=2)
+
+    rule_sets = [load_rule_set(name) for name in rule_set_names]
+
+    if output.resolve() == pdf.resolve():
+        console.print("  [red]Refusing to overwrite the input file.[/] Use a different `-o` path.")
+        raise typer.Exit(code=2)
+
+    pages = extract_word_index(pdf)
+
+    findings: list[Finding] = []
+    llm_cat_ids: list[str] = []
+    for rs in rule_sets:
+        findings.extend(apply_regex_rules(pages, rs))
+        llm_cat_ids.extend(c.id for c in llm_categories(rs))
+
+    provider = AnthropicProvider(model=model)
+    findings.extend(provider.detect_redactions(pages, tuple(llm_cat_ids)))
+
+    if not findings:
+        console.print(f"  No redactions proposed for {pdf}. Exiting.")
+        raise typer.Exit(code=0)
+
+    console.print(f"  Found {len(findings)} candidate redactions.")
+
+    if not yes:
+        confirm = typer.confirm("Apply redactions?", default=True)
+        if not confirm:
+            raise typer.Exit(code=0)
+
+    backup = create_backup(pdf, backup_root=backup_dir)
+    audit_path = audit_dir / f"{backup.timestamp}.jsonl"
+    audit = AuditLog.open(
+        audit_path,
+        original=pdf,
+        output=output,
+        provider=provider.name,
+        model=provider.model,
+        rules=tuple(rs.name for rs in rule_sets),
+    )
+
+    temp_out = output.parent / (output.stem + ".kuroi-tmp" + output.suffix)
+    moved = False
+    try:
+        for f in findings:
+            audit.write_finding(f)
+
+        # Apply to a temp file. Only promote to output if verification passes.
+        temp_out.parent.mkdir(parents=True, exist_ok=True)
+        apply_redactions(pdf, findings, pages, temp_out)
+
+        report = verify_pdf(temp_out)
+        if not report.passed:
+            audit.write_event(
+                "verification_failed",
+                leaks=[
+                    {"page": leak.page, "kind": leak.kind, "detail": leak.detail}
+                    for leak in report.leaks
+                ],
+            )
+            audit.close(verification_passed=False, redaction_count=len(findings))
+            console.print(
+                f"  [red]Verification FAILED.[/] {len(report.leaks)} leaks; output not written."
+            )
+            raise typer.Exit(code=4)
+
+        shutil.move(str(temp_out), str(output))
+        moved = True
+        audit.close(verification_passed=True, redaction_count=len(findings))
+        console.print(f"  Wrote {output}")
+        console.print(f"  Audit: {audit_path}")
+    except typer.Exit:
+        raise
+    except BaseException:
+        audit.write_event("error")
+        audit.close(verification_passed=False, redaction_count=0)
+        raise
+    finally:
+        if not moved:
+            temp_out.unlink(missing_ok=True)
