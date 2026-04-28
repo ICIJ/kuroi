@@ -13,7 +13,7 @@ from typing import Literal
 
 import pymupdf
 
-LeakKind = Literal["text_under_overlay", "metadata", "unapplied_redact_annot"]
+LeakKind = Literal["text_under_overlay", "metadata"]
 
 
 @dataclass(frozen=True)
