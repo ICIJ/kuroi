@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from html import escape
 from pathlib import Path
 from typing import Literal
 
@@ -77,3 +78,37 @@ def render_json(d: Diff) -> str:
         }
         lines.append(json.dumps(payload, separators=(",", ":")))
     return "\n".join(lines)
+
+
+def render_html(d: Diff) -> str:
+    style = (
+        "body { font-family: sans-serif; margin: 2em; }"
+        "h2 { border-bottom: 1px solid #ddd; }"
+        ".page { margin-bottom: 2em; }"
+        ".cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1em; }"
+        ".col pre { background: #f6f6f6; padding: 0.5em; white-space: pre-wrap; }"
+        ".redactions li { font-family: monospace; }"
+    )
+    parts: list[str] = ['<!doctype html><html><head><meta charset="utf-8">']
+    parts.append("<title>kuroi diff</title>")
+    parts.append(f"<style>{style}</style></head><body>")
+    parts.append("<h1>kuroi diff</h1>")
+    for page in d.pages:
+        parts.append(f'<div class="page"><h2>Page {page.page_number} '
+                     f'({len(page.redactions)} redactions)</h2>')
+        parts.append('<div class="cols">')
+        parts.append(f'<div class="col"><h3>Original</h3><pre>{escape(page.before_text)}</pre></div>')
+        parts.append(f'<div class="col"><h3>Redacted</h3><pre>{escape(page.after_text)}</pre></div>')
+        parts.append("</div>")
+        if page.redactions:
+            parts.append('<ul class="redactions">')
+            for r in page.redactions:
+                x0, y0, x1, y1 = r.bbox
+                parts.append(
+                    f"<li>[{x0:.0f},{y0:.0f},{x1:.0f},{y1:.0f}] "
+                    f"<code>{escape(r.before_text)}</code></li>"
+                )
+            parts.append("</ul>")
+        parts.append("</div>")
+    parts.append("</body></html>")
+    return "".join(parts)
