@@ -87,7 +87,8 @@ def run(
         llm_cat_ids.extend(c.id for c in llm_categories(rs))
 
     provider = make_provider(config)
-    findings.extend(provider.detect_redactions(pages, tuple(llm_cat_ids)))
+    provider_findings, _chunks = provider.detect_redactions(pages, tuple(llm_cat_ids))
+    findings.extend(provider_findings)
 
     if not findings:
         console.print(f"  No redactions proposed for {pdf}. Exiting.")
