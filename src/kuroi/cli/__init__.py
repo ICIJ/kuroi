@@ -12,6 +12,7 @@ from kuroi.cli.doctor import doctor_app
 from kuroi.cli.setup import setup_app
 from kuroi.cli.undo import undo_app
 from kuroi.cli.verify import verify_app
+from kuroi.core.log import setup_logging, warn_vv_once
 
 app = typer.Typer(
     name="kuroi",
@@ -29,6 +30,13 @@ def _version_callback(value: bool) -> None:
 
 @app.callback()
 def main(
+    verbose: int = typer.Option(
+        0, "-v", "--verbose", count=True,
+        help="Show more detail (use -vv for debug).",
+    ),
+    quiet: bool = typer.Option(
+        False, "-q", "--quiet", help="Show less.",
+    ),
     version: bool = typer.Option(
         False,
         "--version",
@@ -38,6 +46,9 @@ def main(
     ),
 ) -> None:
     """kuroi — strip sensitive data from PDFs with LLM assistance."""
+    setup_logging(verbosity=verbose, quiet=quiet)
+    if verbose >= 2:
+        warn_vv_once()
 
 
 app.add_typer(doctor_app, name="doctor", help="Check that everything is working.")

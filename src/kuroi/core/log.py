@@ -39,3 +39,24 @@ def setup_logging(verbosity: int, quiet: bool) -> None:
     # can observe `kuroi.*` log records. The duplicate-emission risk is bounded
     # because the root logger has no handlers in normal CLI usage.
     root.propagate = True
+
+
+_VV_WARNED = False
+
+
+def warn_vv_once() -> None:
+    """Emit the document-text warning the first time -vv is in use this process."""
+    global _VV_WARNED
+    if _VV_WARNED:
+        return
+    _VV_WARNED = True
+    print(
+        "note: -vv prints document text to stderr; redirect if recording",
+        file=sys.stderr,
+    )
+
+
+def _reset_vv_warning_flag() -> None:
+    """Test hook only — do not call from production code."""
+    global _VV_WARNED
+    _VV_WARNED = False
