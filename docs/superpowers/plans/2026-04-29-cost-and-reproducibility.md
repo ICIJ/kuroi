@@ -1,4 +1,4 @@
-# Cluster 1 — Cost and reproducibility implementation plan
+# Cost and reproducibility implementation plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -1154,7 +1154,7 @@ provider_findings, chunks = provider.detect_redactions(
 findings.extend(provider_findings)
 ```
 
-Initialize `actual_cost = 0.0` immediately after — this guarantees the variable is bound on every code path, including verification failure (cluster 2 task 3 will read it from the failure branch too).
+Initialize `actual_cost = 0.0` immediately after — this guarantees the variable is bound on every code path, including verification failure (the state-persistence plan reads it from the failure branch too).
 
 After the run completes successfully, before printing `Wrote {output}`:
 
