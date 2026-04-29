@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
+from dataclasses import asdict
 from pathlib import Path
 
 import typer
@@ -135,6 +136,9 @@ def run(
         model=provider.model,
         rules=tuple(rs.name for rs in rule_sets),
     )
+
+    for chunk in chunks:
+        audit.write_event("chunk_request", **asdict(chunk))
 
     temp_out = output.parent / (output.stem + ".kuroi-tmp" + output.suffix)
     moved = False
