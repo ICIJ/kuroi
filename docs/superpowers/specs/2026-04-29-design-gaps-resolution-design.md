@@ -10,7 +10,7 @@ Date: 2026-04-29.
 
 This spec resolves all 17. Each resolution is small. The aggregate purpose is to make the existing design buildable without further design work for these specific points. New features still get their own specs.
 
-The 17 gaps are grouped into five thematic clusters. Within each gap, the resolution either commits to a behavior (most cases) or commits to constraints any future implementation must honor (gap 17, `--corpus-mode`, deferred to v1.1+).
+The 17 gaps are grouped into five thematic groups. Within each gap, the resolution either commits to a behavior (most cases) or commits to constraints any future implementation must honor (gap 17, `--corpus-mode`, deferred to v1.1+).
 
 ## Changes to `kuroi-design.md`
 
@@ -20,7 +20,7 @@ A follow-up edit to `kuroi-design.md` should:
 - Replace the example `kuroi run leak.pdf --in-place --backup` (line 1027) with `kuroi run leak.pdf --in-place` — `--backup` is not a real flag because backup is mandatory.
 - Add a one-line cross-reference to this spec in the "Open design questions" section noting that the listed open questions for items 4-6, 8 are deferred but the small ambiguities in items 1, 2, 3, 7 are now resolved.
 
-## Cluster 1 — Cost and reproducibility
+## Group 1 — Cost and reproducibility
 
 ### 1.1 Cost estimation formula
 
@@ -72,7 +72,7 @@ Telemetry is removed from the design entirely.
 
 The design's "kuroi never sees your documents" framing is preserved (and strengthened): there is no opt-in path that would change that. Future product needs may revisit, but it is out of scope for this spec.
 
-## Cluster 2 — State persistence
+## Group 2 — State persistence
 
 ### 2.1 Per-finding audit log schema
 
@@ -258,7 +258,7 @@ If the bytes differ from when the session started (`input_sha256` mismatch), kur
 
 Sessions follow the same retention as backups (default 24h); same lazy sweep cleans them up. A session whose backup is expired is also expired.
 
-## Cluster 3 — File handling and UX
+## Group 3 — File handling and UX
 
 ### 3.1 Drag-and-drop path normalization
 
@@ -322,7 +322,7 @@ Backup directory names include 6 random hex characters: `YYYY-MM-DDTHH-MM-SSZ-<r
 
 For batch (`--out-dir`): lock per output file. Two batches with disjoint outputs run concurrently fine; overlapping outputs surface the lock conflict on the first overlap.
 
-## Cluster 4 — CLI surfaces
+## Group 4 — CLI surfaces
 
 ### 4.1 `kuroi diff` output format
 
@@ -404,7 +404,7 @@ note: -vv prints document text to stderr; redirect if recording
 
 This is a per-process warning, not stored anywhere — opening a new terminal earns a fresh warning. The warning never appears under `--json` (the user is already aware they're capturing output).
 
-## Cluster 5 — OCR and validation
+## Group 5 — OCR and validation
 
 ### 5.1 OCR redaction bbox precision
 

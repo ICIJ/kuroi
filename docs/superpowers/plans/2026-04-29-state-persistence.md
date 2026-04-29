@@ -1,4 +1,4 @@
-# Cluster 2 — State persistence implementation plan
+# State persistence implementation plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -6,7 +6,7 @@
 
 Gap 2.4 (`kuroi review` session files) is deferred to the same plan that builds the review TUI; this plan does not touch it.
 
-**Depends on cluster 1.** Task 3 reads `chunks` and `actual_cost` from `cli/run.py`'s scope, both of which are introduced by cluster 1 (tasks 8-10). Land cluster 1 first; if you need to land this plan in isolation, replace `sum(c.tokens_in for c in chunks)` and `actual_cost` with literal `0` and `0.0` and add the real values when cluster 1 lands. Plans 3 and 4 are fully independent of clusters 1 and 2.
+**Depends on the cost-and-reproducibility plan.** Task 3 reads `chunks` and `actual_cost` from `cli/run.py`'s scope, both of which are introduced by that earlier plan (tasks 8-10). Land it first; if you need to land this plan in isolation, replace `sum(c.tokens_in for c in chunks)` and `actual_cost` with literal `0` and `0.0` and add the real values when the cost work lands. The file-handling and CLI-surfaces plans are fully independent of this one.
 
 **Architecture:** `core/audit.py` is restructured around a single `event` discriminator with four event types (`session_start`, `chunk_request`, `finding`, `session_end`). Each event gains the fields specified in section 2.1 of the spec, with text fields hashed by default and an `[audit] include_text` opt-in for plaintext. A new `core/state.py` reads/writes `$XDG_STATE_HOME/kuroi/state.toml` with the same atomic-write pattern used for config. `core/backup.py` gains a `sweep_backups()` function called eagerly from `run` and `undo`, plus a 6-char random suffix on session names. A new `cli/backups.py` Typer app provides `list` and `gc` subcommands.
 
@@ -230,7 +230,7 @@ audit = AuditLog.open(
     input_bytes=len(input_bytes),
     model_version=getattr(provider, "model_version", provider.model),
     instructions=(),
-    config_resolved_from=(),  # populated in cluster 4 with -v
+    config_resolved_from=(),  # populated by the CLI-surfaces plan with -v
 )
 ```
 
@@ -800,7 +800,7 @@ git commit -m "feat(state): add state.toml at XDG_STATE_HOME with atomic write"
 
 ## Task 7: Add 6-char random suffix to backup directory names
 
-**Why this task exists:** Concurrent runs (cluster 3 task 4) require non-colliding backup-dir names even within a second. The lazy sweep parses the timestamp prefix and ignores the suffix.
+**Why this task exists:** Concurrent runs (the file-handling plan adds output locks) require non-colliding backup-dir names even within a second. The lazy sweep parses the timestamp prefix and ignores the suffix.
 
 **Files:**
 - Modify: `src/kuroi/core/backup.py`
@@ -1310,7 +1310,7 @@ git commit -m "feat(cli): add kuroi backups list and gc subcommands"
 - [ ] `uv run pytest tests/ -q` — all green.
 - [ ] `uv run mypy src/` — no errors.
 - [ ] `uv run ruff check src/ tests/` — no warnings.
-- [ ] An audit log written by `kuroi run` contains `event: session_start`, `event: chunk_request` (from cluster 1), `event: finding`, `event: session_end` lines, all with the spec's expanded fields.
+- [ ] An audit log written by `kuroi run` contains `event: session_start`, `event: chunk_request` (from the cost-and-reproducibility plan), `event: finding`, `event: session_end` lines, all with the spec's expanded fields.
 - [ ] A finding event has `text_sha256` and no `text` field by default; setting `[audit] include_text = true` in config flips this.
 - [ ] `kuroi backups list` shows session ages.
 - [ ] `kuroi backups gc --max-age 24` prunes expired backups.
