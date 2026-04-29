@@ -3,6 +3,7 @@
 import typer
 
 import kuroi.cli.diff as _diff_module
+import kuroi.cli.models as _models_module
 import kuroi.cli.run as _run_module
 from kuroi import __version__
 from kuroi.cli.backups import backups_app
@@ -47,3 +48,4 @@ app.add_typer(setup_app, name="setup", help="Interactively configure kuroi.")
 app.add_typer(config_app, name="config", help="Configuration management.")
 app.add_typer(backups_app, name="backups", help="Manage backups.")
 app.command("diff", help="Show what changed between original and redacted.")(_diff_module.diff)
+app.command("models", help="List available LLM providers and models.")(_models_module.models)
