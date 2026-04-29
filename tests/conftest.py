@@ -47,3 +47,17 @@ def make_overlay_pdf(tmp_path: Path) -> Callable[..., Path]:
         return out
 
     return _make
+
+
+@pytest.fixture(autouse=True)
+def _isolate_kuroi_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Keep tests deterministic: clear KUROI_* vars and point XDG_CONFIG_HOME at tmp_path.
+
+    `cli/run.py` (and others) read kuroi config from env + XDG_CONFIG_HOME.
+    Without this fixture, a developer's shell env or real ~/.config/kuroi/config.toml
+    could change test behavior. Tests that exercise these surfaces will set their
+    own values within the test body.
+    """
+    for key in ("KUROI_PROVIDER", "KUROI_MODEL", "KUROI_OLLAMA_URL"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg-config"))
