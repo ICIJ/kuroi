@@ -1,7 +1,7 @@
 """Append-only NDJSON audit log written 0600.
 
-Each `kuroi run` opens one log file. The file contains a session_open header,
-one finding line per applied redaction, and a session_close footer recording
+Each `kuroi run` opens one log file. The file contains a session_start header,
+one finding line per applied redaction, and a session_end footer recording
 verification status. Closure on Python exit even if the process crashes mid-run
 is the caller's responsibility (use the context-manager form).
 """
@@ -42,7 +42,7 @@ class AuditLog:
         log = cls(fh)
         log._write(
             {
-                "event": "session_open",
+                "event": "session_start",
                 "ts": _now_iso(),
                 "original": str(original),
                 "output": str(output),
@@ -62,7 +62,7 @@ class AuditLog:
     def close(self, *, verification_passed: bool, redaction_count: int) -> None:
         self._write(
             {
-                "event": "session_close",
+                "event": "session_end",
                 "ts": _now_iso(),
                 "verification_passed": verification_passed,
                 "redaction_count": redaction_count,

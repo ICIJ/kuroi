@@ -27,11 +27,11 @@ def test_audit_log_writes_session_header_and_findings(tmp_path: Path) -> None:
     finding = json.loads(lines[1])
     footer = json.loads(lines[-1])
 
-    assert header["event"] == "session_open"
+    assert header["event"] == "session_start"
     assert header["provider"] == "anthropic"
     assert finding["event"] == "finding"
     assert finding["kind"] == "email"
-    assert footer["event"] == "session_close"
+    assert footer["event"] == "session_end"
     assert footer["verification_passed"] is True
     assert footer["redaction_count"] == 1
 
