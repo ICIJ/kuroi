@@ -61,3 +61,5 @@ def _isolate_kuroi_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
     for key in ("KUROI_PROVIDER", "KUROI_MODEL", "KUROI_OLLAMA_URL"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg-config"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "xdg-state"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg-data"))
