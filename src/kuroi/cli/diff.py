@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Literal
 
@@ -16,7 +17,6 @@ console = Console()
 Format = Literal["text", "html", "json"]
 
 
-@diff_app.callback(invoke_without_command=True)
 def diff(
     original: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
     redacted: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
@@ -46,7 +46,8 @@ def diff(
         raise AssertionError("unreachable")
 
     if output is None:
-        console.print(rendered)
+        # Use typer.echo (no Rich wrapping/formatting) so JSON stays on one line per record.
+        typer.echo(rendered)
     else:
         output.write_text(rendered, encoding="utf-8")
 
@@ -59,4 +60,20 @@ def render_text(d: Diff) -> str:
         for red in page.redactions:
             x0, y0, x1, y1 = red.bbox
             lines.append(f"  - [{x0:.0f},{y0:.0f},{x1:.0f},{y1:.0f}]  {red.before_text!r}")
+    return "\n".join(lines)
+
+
+def render_json(d: Diff) -> str:
+    lines: list[str] = []
+    for page in d.pages:
+        payload = {
+            "page": page.page_number,
+            "before_text": page.before_text,
+            "after_text": page.after_text,
+            "redactions": [
+                {"bbox": list(r.bbox), "kind": "", "replacement": "", "before_text": r.before_text}
+                for r in page.redactions
+            ],
+        }
+        lines.append(json.dumps(payload, separators=(",", ":")))
     return "\n".join(lines)
