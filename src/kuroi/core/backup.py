@@ -10,8 +10,8 @@ Layout:
 from __future__ import annotations
 
 import json
+import secrets
 import shutil
-import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -74,14 +74,11 @@ def latest_backup(backup_root: Path) -> Backup | None:
 
 
 def _next_timestamp(backup_root: Path) -> str:
-    """Generate a timestamp that is unique within the backup root.
+    """Generate a timestamp with a 6-char random suffix.
 
-    If the current second already has a backup directory, wait briefly so the
-    sort order in latest_backup remains correct.
+    The suffix avoids collisions across concurrent runs even within the same
+    second; the lazy sweep parses the leading timestamp and ignores the suffix.
     """
-    while True:
-        ts = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%SZ")
-        candidate = backup_root / ts
-        if not candidate.exists():
-            return ts
-        time.sleep(0.01)
+    suffix = secrets.token_hex(3)
+    ts = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%SZ")
+    return f"{ts}-{suffix}"
