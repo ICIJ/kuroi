@@ -45,3 +45,21 @@ def test_load_pricing_from_explicit_path(tmp_path: Path) -> None:
     rates = pricing.rates("anthropic", "claude-opus-4-7")
     assert rates.input_per_million == 15.0
     assert rates.output_per_million == 75.0
+
+
+from kuroi.core.pricing import count_tokens
+
+
+def test_count_tokens_short_text() -> None:
+    # 12 chars / 4 = 3, plus the 500-token overhead = 503.
+    assert count_tokens("hello world!") == 503
+
+
+def test_count_tokens_empty_text_includes_overhead() -> None:
+    assert count_tokens("") == 500
+
+
+def test_count_tokens_long_text_scales() -> None:
+    text = "a" * 4000
+    # 4000 / 4 = 1000 tokens, plus 500 overhead = 1500.
+    assert count_tokens(text) == 1500

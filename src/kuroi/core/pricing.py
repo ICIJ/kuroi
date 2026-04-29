@@ -61,3 +61,20 @@ def load_pricing(path: Path | None = None) -> Pricing:
         updated_at=str(raw["updated_at"]),
         providers=providers,
     )
+
+
+PROMPT_OVERHEAD_TOKENS = 500
+"""Static budget for system prompt + JSON schema + output schema hints.
+
+This is a calibration parameter. The post-run divergence note logs cases where
+the actual / estimated cost ratio exceeds 2.0 so this value can be tuned.
+"""
+
+
+def count_tokens(text: str) -> int:
+    """Heuristic token count.
+
+    Uses 4 chars/token (typical for English-leaning content across the major
+    BPE tokenizers). Adds `PROMPT_OVERHEAD_TOKENS` for the kuroi-side prompt.
+    """
+    return len(text) // 4 + PROMPT_OVERHEAD_TOKENS
