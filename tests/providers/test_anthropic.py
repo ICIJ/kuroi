@@ -92,7 +92,7 @@ def test_detect_redactions_round_trips_through_stub_client() -> None:
     provider = AnthropicProvider(model="claude-opus-4-7", client=client)
     pages = (_page(1, ["Hello", "Sarah", "Chen"]),)
 
-    findings = provider.detect_redactions(pages, llm_category_ids=("person_name",))
+    findings, _chunks = provider.detect_redactions(pages, llm_category_ids=("person_name",))
 
     assert len(findings) == 1
     f = findings[0]
@@ -110,8 +110,92 @@ def test_detect_redactions_short_circuits_with_no_categories() -> None:
     provider = AnthropicProvider(client=client)
     pages = (_page(1, ["Hello"]),)
 
-    findings = provider.detect_redactions(pages, llm_category_ids=())
+    findings, chunks = provider.detect_redactions(pages, llm_category_ids=())
 
     assert findings == []
+    assert chunks == []
     # No call was made because there were no LLM categories.
     assert client.messages.last_call is None
+
+
+import hashlib
+from unittest.mock import MagicMock
+
+from kuroi.providers.anthropic import AnthropicProvider as _AnthropicProvider2
+
+
+def _stub_response(
+    text: str, fingerprint: str | None = None, in_t: int = 100, out_t: int = 20
+) -> MagicMock:
+    block = MagicMock()
+    block.text = text
+    response = MagicMock()
+    response.content = [block]
+    response.usage = MagicMock(input_tokens=in_t, output_tokens=out_t)
+    response.system_fingerprint = fingerprint
+    return response
+
+
+def _one_page() -> tuple[Page, ...]:
+    return (
+        Page(
+            number=1,
+            words=(
+                Word(idx=0, text="Sarah", bbox=(0.0, 0.0, 10.0, 10.0)),
+                Word(idx=1, text="Chen", bbox=(11.0, 0.0, 20.0, 10.0)),
+            ),
+        ),
+    )
+
+
+def test_anthropic_returns_findings_and_chunk_record() -> None:
+    client = MagicMock()
+    client.messages.create.return_value = _stub_response(
+        '{"findings": [{"page": 1, "start": 0, "end": 1, "kind": "person_name", "confidence": "high"}]}',
+        fingerprint=None,
+        in_t=100,
+        out_t=20,
+    )
+    provider = _AnthropicProvider2(model="claude-opus-4-7", client=client)
+
+    findings, chunks = provider.detect_redactions(_one_page(), ("person_name",))
+
+    assert len(findings) == 1
+    assert findings[0].kind == "person_name"
+    assert len(chunks) == 1
+    chunk = chunks[0]
+    assert chunk.chunk_idx == 0
+    assert chunk.pages == (1,)
+    assert chunk.temperature == 0.0
+    assert chunk.seed_requested is None
+    assert chunk.seed_honored is False  # Anthropic SDK never honors a seed
+    assert chunk.tokens_in == 100
+    assert chunk.tokens_out == 20
+    assert len(chunk.prompt_sha256) == 64
+    assert len(chunk.response_sha256) == 64
+
+
+def test_anthropic_records_seed_but_does_not_send_it() -> None:
+    client = MagicMock()
+    client.messages.create.return_value = _stub_response(
+        '{"findings": []}', in_t=10, out_t=2
+    )
+    provider = _AnthropicProvider2(model="claude-opus-4-7", client=client)
+
+    _, chunks = provider.detect_redactions(_one_page(), ("person_name",), seed=42)
+
+    # seed is recorded, never sent.
+    assert chunks[0].seed_requested == 42
+    assert chunks[0].seed_honored is False
+    call_kwargs = client.messages.create.call_args.kwargs
+    assert "seed" not in call_kwargs
+    assert call_kwargs["temperature"] == 0
+
+
+def test_anthropic_no_categories_returns_empty_lists() -> None:
+    client = MagicMock()
+    provider = _AnthropicProvider2(model="claude-opus-4-7", client=client)
+    findings, chunks = provider.detect_redactions(_one_page(), ())
+    assert findings == []
+    assert chunks == []
+    client.messages.create.assert_not_called()
