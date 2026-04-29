@@ -20,8 +20,10 @@ class _StubProvider:
     def __init__(self, model: str) -> None:
         self.model = model
 
-    def detect_redactions(self, pages: Any, llm_category_ids: Any) -> list[Finding]:
-        return []
+    def detect_redactions(
+        self, pages: Any, llm_category_ids: Any, *, seed: int | None = None
+    ) -> tuple[list[Finding], list[Any]]:
+        return [], []
 
 
 def _common_args(pdf: Path, out: Path, tmp_path: Path) -> list[str]:
