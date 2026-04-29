@@ -12,6 +12,7 @@ from kuroi.core.config import (
     ConfigError,
     ConfigOverrides,
     load_config_file,
+    resolve_config,
     write_config_file,
     xdg_config_home,
 )
@@ -112,3 +113,129 @@ def test_write_is_atomic(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
         write_config_file(path, cfg_b)
     assert path.read_text() == original
     assert not (path.parent / (path.name + ".tmp")).exists() or True  # tmp may or may not be cleaned
+
+
+# ---------------------------------------------------------------------------
+# resolve_config tests
+# ---------------------------------------------------------------------------
+
+
+def _file(tmp_path: Path, body: str) -> Path:
+    path = tmp_path / "config.toml"
+    path.write_text(body)
+    return path
+
+
+def test_resolve_uses_built_in_defaults_when_nothing_set(tmp_path: Path) -> None:
+    cfg = resolve_config(ConfigOverrides(), env={}, file_path=tmp_path / "missing.toml")
+    assert cfg.provider == "anthropic"
+    assert cfg.model == "claude-opus-4-7"
+    assert cfg.ollama_url == "http://localhost:11434"
+
+
+def test_resolve_reads_provider_and_model_from_file(tmp_path: Path) -> None:
+    path = _file(
+        tmp_path,
+        'provider = "ollama"\nmodel = "llama3.1:8b"\n\n[ollama]\nurl = "http://h:1"\n',
+    )
+    cfg = resolve_config(ConfigOverrides(), env={}, file_path=path)
+    assert cfg.provider == "ollama"
+    assert cfg.model == "llama3.1:8b"
+    assert cfg.ollama_url == "http://h:1"
+
+
+def test_resolve_env_beats_file(tmp_path: Path) -> None:
+    path = _file(tmp_path, 'provider = "anthropic"\nmodel = "claude-opus-4-7"\n')
+    cfg = resolve_config(
+        ConfigOverrides(),
+        env={"KUROI_PROVIDER": "ollama", "KUROI_MODEL": "llama3.1:8b"},
+        file_path=path,
+    )
+    assert cfg.provider == "ollama"
+    assert cfg.model == "llama3.1:8b"
+
+
+def test_resolve_cli_beats_env(tmp_path: Path) -> None:
+    cfg = resolve_config(
+        ConfigOverrides(provider="anthropic", model="claude-haiku-4-5-20251001"),
+        env={"KUROI_PROVIDER": "ollama", "KUROI_MODEL": "llama3.1:8b"},
+        file_path=tmp_path / "missing.toml",
+    )
+    assert cfg.provider == "anthropic"
+    assert cfg.model == "claude-haiku-4-5-20251001"
+
+
+def test_resolve_per_key_mixing(tmp_path: Path) -> None:
+    """provider from file, model from CLI, ollama_url from env."""
+    path = _file(tmp_path, 'provider = "ollama"\nmodel = "old-model"\n')
+    cfg = resolve_config(
+        ConfigOverrides(model="llama3.1:70b"),
+        env={"KUROI_OLLAMA_URL": "http://env-host:11434"},
+        file_path=path,
+    )
+    assert cfg.provider == "ollama"
+    assert cfg.model == "llama3.1:70b"
+    assert cfg.ollama_url == "http://env-host:11434"
+
+
+def test_resolve_kuroi_ollama_url_env(tmp_path: Path) -> None:
+    cfg = resolve_config(
+        ConfigOverrides(),
+        env={"KUROI_OLLAMA_URL": "http://example:99"},
+        file_path=tmp_path / "missing.toml",
+    )
+    assert cfg.ollama_url == "http://example:99"
+
+
+def test_resolve_unknown_provider_raises(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError) as exc:
+        resolve_config(
+            ConfigOverrides(provider="bogus"),
+            env={},
+            file_path=tmp_path / "missing.toml",
+        )
+    assert "bogus" in str(exc.value)
+
+
+def test_resolve_ollama_with_no_model_raises(tmp_path: Path) -> None:
+    """Ollama has no built-in default model; resolution must require one."""
+    with pytest.raises(ConfigError) as exc:
+        resolve_config(
+            ConfigOverrides(provider="ollama"),
+            env={},
+            file_path=tmp_path / "missing.toml",
+        )
+    msg = str(exc.value)
+    assert "Ollama" in msg or "ollama" in msg
+    assert "model" in msg.lower()
+
+
+def test_resolve_anthropic_with_no_model_uses_default(tmp_path: Path) -> None:
+    cfg = resolve_config(
+        ConfigOverrides(provider="anthropic"),
+        env={},
+        file_path=tmp_path / "missing.toml",
+    )
+    assert cfg.model == "claude-opus-4-7"
+
+
+def test_resolve_rejects_wrong_type_in_file(tmp_path: Path) -> None:
+    path = _file(tmp_path, "provider = 7\n")
+    with pytest.raises(ConfigError) as exc:
+        resolve_config(ConfigOverrides(), env={}, file_path=path)
+    assert "provider" in str(exc.value)
+    assert "string" in str(exc.value)
+
+
+def test_resolve_rejects_wrong_type_in_nested_table(tmp_path: Path) -> None:
+    path = _file(tmp_path, '[ollama]\nurl = 7\n')
+    with pytest.raises(ConfigError) as exc:
+        resolve_config(ConfigOverrides(), env={}, file_path=path)
+    assert "ollama.url" in str(exc.value) or "url" in str(exc.value)
+    assert "string" in str(exc.value)
+
+
+def test_resolve_invalid_toml_raises(tmp_path: Path) -> None:
+    path = _file(tmp_path, "this is not toml ===\n")
+    with pytest.raises(ConfigError):
+        resolve_config(ConfigOverrides(), env={}, file_path=path)

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -100,3 +101,78 @@ def write_config_file(path: Path, config: Config) -> None:
     except OSError:
         tmp.unlink(missing_ok=True)
         raise
+
+
+VALID_PROVIDERS: tuple[ProviderName, ...] = ("anthropic", "ollama")
+
+
+def _read_string(data: dict[str, Any], key: str, *, label: str | None = None) -> str | None:
+    """Pull a string value at `key` (dot-path supported, one level deep) from `data`.
+
+    Returns None if the key is absent. Raises `ConfigError` if the key is present
+    but not a string.
+    """
+    if "." in key:
+        head, tail = key.split(".", 1)
+        nested = data.get(head)
+        if nested is None:
+            return None
+        if not isinstance(nested, dict):
+            raise ConfigError(f"Expected table for `{head}`, got {type(nested).__name__}")
+        return _read_string(nested, tail, label=label or key)
+    if key not in data:
+        return None
+    value = data[key]
+    if not isinstance(value, str):
+        raise ConfigError(
+            f"Expected string for `{label or key}`, got {type(value).__name__}"
+        )
+    return value
+
+
+def resolve_config(
+    overrides: ConfigOverrides,
+    *,
+    env: Mapping[str, str],
+    file_path: Path,
+) -> Config:
+    """Resolve a `Config` by walking CLI → env → file → built-in defaults.
+
+    Resolution is per-key. A `ConfigError` is raised if any key is invalid
+    (unknown provider, wrong type in the file, missing required Ollama model).
+    """
+    file_data = load_config_file(file_path)
+
+    provider_raw = (
+        overrides.provider
+        or env.get("KUROI_PROVIDER")
+        or _read_string(file_data, "provider")
+        or "anthropic"
+    )
+    if provider_raw not in VALID_PROVIDERS:
+        raise ConfigError(
+            f"Unknown provider: {provider_raw!r}. Expected one of {list(VALID_PROVIDERS)}."
+        )
+    provider: ProviderName = provider_raw
+
+    model = (
+        overrides.model
+        or env.get("KUROI_MODEL")
+        or _read_string(file_data, "model")
+    )
+    if model is None:
+        if provider == "anthropic":
+            model = DEFAULT_ANTHROPIC_MODEL
+        else:
+            raise ConfigError(
+                "No Ollama model configured. Run `kuroi setup` or pass --model."
+            )
+
+    ollama_url = (
+        overrides.ollama_url
+        or env.get("KUROI_OLLAMA_URL")
+        or _read_string(file_data, "ollama.url")
+        or DEFAULT_OLLAMA_URL
+    )
+
+    return Config(provider=provider, model=model, ollama_url=ollama_url)
