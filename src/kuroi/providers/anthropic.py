@@ -6,10 +6,13 @@ they can be unit-tested against pure data with no SDK involvement.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import time
 from typing import Any
 
+from kuroi.core.audit_records import ChunkRecord
 from kuroi.core.findings import Finding
 from kuroi.core.pdf import Page, serialize_for_llm
 from kuroi.providers._shared import parse_findings_payload
@@ -85,19 +88,49 @@ class AnthropicProvider:
         self,
         pages: tuple[Page, ...],
         llm_category_ids: tuple[str, ...],
-    ) -> list[Finding]:
+        *,
+        seed: int | None = None,
+    ) -> tuple[list[Finding], list[ChunkRecord]]:
         if not llm_category_ids:
-            return []
+            return [], []
         user_prompt = build_user_prompt(pages, llm_category_ids)
+        prompt_sha = hashlib.sha256(user_prompt.encode("utf-8")).hexdigest()
+
+        started = time.monotonic()
         response = self._client.messages.create(
             model=self.model,
             max_tokens=self._max_tokens,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_prompt}],
+            temperature=0,  # always; --seed support is best-effort
         )
-        text = "".join(block.text for block in response.content if hasattr(block, "text"))
+        duration_ms = int((time.monotonic() - started) * 1000)
+
+        text = "".join(
+            block.text for block in response.content if hasattr(block, "text")
+        )
+        response_sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+        usage = getattr(response, "usage", None)
+        tokens_in = int(getattr(usage, "input_tokens", 0)) if usage else 0
+        tokens_out = int(getattr(usage, "output_tokens", 0)) if usage else 0
+
+        chunk = ChunkRecord(
+            chunk_idx=0,
+            pages=tuple(p.number for p in pages),
+            temperature=0.0,
+            seed_requested=seed,
+            seed_honored=False,  # Anthropic SDK does not expose seed
+            system_fingerprint=getattr(response, "system_fingerprint", None),
+            prompt_sha256=prompt_sha,
+            response_sha256=response_sha,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            duration_ms=duration_ms,
+        )
+
         try:
             payload = json.loads(text)
         except json.JSONDecodeError:
-            return []
-        return parse_findings_payload(payload, pages, source="llm")
+            return [], [chunk]
+        return parse_findings_payload(payload, pages, source="llm"), [chunk]
