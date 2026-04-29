@@ -136,3 +136,35 @@ def test_audit_session_end_carries_full_metrics(tmp_path: Path) -> None:
     assert footer["redactions_rejected"] == 2
     assert footer["redactions_excluded"] == 1
     assert "duration_ms" in footer
+
+
+def test_audit_finding_carries_bbox_and_hashes(tmp_path: Path) -> None:
+    log_path = tmp_path / "f.jsonl"
+    log = AuditLog.open(
+        log_path,
+        original=tmp_path / "i.pdf",
+        output=tmp_path / "o.pdf",
+        provider="anthropic", model="m", rules=(),
+        session_id="x", input_sha256="0" * 64,
+        input_pages=1, input_bytes=1, model_version="m",
+    )
+    log.write_finding(
+        Finding(page=1, start=5, end=6, kind="email", confidence="high",
+                source="rules:pii-en"),
+        bbox=(10.0, 20.0, 30.0, 40.0),
+        redacted_text="x@y.z",
+        context_text="see x@y.z for contact",
+    )
+    log.close(verification_passed=True, redaction_count=1)
+
+    finding = json.loads(log_path.read_text().splitlines()[1])
+    assert finding["event"] == "finding"
+    assert finding["bbox"] == [10.0, 20.0, 30.0, 40.0]
+    assert finding["text_length"] == 5
+    assert len(finding["text_sha256"]) == 64
+    assert len(finding["context_sha256"]) == 64
+    assert finding["decision"] == "applied"
+    assert finding["reviewer"] == "auto"
+    # Plaintext fields default off:
+    assert "text" not in finding
+    assert "context" not in finding
