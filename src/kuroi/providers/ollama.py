@@ -95,7 +95,6 @@ class OllamaProvider:
             response = self._client.post(
                 f"{self._url}/api/chat",
                 json=body,
-                timeout=READ_TIMEOUT_SECONDS,
             )
             response.raise_for_status()
             envelope = response.json()
