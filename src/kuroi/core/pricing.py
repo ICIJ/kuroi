@@ -41,11 +41,22 @@ class Pricing:
 
 
 def load_pricing(path: Path | None = None) -> Pricing:
-    """Load pricing from `path` (for tests) or the packaged default."""
-    if path is None:
-        text = (files("kuroi") / "data" / "pricing.json").read_text(encoding="utf-8")
-    else:
+    """Load pricing.
+
+    Resolution order: explicit `path` (for tests) > user override at
+    `$XDG_DATA_HOME/kuroi/pricing.json` > packaged default.
+    """
+    if path is not None:
         text = path.read_text(encoding="utf-8")
+    else:
+        # Late import to avoid CLI dependency in core
+        import os
+        xdg = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
+        user_file = Path(xdg) / "kuroi" / "pricing.json"
+        if user_file.exists():
+            text = user_file.read_text(encoding="utf-8")
+        else:
+            text = (files("kuroi") / "data" / "pricing.json").read_text(encoding="utf-8")
     raw = json.loads(text)
     providers: dict[str, dict[str, ProviderRates]] = {}
     for provider_name, models in raw["providers"].items():
