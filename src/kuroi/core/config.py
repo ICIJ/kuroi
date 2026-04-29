@@ -36,6 +36,7 @@ class Config:
     model: str
     ollama_url: str
     audit_include_text: bool = False
+    backup_retention_hours: int = 24
 
 
 @dataclass(frozen=True)
@@ -187,9 +188,26 @@ def resolve_config(
             f"Expected boolean for `audit.include_text`, got {type(audit_include_text_raw).__name__}"
         )
 
+    backup_table = file_data.get("backup", {})
+    if not isinstance(backup_table, dict):
+        raise ConfigError(
+            f"Expected table for `backup`, got {type(backup_table).__name__}"
+        )
+    backup_retention_raw = backup_table.get("retention_hours", 24)
+    if (
+        not isinstance(backup_retention_raw, int)
+        or isinstance(backup_retention_raw, bool)
+        or backup_retention_raw < 0
+    ):
+        raise ConfigError(
+            "kuroi requires backups for in-place edits; set retention_hours "
+            "to a positive integer or 0"
+        )
+
     return Config(
         provider=provider,
         model=model,
         ollama_url=ollama_url,
         audit_include_text=audit_include_text_raw,
+        backup_retention_hours=backup_retention_raw,
     )

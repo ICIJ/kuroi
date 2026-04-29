@@ -264,3 +264,28 @@ def test_config_audit_include_text_from_file(tmp_path: Path) -> None:
         file_path=cfg_file,
     )
     assert config.audit_include_text is True
+
+
+def test_config_backup_retention_default_24(tmp_path: Path) -> None:
+    cfg = tmp_path / "c.toml"
+    cfg.write_text('provider = "anthropic"\nmodel = "m"\n')
+    config = resolve_config(ConfigOverrides(), env={}, file_path=cfg)
+    assert config.backup_retention_hours == 24
+
+
+def test_config_backup_retention_zero_means_keep_forever(tmp_path: Path) -> None:
+    cfg = tmp_path / "c.toml"
+    cfg.write_text(
+        'provider = "anthropic"\nmodel = "m"\n[backup]\nretention_hours = 0\n'
+    )
+    config = resolve_config(ConfigOverrides(), env={}, file_path=cfg)
+    assert config.backup_retention_hours == 0
+
+
+def test_config_backup_retention_negative_rejected(tmp_path: Path) -> None:
+    cfg = tmp_path / "c.toml"
+    cfg.write_text(
+        'provider = "anthropic"\nmodel = "m"\n[backup]\nretention_hours = -1\n'
+    )
+    with pytest.raises(ConfigError, match="positive integer or 0"):
+        resolve_config(ConfigOverrides(), env={}, file_path=cfg)
