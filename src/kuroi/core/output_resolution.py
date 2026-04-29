@@ -11,7 +11,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-
 _VERSIONED_RE = re.compile(r"^(?P<stem>.+)\.v(?P<n>\d+)$")
 
 
