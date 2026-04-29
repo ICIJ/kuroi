@@ -158,3 +158,61 @@ def test_run_aborts_when_verification_fails(
 
     assert result.exit_code == 4
     assert not out.exists()
+
+
+import re
+
+from typer.testing import CliRunner as _CliRunner2
+
+runner = _CliRunner2()
+
+
+def test_run_seed_flag_anthropic_prints_not_honored_notice(
+    monkeypatch, make_pdf, tmp_path
+):
+    """When --seed is set against Anthropic, kuroi prints a one-line notice."""
+    monkeypatch.setenv("KUROI_PROVIDER", "anthropic")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    # Stub the SDK's Anthropic client so the run completes deterministically.
+    from kuroi.providers import anthropic as ap
+
+    class _StubResp:
+        content = [type("B", (), {"text": '{"findings": []}'})()]
+        usage = type("U", (), {"input_tokens": 1, "output_tokens": 1})()
+        system_fingerprint = None
+
+    class _StubClient:
+        class messages:  # noqa: N801
+            @staticmethod
+            def create(**kwargs):
+                return _StubResp()
+
+    real_provider = ap.AnthropicProvider
+    monkeypatch.setattr(
+        ap,
+        "AnthropicProvider",
+        lambda **kw: real_provider(
+            client=_StubClient(), model=kw.get("model", "claude-opus-4-7")
+        ),
+    )
+
+    pdf = make_pdf(["dummy text"])
+    out = tmp_path / "out.pdf"
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "-o",
+            str(out),
+            "--seed",
+            "42",
+            "-y",
+            "--backup-dir",
+            str(tmp_path / "backups"),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+    assert "--seed recorded but only temperature=0 is enforced" in result.stdout

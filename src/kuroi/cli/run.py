@@ -55,6 +55,11 @@ def run(
         "--ollama-url",
         help="Base URL of the Ollama daemon. Overrides env and config.",
     ),
+    seed: int | None = typer.Option(
+        None,
+        "--seed",
+        help="Reproducibility seed. Best-effort per provider; recorded in audit.",
+    ),
 ) -> None:
     """Redact a PDF using rules and/or instructions, with verification gating."""
     rule_set_names = tuple(name.strip() for name in rules.split(",") if name.strip())
@@ -87,7 +92,14 @@ def run(
         llm_cat_ids.extend(c.id for c in llm_categories(rs))
 
     provider = make_provider(config)
-    provider_findings, _chunks = provider.detect_redactions(pages, tuple(llm_cat_ids))
+    if seed is not None and provider.name == "anthropic":
+        console.print(
+            "  [yellow]note:[/] --seed recorded but only temperature=0 "
+            "is enforced for this provider"
+        )
+    provider_findings, _chunks = provider.detect_redactions(
+        pages, tuple(llm_cat_ids), seed=seed
+    )
     findings.extend(provider_findings)
 
     if not findings:
