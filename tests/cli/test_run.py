@@ -216,3 +216,50 @@ def test_run_seed_flag_anthropic_prints_not_honored_notice(
         ],
     )
     assert "--seed recorded but only temperature=0 is enforced" in result.stdout
+
+
+def test_run_displays_pre_flight_cost_estimate(monkeypatch, make_pdf, tmp_path):
+    monkeypatch.setenv("KUROI_PROVIDER", "anthropic")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    from kuroi.providers import anthropic as ap
+
+    class _StubResp:
+        content = [type("B", (), {"text": '{"findings": []}'})()]
+        usage = type("U", (), {"input_tokens": 100, "output_tokens": 20})()
+        system_fingerprint = None
+
+    class _StubClient:
+        class messages:  # noqa: N801
+            @staticmethod
+            def create(**kwargs):
+                return _StubResp()
+
+    real_provider = ap.AnthropicProvider
+    monkeypatch.setattr(
+        ap,
+        "AnthropicProvider",
+        lambda **kw: real_provider(
+            client=_StubClient(), model=kw.get("model", "claude-opus-4-7")
+        ),
+    )
+
+    pdf = make_pdf(["short"])
+    out = tmp_path / "out.pdf"
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "-o",
+            str(out),
+            "-y",
+            "--backup-dir",
+            str(tmp_path / "backups"),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+    assert "Estimated cost" in result.stdout
+    assert "$" in result.stdout

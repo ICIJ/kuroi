@@ -18,7 +18,8 @@ from kuroi.core.config import (
     xdg_config_home,
 )
 from kuroi.core.findings import Finding
-from kuroi.core.pdf import extract_word_index
+from kuroi.core.pdf import extract_word_index, serialize_for_llm
+from kuroi.core.pricing import count_tokens, estimate_cost, load_pricing
 from kuroi.core.redaction import apply_redactions
 from kuroi.core.rules import apply_regex_rules, llm_categories, load_rule_set
 from kuroi.core.verification import verify_pdf
@@ -85,6 +86,16 @@ def run(
 
     pages = extract_word_index(pdf)
 
+    pricing = load_pricing()
+    input_tokens = count_tokens(serialize_for_llm(pages))
+    estimated_cost = estimate_cost(
+        pricing, config.provider, config.model, input_tokens=input_tokens
+    )
+    console.print(
+        f"  Estimated cost: ${estimated_cost:.4f}  "
+        f"({input_tokens} input tokens × {config.provider}/{config.model})"
+    )
+
     findings: list[Finding] = []
     llm_cat_ids: list[str] = []
     for rs in rule_sets:
@@ -97,10 +108,11 @@ def run(
             "  [yellow]note:[/] --seed recorded but only temperature=0 "
             "is enforced for this provider"
         )
-    provider_findings, _chunks = provider.detect_redactions(
+    provider_findings, chunks = provider.detect_redactions(
         pages, tuple(llm_cat_ids), seed=seed
     )
     findings.extend(provider_findings)
+    actual_cost = 0.0
 
     if not findings:
         console.print(f"  No redactions proposed for {pdf}. Exiting.")
@@ -152,6 +164,21 @@ def run(
         shutil.move(str(temp_out), str(output))
         moved = True
         audit.close(verification_passed=True, redaction_count=len(findings))
+
+        actual_in = sum(c.tokens_in for c in chunks)
+        actual_out = sum(c.tokens_out for c in chunks)
+        if actual_in > 0:
+            rates = pricing.rates(config.provider, config.model)
+            actual_cost = (
+                actual_in / 1_000_000 * rates.input_per_million
+                + actual_out / 1_000_000 * rates.output_per_million
+            )
+            if estimated_cost > 0 and actual_cost / estimated_cost > 2.0:
+                console.print(
+                    "  [yellow]note:[/] cost estimate diverged from actual "
+                    f"(${estimated_cost:.4f} → ${actual_cost:.4f})"
+                )
+
         console.print(f"  Wrote {output}")
         console.print(f"  Audit: {audit_path}")
     except typer.Exit:
