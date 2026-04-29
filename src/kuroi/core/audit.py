@@ -32,6 +32,13 @@ class AuditLog:
         provider: str,
         model: str,
         rules: tuple[str, ...],
+        session_id: str,
+        input_sha256: str,
+        input_pages: int,
+        input_bytes: int,
+        model_version: str,
+        instructions: tuple[dict[str, Any], ...] = (),
+        config_resolved_from: tuple[str, ...] = (),
     ) -> AuditLog:
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         # mkdir's mode is subject to umask; force the right mode after creation.
@@ -43,12 +50,21 @@ class AuditLog:
         log._write(
             {
                 "event": "session_start",
-                "ts": _now_iso(),
-                "original": str(original),
-                "output": str(output),
+                "audit_schema_version": 1,
+                "session_id": session_id,
+                "ts_start": _now_iso(),
+                "kuroi_version": _kuroi_version(),
+                "input_path": str(original),
+                "input_sha256": input_sha256,
+                "input_pages": input_pages,
+                "input_bytes": input_bytes,
+                "output_path": str(output),
                 "provider": provider,
                 "model": model,
+                "model_version": model_version,
                 "rules": list(rules),
+                "instructions": list(instructions),
+                "config_resolved_from": list(config_resolved_from),
             }
         )
         return log
@@ -78,3 +94,8 @@ class AuditLog:
 
 def _now_iso() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _kuroi_version() -> str:
+    from kuroi import __version__
+    return __version__

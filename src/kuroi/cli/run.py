@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
+import uuid
 from dataclasses import asdict
 from pathlib import Path
 
@@ -126,6 +128,11 @@ def run(
         if not confirm:
             raise typer.Exit(code=0)
 
+    with pdf.open("rb") as fh:
+        input_bytes = fh.read()
+    input_sha256 = hashlib.sha256(input_bytes).hexdigest()
+    session_id = str(uuid.uuid4())
+
     backup = create_backup(pdf, backup_root=backup_dir)
     audit_path = audit_dir / f"{backup.timestamp}.jsonl"
     audit = AuditLog.open(
@@ -135,6 +142,13 @@ def run(
         provider=provider.name,
         model=provider.model,
         rules=tuple(rs.name for rs in rule_sets),
+        session_id=session_id,
+        input_sha256=input_sha256,
+        input_pages=len(pages),
+        input_bytes=len(input_bytes),
+        model_version=getattr(provider, "model_version", provider.model),
+        instructions=(),
+        config_resolved_from=(),  # populated in cluster 4 with -v
     )
 
     for chunk in chunks:
