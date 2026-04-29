@@ -39,3 +39,30 @@ def test_setup_logging_quiet_silences_info(caplog):
     # quiet wins over -v: INFO suppressed, ERROR still flows.
     assert "should-be-silent" not in caplog.text
     assert "error-flows" in caplog.text
+
+
+def test_warn_vv_once_only_emits_once(capsys):
+    from kuroi.core.log import _reset_vv_warning_flag, warn_vv_once
+
+    _reset_vv_warning_flag()
+    warn_vv_once()
+    warn_vv_once()
+    err = capsys.readouterr().err
+    # Warning text appears exactly once even after two calls.
+    assert err.count("note: -vv prints document text") == 1
+
+
+def test_cli_vv_emits_warning_to_stderr():
+    from typer.testing import CliRunner
+
+    from kuroi.cli import app
+    from kuroi.core.log import _reset_vv_warning_flag
+
+    # `--version` is `is_eager=True` and exits before the main callback runs,
+    # so we use `models --json` (a side-effect-free informational subcommand)
+    # to actually exercise the main callback that calls `warn_vv_once`.
+    _reset_vv_warning_flag()
+    runner = CliRunner()
+    result = runner.invoke(app, ["-vv", "models", "--json"])
+    assert result.exit_code == 0
+    assert "note: -vv prints document text" in result.stderr
