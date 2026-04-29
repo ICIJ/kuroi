@@ -38,8 +38,8 @@ def test_audit_log_writes_session_header_and_findings(tmp_path: Path) -> None:
     assert finding["event"] == "finding"
     assert finding["kind"] == "email"
     assert footer["event"] == "session_end"
-    assert footer["verification_passed"] is True
-    assert footer["redaction_count"] == 1
+    assert footer["status"] == "ok"
+    assert footer["redactions_applied"] == 1
 
 
 def test_audit_log_file_is_mode_0600(tmp_path: Path) -> None:
@@ -94,3 +94,45 @@ def test_audit_session_start_includes_full_provenance(tmp_path: Path) -> None:
     assert header["instructions"] == []
     assert header["rules"] == ["pii-en"]
     assert header["config_resolved_from"] == ["flag", "user_config"]
+
+
+def test_audit_session_end_carries_full_metrics(tmp_path: Path) -> None:
+    log_path = tmp_path / "session.jsonl"
+    log = AuditLog.open(
+        log_path,
+        original=tmp_path / "in.pdf",
+        output=tmp_path / "out.pdf",
+        provider="anthropic",
+        model="claude-opus-4-7",
+        rules=(),
+        session_id="x",
+        input_sha256="0" * 64,
+        input_pages=1,
+        input_bytes=100,
+        model_version="claude-opus-4-7",
+    )
+    log.close(
+        verification_passed=True,
+        redaction_count=5,
+        tokens_in=1000,
+        tokens_out=200,
+        cost_usd=0.0285,
+        output_sha256="e" * 64,
+        verify_leak_count=0,
+        redactions_rejected=2,
+        redactions_excluded=1,
+    )
+
+    footer = json.loads(log_path.read_text().splitlines()[-1])
+    assert footer["event"] == "session_end"
+    assert footer["status"] == "ok"
+    assert footer["tokens_in"] == 1000
+    assert footer["tokens_out"] == 200
+    assert footer["cost_usd"] == 0.0285
+    assert footer["output_sha256"] == "e" * 64
+    assert footer["verify_result"] == "pass"
+    assert footer["verify_leak_count"] == 0
+    assert footer["redactions_applied"] == 5
+    assert footer["redactions_rejected"] == 2
+    assert footer["redactions_excluded"] == 1
+    assert "duration_ms" in footer

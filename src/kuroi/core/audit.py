@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
@@ -21,6 +22,7 @@ from kuroi.core.findings import Finding
 class AuditLog:
     def __init__(self, fh: IO[str]) -> None:
         self._fh = fh
+        self._started = time.monotonic()
 
     @classmethod
     def open(
@@ -75,13 +77,41 @@ class AuditLog:
     def write_event(self, event: str, **fields: Any) -> None:
         self._write({"event": event, "ts": _now_iso(), **fields})
 
-    def close(self, *, verification_passed: bool, redaction_count: int) -> None:
+    def close(
+        self,
+        *,
+        verification_passed: bool,
+        redaction_count: int,
+        tokens_in: int = 0,
+        tokens_out: int = 0,
+        cost_usd: float = 0.0,
+        output_sha256: str = "",
+        verify_leak_count: int = 0,
+        redactions_rejected: int = 0,
+        redactions_excluded: int = 0,
+    ) -> None:
+        duration_ms = int((time.monotonic() - self._started) * 1000)
+        if verification_passed:
+            status, verify_result = "ok", "pass"
+        elif verify_leak_count > 0:
+            status, verify_result = "verify_failed", "fail"
+        else:
+            status, verify_result = "failed", "skipped"
         self._write(
             {
                 "event": "session_end",
-                "ts": _now_iso(),
-                "verification_passed": verification_passed,
-                "redaction_count": redaction_count,
+                "ts_end": _now_iso(),
+                "status": status,
+                "redactions_applied": redaction_count,
+                "redactions_rejected": redactions_rejected,
+                "redactions_excluded": redactions_excluded,
+                "duration_ms": duration_ms,
+                "tokens_in": tokens_in,
+                "tokens_out": tokens_out,
+                "cost_usd": cost_usd,
+                "verify_result": verify_result,
+                "verify_leak_count": verify_leak_count,
+                "output_sha256": output_sha256,
             }
         )
         self._fh.close()
