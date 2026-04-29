@@ -35,6 +35,7 @@ class Config:
     provider: ProviderName
     model: str
     ollama_url: str
+    audit_include_text: bool = False
 
 
 @dataclass(frozen=True)
@@ -175,4 +176,20 @@ def resolve_config(
         or DEFAULT_OLLAMA_URL
     )
 
-    return Config(provider=provider, model=model, ollama_url=ollama_url)
+    audit_table = file_data.get("audit", {})
+    if not isinstance(audit_table, dict):
+        raise ConfigError(
+            f"Expected table for `audit`, got {type(audit_table).__name__}"
+        )
+    audit_include_text_raw = audit_table.get("include_text", False)
+    if not isinstance(audit_include_text_raw, bool):
+        raise ConfigError(
+            f"Expected boolean for `audit.include_text`, got {type(audit_include_text_raw).__name__}"
+        )
+
+    return Config(
+        provider=provider,
+        model=model,
+        ollama_url=ollama_url,
+        audit_include_text=audit_include_text_raw,
+    )
