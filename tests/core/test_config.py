@@ -112,7 +112,8 @@ def test_write_is_atomic(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     with pytest.raises(OSError):
         write_config_file(path, cfg_b)
     assert path.read_text() == original
-    assert not (path.parent / (path.name + ".tmp")).exists() or True  # tmp may or may not be cleaned
+    # write_config_file unlinks the .tmp file in its except block before re-raising
+    assert not (path.parent / (path.name + ".tmp")).exists()
 
 
 # ---------------------------------------------------------------------------
