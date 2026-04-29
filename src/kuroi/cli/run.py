@@ -173,7 +173,14 @@ def run(
                     for leak in report.leaks
                 ],
             )
-            audit.close(verification_passed=False, redaction_count=len(findings))
+            audit.close(
+                verification_passed=False,
+                redaction_count=len(findings),
+                tokens_in=sum(c.tokens_in for c in chunks),
+                tokens_out=sum(c.tokens_out for c in chunks),
+                cost_usd=0.0,
+                verify_leak_count=len(report.leaks),
+            )
             console.print(
                 f"  [red]Verification FAILED.[/] {len(report.leaks)} leaks; output not written."
             )
@@ -181,7 +188,6 @@ def run(
 
         shutil.move(str(temp_out), str(output))
         moved = True
-        audit.close(verification_passed=True, redaction_count=len(findings))
 
         actual_in = sum(c.tokens_in for c in chunks)
         actual_out = sum(c.tokens_out for c in chunks)
@@ -197,6 +203,17 @@ def run(
                     f"(${estimated_cost:.4f} → ${actual_cost:.4f})"
                 )
 
+        with output.open("rb") as fh:
+            output_sha256 = hashlib.sha256(fh.read()).hexdigest()
+
+        audit.close(
+            verification_passed=True,
+            redaction_count=len(findings),
+            tokens_in=actual_in,
+            tokens_out=actual_out,
+            cost_usd=actual_cost,
+            output_sha256=output_sha256,
+        )
         console.print(f"  Wrote {output}")
         console.print(f"  Audit: {audit_path}")
     except typer.Exit:
