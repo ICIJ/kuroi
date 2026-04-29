@@ -13,7 +13,7 @@ import typer
 from rich.console import Console
 
 from kuroi.core.audit import AuditLog
-from kuroi.core.backup import create_backup
+from kuroi.core.backup import create_backup, sweep_backups
 from kuroi.core.config import (
     ConfigError,
     ConfigOverrides,
@@ -86,6 +86,8 @@ def run(
     except ConfigError as exc:
         console.print(f"[red]Config error:[/] {exc}")
         raise typer.Exit(code=2) from exc
+
+    sweep_backups(backup_dir, retention_hours=config.backup_retention_hours)
 
     pages = extract_word_index(pdf)
 

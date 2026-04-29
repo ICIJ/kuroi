@@ -1,5 +1,6 @@
 import json as _json2
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -169,7 +170,6 @@ def test_run_seed_flag_anthropic_prints_not_honored_notice(
     """When --seed is set against Anthropic, kuroi prints a one-line notice."""
     monkeypatch.setenv("KUROI_PROVIDER", "anthropic")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    # Stub the SDK's Anthropic client so the run completes deterministically.
     from kuroi.providers import anthropic as ap
 
     class _StubResp:
@@ -266,8 +266,6 @@ def test_run_writes_chunk_request_audit_event(monkeypatch, make_pdf, tmp_path):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     audit_dir = tmp_path / "audit"
 
-    # Patch AnthropicProvider.__init__ to install a stub client. This is the
-    # only reliable way because the factory imports the class at module load.
     class _StubResp2:
         content: ClassVar = [type("B", (), {"text": '{"findings": []}'})()]
         usage: ClassVar = type("U", (), {"input_tokens": 50, "output_tokens": 5})()
@@ -331,3 +329,38 @@ def test_run_writes_chunk_request_audit_event(monkeypatch, make_pdf, tmp_path):
     assert chunk_lines[0]["tokens_in"] == 50
     assert chunk_lines[0]["tokens_out"] == 5
     assert chunk_lines[0]["seed_honored"] is False
+
+
+def test_run_sweeps_expired_backups(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    stub_anthropic_client: dict[str, Any],
+) -> None:
+    backup_dir = tmp_path / "backups"
+    backup_dir.mkdir()
+    old_name = (datetime.now(UTC) - timedelta(hours=48)).strftime(
+        "%Y-%m-%dT%H-%M-%SZ-deadbe"
+    )
+    (backup_dir / old_name).mkdir()
+    (backup_dir / old_name / "manifest.json").write_text("{}")
+
+    pdf = make_pdf(["Contact alice@example.com today"])
+    out = tmp_path / "out.pdf"
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "-o",
+            str(out),
+            "-y",
+            "--backup-dir",
+            str(backup_dir),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert not (backup_dir / old_name).exists()

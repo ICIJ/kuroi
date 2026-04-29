@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
 import typer
 from rich.console import Console
 
-from kuroi.core.backup import latest_backup
+from kuroi.core.backup import latest_backup, sweep_backups
+from kuroi.core.config import ConfigError, ConfigOverrides, resolve_config, xdg_config_home
 
 undo_app = typer.Typer(invoke_without_command=True)
 console = Console()
@@ -23,6 +25,18 @@ def undo(
     ),
 ) -> None:
     """Restore the original file from the most recent backup."""
+    try:
+        config = resolve_config(
+            ConfigOverrides(),
+            env=os.environ,
+            file_path=xdg_config_home() / "kuroi" / "config.toml",
+        )
+    except ConfigError as exc:
+        console.print(f"[red]Config error:[/] {exc}")
+        raise typer.Exit(code=2) from exc
+
+    sweep_backups(backup_dir, retention_hours=config.backup_retention_hours)
+
     bak = latest_backup(backup_dir)
     if bak is None:
         console.print(f"  No backup found in {backup_dir}.")
