@@ -40,3 +40,24 @@ def test_diff_json_format_emits_ndjson(tmp_path: Path):
     assert "after_text" in parsed[0]
     assert "redactions" in parsed[0]
     assert isinstance(parsed[0]["redactions"], list)
+
+
+def test_diff_html_format_writes_self_contained_file(tmp_path: Path):
+    orig, red = _make_pair(tmp_path, "Sarah Chen was here", "         was here")
+    out = tmp_path / "diff.html"
+    result = runner.invoke(app, [
+        "diff", str(orig), str(red), "--format", "html", "-o", str(out),
+    ])
+    assert result.exit_code == 0
+    body = out.read_text()
+    assert "<html" in body
+    assert "<style" in body  # inline CSS, no external stylesheet
+    assert "Sarah" in body
+    assert "Page 1" in body
+
+
+def test_diff_html_format_refuses_tty(tmp_path: Path):
+    orig, red = _make_pair(tmp_path, "x", "y")
+    result = runner.invoke(app, ["diff", str(orig), str(red), "--format", "html"])
+    assert result.exit_code == 2
+    assert "requires -o" in result.stdout
