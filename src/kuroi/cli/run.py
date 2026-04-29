@@ -169,6 +169,7 @@ def run(
                 bbox=bbox,
                 redacted_text=redacted_text,
                 context_text=context_text,
+                include_text=config.audit_include_text,
             )
 
         # Apply to a temp file. Only promote to output if verification passes.

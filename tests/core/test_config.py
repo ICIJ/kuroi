@@ -240,3 +240,27 @@ def test_resolve_invalid_toml_raises(tmp_path: Path) -> None:
     path = _file(tmp_path, "this is not toml ===\n")
     with pytest.raises(ConfigError):
         resolve_config(ConfigOverrides(), env={}, file_path=path)
+
+
+def test_config_audit_include_text_default_false(tmp_path: Path) -> None:
+    cfg_file = tmp_path / "config.toml"
+    cfg_file.write_text('provider = "anthropic"\nmodel = "m"\n')
+    config = resolve_config(
+        ConfigOverrides(),
+        env={},
+        file_path=cfg_file,
+    )
+    assert config.audit_include_text is False
+
+
+def test_config_audit_include_text_from_file(tmp_path: Path) -> None:
+    cfg_file = tmp_path / "config.toml"
+    cfg_file.write_text(
+        'provider = "anthropic"\nmodel = "m"\n\n[audit]\ninclude_text = true\n'
+    )
+    config = resolve_config(
+        ConfigOverrides(),
+        env={},
+        file_path=cfg_file,
+    )
+    assert config.audit_include_text is True
