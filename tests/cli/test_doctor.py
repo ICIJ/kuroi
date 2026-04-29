@@ -1,3 +1,4 @@
+import pytest
 from typer.testing import CliRunner
 
 from kuroi.cli import app
@@ -20,3 +21,32 @@ def test_doctor_reports_anthropic_key_set(monkeypatch) -> None:
     result = runner.invoke(app, ["doctor"])
     assert "Anthropic API key" in result.stdout
     assert "set" in result.stdout
+
+
+def test_doctor_reports_resolved_provider_and_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KUROI_PROVIDER", "ollama")
+    monkeypatch.setenv("KUROI_MODEL", "llama3.1:8b")
+    monkeypatch.setenv("KUROI_OLLAMA_URL", "http://localhost:11434")
+
+    # Stub the reachability probe to "reachable" so this test focuses on display.
+    from kuroi.cli import doctor as doctor_module
+    monkeypatch.setattr(doctor_module, "probe_ollama_models", lambda url: ["llama3.1:8b"])
+
+    result = CliRunner().invoke(app, ["doctor"])
+    assert "Provider" in result.stdout
+    assert "ollama" in result.stdout
+    assert "llama3.1:8b" in result.stdout
+
+
+def test_doctor_reports_ollama_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KUROI_PROVIDER", "ollama")
+    monkeypatch.setenv("KUROI_MODEL", "llama3.1:8b")
+    monkeypatch.setenv("KUROI_OLLAMA_URL", "http://localhost:11434")
+
+    from kuroi.cli import doctor as doctor_module
+    monkeypatch.setattr(doctor_module, "probe_ollama_models", lambda url: None)
+
+    result = CliRunner().invoke(app, ["doctor"])
+    assert "unreachable" in result.stdout.lower()
+    # No traceback should leak into output
+    assert "Traceback" not in result.stdout

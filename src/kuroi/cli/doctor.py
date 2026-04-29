@@ -12,6 +12,13 @@ import typer
 from rich.console import Console
 
 from kuroi import __version__
+from kuroi.cli.setup import probe_ollama_models
+from kuroi.core.config import (
+    ConfigError,
+    ConfigOverrides,
+    resolve_config,
+    xdg_config_home,
+)
 
 doctor_app = typer.Typer(invoke_without_command=True)
 console = Console()
@@ -52,6 +59,34 @@ def _binary_check(name: str) -> CheckResult:
     return CheckResult(name, "warn", f"{name} not found in PATH (optional for v0.1)")
 
 
+def _config_checks() -> list[CheckResult]:
+    """Resolve config and report it. If provider=ollama, probe reachability."""
+    try:
+        config = resolve_config(
+            ConfigOverrides(),
+            env=os.environ,
+            file_path=xdg_config_home() / "kuroi" / "config.toml",
+        )
+    except ConfigError as exc:
+        return [CheckResult("Config", "problem", f"{exc}")]
+    results: list[CheckResult] = [
+        CheckResult("Provider", "ok", config.provider),
+        CheckResult("Model", "ok", config.model),
+    ]
+    if config.provider == "ollama":
+        results.append(CheckResult("Ollama URL", "ok", config.ollama_url))
+        models = probe_ollama_models(config.ollama_url)
+        if models is None:
+            results.append(
+                CheckResult("Ollama reachability", "problem", f"unreachable at {config.ollama_url}")
+            )
+        else:
+            results.append(
+                CheckResult("Ollama reachability", "ok", f"{len(models)} model(s) installed")
+            )
+    return results
+
+
 @doctor_app.callback(invoke_without_command=True)
 def doctor() -> None:
     """Check that everything kuroi needs is in working order."""
@@ -61,6 +96,7 @@ def doctor() -> None:
         _anthropic_key(),
         _binary_check("tesseract"),
         _binary_check("qpdf"),
+        *_config_checks(),
     ]
 
     glyph = {"ok": "[green]ok[/]", "warn": "[yellow]warn[/]", "problem": "[red]PROBLEM[/]"}
