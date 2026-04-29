@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
@@ -10,12 +11,18 @@ from rich.console import Console
 
 from kuroi.core.audit import AuditLog
 from kuroi.core.backup import create_backup
+from kuroi.core.config import (
+    ConfigError,
+    ConfigOverrides,
+    resolve_config,
+    xdg_config_home,
+)
 from kuroi.core.findings import Finding
 from kuroi.core.pdf import extract_word_index
 from kuroi.core.redaction import apply_redactions
 from kuroi.core.rules import apply_regex_rules, llm_categories, load_rule_set
 from kuroi.core.verification import verify_pdf
-from kuroi.providers.anthropic import AnthropicProvider
+from kuroi.providers.factory import make_provider
 
 console = Console()
 
@@ -33,7 +40,21 @@ def run(
         Path.home() / ".local" / "share" / "kuroi" / "audit",
         "--audit-dir",
     ),
-    model: str = typer.Option("claude-opus-4-7", "--model"),
+    provider_name: str | None = typer.Option(
+        None,
+        "--provider",
+        help="LLM provider: 'anthropic' or 'ollama'. Overrides env and config.",
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Model ID. Overrides env and config.",
+    ),
+    ollama_url: str | None = typer.Option(
+        None,
+        "--ollama-url",
+        help="Base URL of the Ollama daemon. Overrides env and config.",
+    ),
 ) -> None:
     """Redact a PDF using rules and/or instructions, with verification gating."""
     rule_set_names = tuple(name.strip() for name in rules.split(",") if name.strip())
@@ -47,6 +68,16 @@ def run(
         console.print("  [red]Refusing to overwrite the input file.[/] Use a different `-o` path.")
         raise typer.Exit(code=2)
 
+    try:
+        config = resolve_config(
+            ConfigOverrides(provider=provider_name, model=model, ollama_url=ollama_url),
+            env=os.environ,
+            file_path=xdg_config_home() / "kuroi" / "config.toml",
+        )
+    except ConfigError as exc:
+        console.print(f"[red]Config error:[/] {exc}")
+        raise typer.Exit(code=2) from exc
+
     pages = extract_word_index(pdf)
 
     findings: list[Finding] = []
@@ -55,7 +86,7 @@ def run(
         findings.extend(apply_regex_rules(pages, rs))
         llm_cat_ids.extend(c.id for c in llm_categories(rs))
 
-    provider = AnthropicProvider(model=model)
+    provider = make_provider(config)
     findings.extend(provider.detect_redactions(pages, tuple(llm_cat_ids)))
 
     if not findings:
