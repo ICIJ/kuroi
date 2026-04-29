@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from kuroi.core.audit_records import ChunkRecord
 from kuroi.core.findings import Finding
 from kuroi.core.pdf import Page
 
@@ -18,4 +19,6 @@ class Provider(Protocol):
         self,
         pages: tuple[Page, ...],
         llm_category_ids: tuple[str, ...],
-    ) -> list[Finding]: ...
+        *,
+        seed: int | None = None,
+    ) -> tuple[list[Finding], list[ChunkRecord]]: ...
