@@ -2,11 +2,11 @@
 
 import typer
 
+import kuroi.cli.diff as _diff_module
 import kuroi.cli.run as _run_module
 from kuroi import __version__
 from kuroi.cli.backups import backups_app
 from kuroi.cli.config import config_app
-from kuroi.cli.diff import diff_app
 from kuroi.cli.doctor import doctor_app
 from kuroi.cli.setup import setup_app
 from kuroi.cli.undo import undo_app
@@ -46,4 +46,4 @@ app.add_typer(undo_app, name="undo", help="Restore the most recent backup.")
 app.add_typer(setup_app, name="setup", help="Interactively configure kuroi.")
 app.add_typer(config_app, name="config", help="Configuration management.")
 app.add_typer(backups_app, name="backups", help="Manage backups.")
-app.add_typer(diff_app, name="diff", help="Show what changed between original and redacted.")
+app.command("diff", help="Show what changed between original and redacted.")(_diff_module.diff)
