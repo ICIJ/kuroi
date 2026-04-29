@@ -4,6 +4,7 @@ import typer
 
 import kuroi.cli.run as _run_module
 from kuroi import __version__
+from kuroi.cli.config import config_app
 from kuroi.cli.doctor import doctor_app
 from kuroi.cli.setup import setup_app
 from kuroi.cli.undo import undo_app
@@ -41,3 +42,4 @@ app.add_typer(verify_app, name="verify", help="Check an already-redacted PDF for
 app.command("run", help="Redact one or more PDFs.")(_run_module.run)
 app.add_typer(undo_app, name="undo", help="Restore the most recent backup.")
 app.add_typer(setup_app, name="setup", help="Interactively configure kuroi.")
+app.add_typer(config_app, name="config", help="Configuration management.")
