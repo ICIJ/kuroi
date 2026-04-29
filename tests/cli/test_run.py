@@ -364,3 +364,102 @@ def test_run_sweeps_expired_backups(
 
     assert result.exit_code == 0, result.stdout
     assert not (backup_dir / old_name).exists()
+
+
+def test_run_refuses_existing_output_without_overwrite(
+    make_pdf: Callable[..., Path], tmp_path: Path
+) -> None:
+    pdf = make_pdf(["x"])
+    out = tmp_path / "out.pdf"
+    out.write_bytes(b"existing")
+
+    result = runner.invoke(app, ["run", str(pdf), "-o", str(out)])
+
+    assert result.exit_code == 2
+    assert "out.v2.pdf" in result.stdout
+
+
+def test_run_overwrite_replaces_existing(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    stub_anthropic_client: dict[str, Any],
+) -> None:
+    pdf = make_pdf(["Contact alice@example.com today"])
+    out = tmp_path / "out.pdf"
+    out.write_bytes(b"existing")
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "-o",
+            str(out),
+            "-y",
+            "--overwrite",
+            "--backup-dir",
+            str(tmp_path / "backups"),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert out.stat().st_size > 8
+
+
+def test_run_in_place_writes_to_input_and_keeps_backup(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    stub_anthropic_client: dict[str, Any],
+) -> None:
+    pdf = make_pdf(["Contact alice@example.com today"])
+    backup_dir = tmp_path / "backups"
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "--in-place",
+            "-y",
+            "--backup-dir",
+            str(backup_dir),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert pdf.exists()
+    sessions = [p for p in backup_dir.iterdir() if p.is_dir()]
+    assert len(sessions) == 1
+
+
+def test_run_in_place_with_output_flag_is_usage_error(
+    make_pdf: Callable[..., Path], tmp_path: Path
+) -> None:
+    pdf = make_pdf(["x"])
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "-o",
+            str(tmp_path / "out.pdf"),
+            "--in-place",
+        ],
+    )
+    assert result.exit_code == 2
+    assert "mutually exclusive" in result.stdout
+
+
+def test_run_held_lock_refuses(
+    make_pdf: Callable[..., Path], tmp_path: Path
+) -> None:
+    pdf = make_pdf(["x"])
+    out = tmp_path / "out.pdf"
+    lock_path = out.with_suffix(out.suffix + ".kuroi.lock")
+    lock_path.write_text("")  # someone else's lock
+
+    result = runner.invoke(app, ["run", str(pdf), "-o", str(out)])
+    assert result.exit_code == 2
+    assert "another kuroi run" in result.stdout
