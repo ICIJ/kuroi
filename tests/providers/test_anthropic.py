@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Any
+from unittest.mock import MagicMock
 
 from kuroi.core.findings import Finding
 from kuroi.core.pdf import Page, Word
@@ -118,12 +119,6 @@ def test_detect_redactions_short_circuits_with_no_categories() -> None:
     assert client.messages.last_call is None
 
 
-import hashlib
-from unittest.mock import MagicMock
-
-from kuroi.providers.anthropic import AnthropicProvider as _AnthropicProvider2
-
-
 def _stub_response(
     text: str, fingerprint: str | None = None, in_t: int = 100, out_t: int = 20
 ) -> MagicMock:
@@ -156,7 +151,7 @@ def test_anthropic_returns_findings_and_chunk_record() -> None:
         in_t=100,
         out_t=20,
     )
-    provider = _AnthropicProvider2(model="claude-opus-4-7", client=client)
+    provider = AnthropicProvider(model="claude-opus-4-7", client=client)
 
     findings, chunks = provider.detect_redactions(_one_page(), ("person_name",))
 
@@ -180,7 +175,7 @@ def test_anthropic_records_seed_but_does_not_send_it() -> None:
     client.messages.create.return_value = _stub_response(
         '{"findings": []}', in_t=10, out_t=2
     )
-    provider = _AnthropicProvider2(model="claude-opus-4-7", client=client)
+    provider = AnthropicProvider(model="claude-opus-4-7", client=client)
 
     _, chunks = provider.detect_redactions(_one_page(), ("person_name",), seed=42)
 
@@ -194,7 +189,7 @@ def test_anthropic_records_seed_but_does_not_send_it() -> None:
 
 def test_anthropic_no_categories_returns_empty_lists() -> None:
     client = MagicMock()
-    provider = _AnthropicProvider2(model="claude-opus-4-7", client=client)
+    provider = AnthropicProvider(model="claude-opus-4-7", client=client)
     findings, chunks = provider.detect_redactions(_one_page(), ())
     assert findings == []
     assert chunks == []

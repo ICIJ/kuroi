@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import json as _json_module
 from typing import Any
 
 import httpx
@@ -177,32 +178,28 @@ def test_strips_trailing_url_slash() -> None:
     assert client.last_url == "http://localhost:11434/api/chat"
 
 
-from kuroi.core.pdf import Word as _Word2
-
-
 class _StubClient2:
     def __init__(
-        self, response_body: dict, prompt_eval: int = 100, eval_count: int = 20
+        self, response_body: dict[str, Any], prompt_eval: int = 100, eval_count: int = 20
     ) -> None:
         self.response_body = response_body
         self.prompt_eval = prompt_eval
         self.eval_count = eval_count
-        self.last_call_kwargs: dict | None = None
+        self.last_call_kwargs: dict[str, Any] | None = None
 
-    def post(self, url, *, json):  # noqa: A002
-        import json as _json
+    def post(self, url: str, *, json: dict[str, Any]) -> Any:
         self.last_call_kwargs = {"url": url, "json": json}
         envelope = {
-            "message": {"content": _json.dumps(self.response_body)},
+            "message": {"content": _json_module.dumps(self.response_body)},
             "prompt_eval_count": self.prompt_eval,
             "eval_count": self.eval_count,
         }
 
         class R:
-            def raise_for_status(self_inner):
+            def raise_for_status(self) -> None:
                 pass
 
-            def json(self_inner):
+            def json(self) -> Any:
                 return envelope
 
         return R()
@@ -212,7 +209,7 @@ def _one_page() -> tuple[Page, ...]:
     return (
         Page(
             number=1,
-            words=(_Word2(idx=0, text="Sarah", bbox=(0.0, 0.0, 10.0, 10.0)),),
+            words=(Word(idx=0, text="Sarah", bbox=(0.0, 0.0, 10.0, 10.0)),),
         ),
     )
 
