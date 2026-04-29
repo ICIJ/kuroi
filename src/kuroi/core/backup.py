@@ -10,11 +10,16 @@ Layout:
 from __future__ import annotations
 
 import json
+import re
 import secrets
 import shutil
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+_BACKUP_DIR_RE = re.compile(
+    r"^(?P<ts>\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z)(-[0-9a-f]{6})?$"
+)
 
 
 @dataclass(frozen=True)
@@ -82,3 +87,30 @@ def _next_timestamp(backup_root: Path) -> str:
     suffix = secrets.token_hex(3)
     ts = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%SZ")
     return f"{ts}-{suffix}"
+
+
+def sweep_backups(root: Path, *, retention_hours: int) -> int:
+    """Remove backup subdirectories older than `retention_hours`.
+
+    `retention_hours = 0` disables pruning (legal-hold mode).
+    Entries whose names don't match the kuroi timestamp pattern are left alone.
+    Returns the number of pruned subdirectories.
+    """
+    if retention_hours == 0 or not root.is_dir():
+        return 0
+    cutoff = datetime.now(UTC) - timedelta(hours=retention_hours)
+    pruned = 0
+    for child in root.iterdir():
+        if not child.is_dir():
+            continue
+        m = _BACKUP_DIR_RE.match(child.name)
+        if not m:
+            continue
+        try:
+            ts = datetime.strptime(m.group("ts"), "%Y-%m-%dT%H-%M-%SZ").replace(tzinfo=UTC)
+        except ValueError:
+            continue
+        if ts < cutoff:
+            shutil.rmtree(child)
+            pruned += 1
+    return pruned

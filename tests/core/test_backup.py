@@ -1,9 +1,10 @@
 import json
 import re
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from kuroi.core.backup import create_backup, latest_backup
+from kuroi.core.backup import create_backup, latest_backup, sweep_backups
 
 
 def test_create_backup_copies_original_and_writes_manifest(
@@ -52,3 +53,51 @@ def test_backup_timestamp_has_random_suffix(tmp_path: Path) -> None:
         r"^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z-[0-9a-f]{6}$",
         backup.timestamp,
     )
+
+
+def test_sweep_backups_removes_expired(tmp_path: Path) -> None:
+    root = tmp_path / "backups"
+    root.mkdir()
+    # Old: 30h ago.
+    old_ts = (datetime.now(UTC) - timedelta(hours=30)).strftime(
+        "%Y-%m-%dT%H-%M-%SZ-aaaaaa"
+    )
+    (root / old_ts).mkdir()
+    (root / old_ts / "manifest.json").write_text('{}')
+    # New: just now.
+    new_ts = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%SZ-bbbbbb")
+    (root / new_ts).mkdir()
+    (root / new_ts / "manifest.json").write_text('{}')
+
+    pruned = sweep_backups(root, retention_hours=24)
+
+    assert pruned == 1
+    assert not (root / old_ts).exists()
+    assert (root / new_ts).exists()
+
+
+def test_sweep_backups_zero_means_keep_all(tmp_path: Path) -> None:
+    root = tmp_path / "backups"
+    root.mkdir()
+    very_old = (datetime.now(UTC) - timedelta(days=400)).strftime(
+        "%Y-%m-%dT%H-%M-%SZ-cccccc"
+    )
+    (root / very_old).mkdir()
+
+    pruned = sweep_backups(root, retention_hours=0)
+
+    assert pruned == 0
+    assert (root / very_old).exists()
+
+
+def test_sweep_backups_ignores_non_kuroi_dirs(tmp_path: Path) -> None:
+    root = tmp_path / "backups"
+    root.mkdir()
+    (root / "user-dropped-this").mkdir()
+    (root / "random-file.txt").write_text("hi")
+
+    pruned = sweep_backups(root, retention_hours=24)
+
+    assert pruned == 0
+    assert (root / "user-dropped-this").exists()
+    assert (root / "random-file.txt").exists()
