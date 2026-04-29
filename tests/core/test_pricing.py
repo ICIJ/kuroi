@@ -63,3 +63,25 @@ def test_count_tokens_long_text_scales() -> None:
     text = "a" * 4000
     # 4000 / 4 = 1000 tokens, plus 500 overhead = 1500.
     assert count_tokens(text) == 1500
+
+
+from kuroi.core.pricing import OUTPUT_MULTIPLIER, estimate_cost
+
+
+def test_estimate_cost_anthropic_opus_one_thousand_tokens() -> None:
+    pricing = load_pricing()
+    # 1000 input tokens, 180 estimated output (0.18 × 1000).
+    # Anthropic opus: 15.00/Mtok in, 75.00/Mtok out.
+    # Cost = 1000/1e6 * 15 + 180/1e6 * 75 = 0.015 + 0.0135 = 0.0285
+    cost = estimate_cost(pricing, "anthropic", "claude-opus-4-7", input_tokens=1000)
+    assert cost == pytest.approx(0.0285, rel=1e-6)
+
+
+def test_estimate_cost_ollama_is_zero() -> None:
+    pricing = load_pricing()
+    cost = estimate_cost(pricing, "ollama", "llama3.1:70b", input_tokens=10_000)
+    assert cost == 0.0
+
+
+def test_output_multiplier_constant() -> None:
+    assert OUTPUT_MULTIPLIER == 0.18

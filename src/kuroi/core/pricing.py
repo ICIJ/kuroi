@@ -78,3 +78,28 @@ def count_tokens(text: str) -> int:
     BPE tokenizers). Adds `PROMPT_OVERHEAD_TOKENS` for the kuroi-side prompt.
     """
     return len(text) // 4 + PROMPT_OVERHEAD_TOKENS
+
+
+OUTPUT_MULTIPLIER = 0.18
+"""Static estimate that output tokens = input tokens × 0.18.
+
+The JSON response is dominated by `(page, start, end)` integers and short
+kind labels, empirically much smaller than the input. Frozen at v1.0;
+calibration data goes through the post-run divergence note in cli/run.py.
+"""
+
+
+def estimate_cost(
+    pricing: Pricing,
+    provider: str,
+    model: str,
+    *,
+    input_tokens: int,
+) -> float:
+    """Pre-flight cost estimate in USD."""
+    rates = pricing.rates(provider, model)
+    output_tokens = input_tokens * OUTPUT_MULTIPLIER
+    return (
+        input_tokens / 1_000_000 * rates.input_per_million
+        + output_tokens / 1_000_000 * rates.output_per_million
+    )
