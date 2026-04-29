@@ -263,3 +263,76 @@ def test_run_displays_pre_flight_cost_estimate(monkeypatch, make_pdf, tmp_path):
     )
     assert "Estimated cost" in result.stdout
     assert "$" in result.stdout
+
+
+import json as _json2
+
+
+def test_run_writes_chunk_request_audit_event(monkeypatch, make_pdf, tmp_path):
+    monkeypatch.setenv("KUROI_PROVIDER", "anthropic")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    audit_dir = tmp_path / "audit"
+
+    # Patch AnthropicProvider.__init__ to install a stub client. This is the
+    # only reliable way because the factory imports the class at module load.
+    class _StubResp2:
+        content = [type("B", (), {"text": '{"findings": []}'})()]
+        usage = type("U", (), {"input_tokens": 50, "output_tokens": 5})()
+        system_fingerprint = None
+
+    class _StubMessages:
+        def create(self, **kwargs):
+            return _StubResp2()
+
+    class _StubClient:
+        def __init__(self):
+            self.messages = _StubMessages()
+
+    def _fake_init(
+        self,
+        *,
+        model="claude-opus-4-7",
+        api_key=None,
+        client=None,
+        max_tokens=4096,
+    ):
+        self.name = "anthropic"
+        self.model = model
+        self._max_tokens = max_tokens
+        self._client = client or _StubClient()
+
+    monkeypatch.setattr(
+        "kuroi.providers.anthropic.AnthropicProvider.__init__", _fake_init
+    )
+
+    pdf = make_pdf(["alice@example.com"])
+    out = tmp_path / "out.pdf"
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "-o",
+            str(out),
+            "-y",
+            "--audit-dir",
+            str(audit_dir),
+            "--backup-dir",
+            str(tmp_path / "backups"),
+            "--rules",
+            "pii",
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+
+    files = list(audit_dir.glob("*.jsonl"))
+    assert len(files) == 1
+    lines = files[0].read_text().splitlines()
+    chunk_lines = [
+        _json2.loads(l) for l in lines if _json2.loads(l).get("event") == "chunk_request"
+    ]
+    assert len(chunk_lines) == 1
+    assert chunk_lines[0]["tokens_in"] == 50
+    assert chunk_lines[0]["tokens_out"] == 5
+    assert chunk_lines[0]["seed_honored"] is False
