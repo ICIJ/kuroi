@@ -81,7 +81,7 @@ def test_detect_redactions_round_trips_through_stub_client() -> None:
     )
     pages = (_page(1, ["Hello", "Sarah", "Chen"]),)
 
-    findings = provider.detect_redactions(pages, llm_category_ids=("person_name",))
+    findings, _chunks = provider.detect_redactions(pages, llm_category_ids=("person_name",))
 
     assert len(findings) == 1
     assert isinstance(findings[0], Finding)
@@ -106,9 +106,10 @@ def test_detect_redactions_short_circuits_with_no_categories() -> None:
     )
     pages = (_page(1, ["Hello"]),)
 
-    findings = provider.detect_redactions(pages, llm_category_ids=())
+    findings, chunks = provider.detect_redactions(pages, llm_category_ids=())
 
     assert findings == []
+    assert chunks == []
     assert client.call_count == 0
 
 
@@ -118,7 +119,9 @@ def test_connect_error_returns_empty_findings() -> None:
         model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
     )
     pages = (_page(1, ["Hello"]),)
-    assert provider.detect_redactions(pages, ("person_name",)) == []
+    findings, chunks = provider.detect_redactions(pages, ("person_name",))
+    assert findings == []
+    assert chunks == []
 
 
 def test_timeout_returns_empty_findings() -> None:
@@ -127,7 +130,9 @@ def test_timeout_returns_empty_findings() -> None:
         model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
     )
     pages = (_page(1, ["Hello"]),)
-    assert provider.detect_redactions(pages, ("person_name",)) == []
+    findings, chunks = provider.detect_redactions(pages, ("person_name",))
+    assert findings == []
+    assert chunks == []
 
 
 def test_500_response_returns_empty_findings() -> None:
@@ -136,7 +141,9 @@ def test_500_response_returns_empty_findings() -> None:
         model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
     )
     pages = (_page(1, ["Hello"]),)
-    assert provider.detect_redactions(pages, ("person_name",)) == []
+    findings, chunks = provider.detect_redactions(pages, ("person_name",))
+    assert findings == []
+    assert chunks == []
 
 
 def test_non_json_body_returns_empty_findings() -> None:
@@ -145,7 +152,8 @@ def test_non_json_body_returns_empty_findings() -> None:
         model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
     )
     pages = (_page(1, ["Hello", "Sarah", "Chen"]),)
-    assert provider.detect_redactions(pages, ("person_name",)) == []
+    findings, _chunks = provider.detect_redactions(pages, ("person_name",))
+    assert findings == []
 
 
 def test_missing_message_content_returns_empty_findings() -> None:
@@ -155,7 +163,8 @@ def test_missing_message_content_returns_empty_findings() -> None:
         model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
     )
     pages = (_page(1, ["Hello"]),)
-    assert provider.detect_redactions(pages, ("person_name",)) == []
+    findings, _chunks = provider.detect_redactions(pages, ("person_name",))
+    assert findings == []
 
 
 def test_strips_trailing_url_slash() -> None:
@@ -166,3 +175,71 @@ def test_strips_trailing_url_slash() -> None:
     pages = (_page(1, ["Hello"]),)
     provider.detect_redactions(pages, ("person_name",))
     assert client.last_url == "http://localhost:11434/api/chat"
+
+
+from kuroi.core.pdf import Word as _Word2
+
+
+class _StubClient2:
+    def __init__(
+        self, response_body: dict, prompt_eval: int = 100, eval_count: int = 20
+    ) -> None:
+        self.response_body = response_body
+        self.prompt_eval = prompt_eval
+        self.eval_count = eval_count
+        self.last_call_kwargs: dict | None = None
+
+    def post(self, url, *, json):  # noqa: A002
+        import json as _json
+        self.last_call_kwargs = {"url": url, "json": json}
+        envelope = {
+            "message": {"content": _json.dumps(self.response_body)},
+            "prompt_eval_count": self.prompt_eval,
+            "eval_count": self.eval_count,
+        }
+
+        class R:
+            def raise_for_status(self_inner):
+                pass
+
+            def json(self_inner):
+                return envelope
+
+        return R()
+
+
+def _one_page() -> tuple[Page, ...]:
+    return (
+        Page(
+            number=1,
+            words=(_Word2(idx=0, text="Sarah", bbox=(0.0, 0.0, 10.0, 10.0)),),
+        ),
+    )
+
+
+def test_ollama_returns_findings_and_chunk_record() -> None:
+    client = _StubClient2({"findings": []}, prompt_eval=42, eval_count=7)
+    provider = OllamaProvider(model="llama3.1:70b", url="http://x", client=client)
+
+    findings, chunks = provider.detect_redactions(_one_page(), ("person_name",))
+
+    assert findings == []
+    assert len(chunks) == 1
+    chunk = chunks[0]
+    assert chunk.tokens_in == 42
+    assert chunk.tokens_out == 7
+    assert chunk.seed_honored is False  # no seed requested
+    assert chunk.seed_requested is None
+
+
+def test_ollama_seed_is_sent_and_marked_honored() -> None:
+    client = _StubClient2({"findings": []})
+    provider = OllamaProvider(model="llama3.1:70b", url="http://x", client=client)
+
+    _, chunks = provider.detect_redactions(_one_page(), ("person_name",), seed=99)
+
+    assert chunks[0].seed_requested == 99
+    assert chunks[0].seed_honored is True
+    body = client.last_call_kwargs["json"]
+    assert body["options"]["seed"] == 99
+    assert body["options"]["temperature"] == 0
