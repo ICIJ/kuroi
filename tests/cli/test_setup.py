@@ -116,6 +116,18 @@ def test_setup_ollama_probe_failure_falls_back_to_free_text(
     assert 'model = "llama3.1:70b"' in body
 
 
+def test_setup_reports_config_error_on_corrupt_file(tmp_path: Path) -> None:
+    """A corrupt config file is surfaced as exit 2 with a red message, not a stack trace."""
+    cfg_path = _xdg_path(tmp_path)
+    cfg_path.parent.mkdir(parents=True)
+    cfg_path.write_text("provider = ===\n")  # malformed TOML
+    runner = CliRunner()
+    result = runner.invoke(app, ["setup"])
+    assert result.exit_code == 2
+    assert "Config error" in result.stdout
+    assert "Traceback" not in result.stdout
+
+
 def test_probe_ollama_models_handles_connect_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """Direct test of the probe helper using a stub httpx.get."""
     from kuroi.cli import setup as setup_module

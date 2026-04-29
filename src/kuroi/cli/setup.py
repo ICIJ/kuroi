@@ -13,6 +13,7 @@ from kuroi.core.config import (
     DEFAULT_OLLAMA_URL,
     VALID_PROVIDERS,
     Config,
+    ConfigError,
     ProviderName,
     load_config_file,
     write_config_file,
@@ -114,7 +115,11 @@ def _prompt_ollama_model(default: str | None, available: list[str] | None) -> st
 def setup() -> None:
     """Interactively configure provider, model, and Ollama URL."""
     cfg_path = xdg_config_home() / "kuroi" / "config.toml"
-    existing = load_config_file(cfg_path)
+    try:
+        existing = load_config_file(cfg_path)
+    except ConfigError as exc:
+        console.print(f"[red]Config error:[/] {exc}")
+        raise typer.Exit(code=2) from exc
     _raw_provider = existing.get("provider")
     cur_provider: str = _raw_provider if isinstance(_raw_provider, str) else "anthropic"
     _raw_model = existing.get("model")
