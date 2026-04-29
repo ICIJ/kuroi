@@ -94,7 +94,7 @@ def run(
     )
     console.print(
         f"  Estimated cost: ${estimated_cost:.4f}  "
-        f"({input_tokens} input tokens × {config.provider}/{config.model})"
+        f"({input_tokens} input tokens, {config.provider}/{config.model})"
     )
 
     findings: list[Finding] = []

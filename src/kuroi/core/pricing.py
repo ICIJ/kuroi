@@ -92,7 +92,7 @@ def count_tokens(text: str) -> int:
 
 
 OUTPUT_MULTIPLIER = 0.18
-"""Static estimate that output tokens = input tokens × 0.18.
+"""Static estimate that output tokens = input tokens x 0.18.
 
 The JSON response is dominated by `(page, start, end)` integers and short
 kind labels, empirically much smaller than the input. Frozen at v1.0;

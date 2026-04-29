@@ -1,12 +1,15 @@
+import json as _json2
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import pymupdf
 import pytest
 from typer.testing import CliRunner
 
 from kuroi.cli import app
+
+runner = CliRunner()
 
 
 @pytest.fixture
@@ -160,13 +163,6 @@ def test_run_aborts_when_verification_fails(
     assert not out.exists()
 
 
-import re
-
-from typer.testing import CliRunner as _CliRunner2
-
-runner = _CliRunner2()
-
-
 def test_run_seed_flag_anthropic_prints_not_honored_notice(
     monkeypatch, make_pdf, tmp_path
 ):
@@ -177,14 +173,14 @@ def test_run_seed_flag_anthropic_prints_not_honored_notice(
     from kuroi.providers import anthropic as ap
 
     class _StubResp:
-        content = [type("B", (), {"text": '{"findings": []}'})()]
-        usage = type("U", (), {"input_tokens": 1, "output_tokens": 1})()
+        content: ClassVar = [type("B", (), {"text": '{"findings": []}'})()]
+        usage: ClassVar = type("U", (), {"input_tokens": 1, "output_tokens": 1})()
         system_fingerprint = None
 
     class _StubClient:
         class messages:  # noqa: N801
             @staticmethod
-            def create(**kwargs):
+            def create(**kwargs: Any) -> _StubResp:
                 return _StubResp()
 
     real_provider = ap.AnthropicProvider
@@ -225,14 +221,14 @@ def test_run_displays_pre_flight_cost_estimate(monkeypatch, make_pdf, tmp_path):
     from kuroi.providers import anthropic as ap
 
     class _StubResp:
-        content = [type("B", (), {"text": '{"findings": []}'})()]
-        usage = type("U", (), {"input_tokens": 100, "output_tokens": 20})()
+        content: ClassVar = [type("B", (), {"text": '{"findings": []}'})()]
+        usage: ClassVar = type("U", (), {"input_tokens": 100, "output_tokens": 20})()
         system_fingerprint = None
 
     class _StubClient:
         class messages:  # noqa: N801
             @staticmethod
-            def create(**kwargs):
+            def create(**kwargs: Any) -> _StubResp:
                 return _StubResp()
 
     real_provider = ap.AnthropicProvider
@@ -265,9 +261,6 @@ def test_run_displays_pre_flight_cost_estimate(monkeypatch, make_pdf, tmp_path):
     assert "$" in result.stdout
 
 
-import json as _json2
-
-
 def test_run_writes_chunk_request_audit_event(monkeypatch, make_pdf, tmp_path):
     monkeypatch.setenv("KUROI_PROVIDER", "anthropic")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
@@ -276,26 +269,26 @@ def test_run_writes_chunk_request_audit_event(monkeypatch, make_pdf, tmp_path):
     # Patch AnthropicProvider.__init__ to install a stub client. This is the
     # only reliable way because the factory imports the class at module load.
     class _StubResp2:
-        content = [type("B", (), {"text": '{"findings": []}'})()]
-        usage = type("U", (), {"input_tokens": 50, "output_tokens": 5})()
+        content: ClassVar = [type("B", (), {"text": '{"findings": []}'})()]
+        usage: ClassVar = type("U", (), {"input_tokens": 50, "output_tokens": 5})()
         system_fingerprint = None
 
     class _StubMessages:
-        def create(self, **kwargs):
+        def create(self, **kwargs: Any) -> _StubResp2:
             return _StubResp2()
 
     class _StubClient:
-        def __init__(self):
+        def __init__(self) -> None:
             self.messages = _StubMessages()
 
     def _fake_init(
-        self,
+        self: Any,
         *,
-        model="claude-opus-4-7",
-        api_key=None,
-        client=None,
-        max_tokens=4096,
-    ):
+        model: str = "claude-opus-4-7",
+        api_key: str | None = None,
+        client: Any | None = None,
+        max_tokens: int = 4096,
+    ) -> None:
         self.name = "anthropic"
         self.model = model
         self._max_tokens = max_tokens
@@ -330,7 +323,9 @@ def test_run_writes_chunk_request_audit_event(monkeypatch, make_pdf, tmp_path):
     assert len(files) == 1
     lines = files[0].read_text().splitlines()
     chunk_lines = [
-        _json2.loads(l) for l in lines if _json2.loads(l).get("event") == "chunk_request"
+        _json2.loads(line)
+        for line in lines
+        if _json2.loads(line).get("event") == "chunk_request"
     ]
     assert len(chunk_lines) == 1
     assert chunk_lines[0]["tokens_in"] == 50

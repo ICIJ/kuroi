@@ -5,7 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from kuroi.core.pricing import Pricing, ProviderRates, load_pricing
+from kuroi.core.pricing import (
+    OUTPUT_MULTIPLIER,
+    Pricing,
+    ProviderRates,
+    count_tokens,
+    estimate_cost,
+    load_pricing,
+)
 
 
 def test_load_pricing_reads_packaged_file() -> None:
@@ -47,9 +54,6 @@ def test_load_pricing_from_explicit_path(tmp_path: Path) -> None:
     assert rates.output_per_million == 75.0
 
 
-from kuroi.core.pricing import count_tokens
-
-
 def test_count_tokens_short_text() -> None:
     # 12 chars / 4 = 3, plus the 500-token overhead = 503.
     assert count_tokens("hello world!") == 503
@@ -65,12 +69,9 @@ def test_count_tokens_long_text_scales() -> None:
     assert count_tokens(text) == 1500
 
 
-from kuroi.core.pricing import OUTPUT_MULTIPLIER, estimate_cost
-
-
 def test_estimate_cost_anthropic_opus_one_thousand_tokens() -> None:
     pricing = load_pricing()
-    # 1000 input tokens, 180 estimated output (0.18 × 1000).
+    # 1000 input tokens, 180 estimated output (0.18 x 1000).
     # Anthropic opus: 15.00/Mtok in, 75.00/Mtok out.
     # Cost = 1000/1e6 * 15 + 180/1e6 * 75 = 0.015 + 0.0135 = 0.0285
     cost = estimate_cost(pricing, "anthropic", "claude-opus-4-7", input_tokens=1000)
