@@ -33,8 +33,8 @@ def test_diff_json_format_emits_ndjson(tmp_path: Path):
     orig, red = _make_pair(tmp_path, "Sarah Chen was here", "         was here")
     result = runner.invoke(app, ["diff", str(orig), str(red), "--format", "json"])
     assert result.exit_code == 0
-    lines = [l for l in result.stdout.splitlines() if l.strip()]
-    parsed = [json.loads(l) for l in lines]
+    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    parsed = [json.loads(line) for line in lines]
     assert parsed[0]["page"] == 1
     assert "before_text" in parsed[0]
     assert "after_text" in parsed[0]

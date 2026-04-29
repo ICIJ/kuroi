@@ -37,8 +37,8 @@ class Diff:
 
 def compute_diff(original: Path, redacted: Path) -> Diff:
     """Compare `original` and `redacted` page-by-page; return a `Diff`."""
-    orig_doc = pymupdf.open(str(original))
-    red_doc = pymupdf.open(str(redacted))
+    orig_doc = pymupdf.open(str(original))  # type: ignore[no-untyped-call]
+    red_doc = pymupdf.open(str(redacted))  # type: ignore[no-untyped-call]
     try:
         if len(orig_doc) != len(red_doc):
             raise ValueError(
@@ -48,8 +48,8 @@ def compute_diff(original: Path, redacted: Path) -> Diff:
         for idx in range(len(orig_doc)):
             orig_page = orig_doc[idx]
             red_page = red_doc[idx]
-            orig_words = orig_page.get_text("words")
-            red_words = red_page.get_text("words")
+            orig_words = orig_page.get_text("words")  # type: ignore[no-untyped-call]
+            red_words = red_page.get_text("words")  # type: ignore[no-untyped-call]
             red_word_set = {(round(w[0], 1), round(w[1], 1), w[4]) for w in red_words}
             redactions: list[DiffRedaction] = []
             for x0, y0, x1, y1, word, *_ in orig_words:
@@ -61,12 +61,12 @@ def compute_diff(original: Path, redacted: Path) -> Diff:
             pages.append(
                 DiffPage(
                     page_number=idx + 1,
-                    before_text=orig_page.get_text("text"),
-                    after_text=red_page.get_text("text"),
+                    before_text=orig_page.get_text("text"),  # type: ignore[no-untyped-call]
+                    after_text=red_page.get_text("text"),  # type: ignore[no-untyped-call]
                     redactions=tuple(redactions),
                 )
             )
         return Diff(pages=tuple(pages))
     finally:
-        orig_doc.close()
-        red_doc.close()
+        orig_doc.close()  # type: ignore[no-untyped-call]
+        red_doc.close()  # type: ignore[no-untyped-call]
