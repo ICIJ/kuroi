@@ -10,8 +10,11 @@ import json
 import os
 from typing import Any
 
-from kuroi.core.findings import Confidence, Finding
+from kuroi.core.findings import Finding
 from kuroi.core.pdf import Page, serialize_for_llm
+from kuroi.providers._shared import parse_findings_payload
+
+__all__ = ["AnthropicProvider", "build_user_prompt", "parse_findings_payload"]
 
 SYSTEM_PROMPT = (
     "You are a redaction-assistant for kuroi, a CLI for stripping sensitive data "
@@ -48,49 +51,6 @@ def build_user_prompt(
         f"Output schema: {OUTPUT_SCHEMA_HINT}\n\n"
         f"<document>\n{doc}\n</document>"
     )
-
-
-def parse_findings_payload(
-    payload: dict[str, Any],
-    pages: tuple[Page, ...],
-    *,
-    source: str,
-) -> list[Finding]:
-    """Convert the model's JSON response into Finding objects.
-
-    Findings whose (page, start, end) reference does not exist in `pages` are
-    silently dropped — a model that hallucinates indices cannot redact words
-    that don't exist.
-    """
-    page_lookup = {p.number: p for p in pages}
-    valid_confidences: tuple[Confidence, ...] = ("high", "medium", "low")
-    out: list[Finding] = []
-    for item in payload.get("findings", []):
-        try:
-            pg = int(item["page"])
-            start = int(item["start"])
-            end = int(item["end"])
-            kind = str(item["kind"])
-            conf_raw: Any = item.get("confidence", "medium")
-        except (KeyError, TypeError, ValueError):
-            continue
-        conf = "medium" if conf_raw not in valid_confidences else conf_raw
-        page = page_lookup.get(pg)
-        if page is None:
-            continue
-        if not (0 <= start <= end < len(page.words)):
-            continue
-        out.append(
-            Finding(
-                page=pg,
-                start=start,
-                end=end,
-                kind=kind,
-                confidence=conf,  # type: ignore[arg-type]
-                source=source,
-            )
-        )
-    return out
 
 
 class AnthropicProvider:
