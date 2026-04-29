@@ -79,6 +79,11 @@ def write_config_file(path: Path, config: Config) -> None:
     Serializes the on-disk schema (top-level `provider` and `model` plus a
     nested `[ollama]` table). Writes to `<path>.tmp` then `os.replace()` so
     a crash mid-write cannot corrupt an existing file.
+
+    Assumes `config.provider`, `config.model`, and `config.ollama_url` contain
+    no double-quote characters; the writer does not perform TOML escaping.
+    This holds because `provider` is a `Literal`, and `model` and `ollama_url`
+    are validated upstream during config resolution.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     body = (
