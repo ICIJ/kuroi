@@ -8,10 +8,10 @@ is the caller's responsibility (use the context-manager form).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import time
-from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO, Any
@@ -71,8 +71,37 @@ class AuditLog:
         )
         return log
 
-    def write_finding(self, finding: Finding) -> None:
-        self._write({"event": "finding", "ts": _now_iso(), **asdict(finding)})
+    def write_finding(
+        self,
+        finding: Finding,
+        *,
+        bbox: tuple[float, float, float, float] | None = None,
+        redacted_text: str = "",
+        context_text: str = "",
+        decision: str = "applied",
+        reviewer: str = "auto",
+        include_text: bool = False,
+    ) -> None:
+        payload: dict[str, Any] = {
+            "event": "finding",
+            "ts": _now_iso(),
+            "page": finding.page,
+            "word_start": finding.start,
+            "word_end": finding.end,
+            "kind": finding.kind,
+            "confidence": finding.confidence,
+            "source": finding.source,
+            "bbox": list(bbox) if bbox is not None else None,
+            "text_length": len(redacted_text),
+            "text_sha256": hashlib.sha256(redacted_text.encode("utf-8")).hexdigest(),
+            "context_sha256": hashlib.sha256(context_text.encode("utf-8")).hexdigest(),
+            "decision": decision,
+            "reviewer": reviewer,
+        }
+        if include_text:
+            payload["text"] = redacted_text
+            payload["context"] = context_text
+        self._write(payload)
 
     def write_event(self, event: str, **fields: Any) -> None:
         self._write({"event": event, "ts": _now_iso(), **fields})

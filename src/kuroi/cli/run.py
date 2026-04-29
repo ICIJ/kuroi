@@ -20,7 +20,7 @@ from kuroi.core.config import (
     resolve_config,
     xdg_config_home,
 )
-from kuroi.core.findings import Finding
+from kuroi.core.findings import Finding, bbox_union
 from kuroi.core.pdf import extract_word_index, serialize_for_llm
 from kuroi.core.pricing import count_tokens, estimate_cost, load_pricing
 from kuroi.core.redaction import apply_redactions
@@ -158,7 +158,18 @@ def run(
     moved = False
     try:
         for f in findings:
-            audit.write_finding(f)
+            page = pages[f.page - 1]
+            words = page.words[f.start : f.end + 1]
+            bbox = bbox_union(w.bbox for w in words) if words else None
+            redacted_text = " ".join(w.text for w in words)
+            context_words = page.words[max(0, f.start - 16) : min(len(page.words), f.end + 17)]
+            context_text = " ".join(w.text for w in context_words)
+            audit.write_finding(
+                f,
+                bbox=bbox,
+                redacted_text=redacted_text,
+                context_text=context_text,
+            )
 
         # Apply to a temp file. Only promote to output if verification passes.
         temp_out.parent.mkdir(parents=True, exist_ok=True)
