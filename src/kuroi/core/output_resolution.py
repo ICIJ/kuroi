@@ -30,3 +30,43 @@ def suggest_versioned_name(target: Path) -> Path:
                 continue
     next_n = max(versions) + 1 if versions else 2
     return parent / f"{base}.v{next_n}{suffix}"
+
+
+class OutputResolutionError(Exception):
+    """User passed an invalid combination of `-o`/`--in-place`/`--overwrite`."""
+
+
+class OutputCollisionError(Exception):
+    """The output path exists and `--overwrite` was not passed."""
+
+    def __init__(self, target: Path, suggestion: Path) -> None:
+        super().__init__(
+            f"output path {target} exists; pass --overwrite or use {suggestion}"
+        )
+        self.target = target
+        self.suggestion = suggestion
+
+
+def resolve_output_path(
+    pdf: Path,
+    *,
+    output: Path | None,
+    in_place: bool,
+    overwrite: bool,
+) -> Path:
+    """Decide the final write path. Validates flag combinations and collisions."""
+    if in_place and output is not None:
+        raise OutputResolutionError("--in-place and -o are mutually exclusive")
+    if in_place:
+        return pdf
+    if output is None:
+        raise OutputResolutionError(
+            "must pass either -o <path> or --in-place"
+        )
+    if output.resolve() == pdf.resolve():
+        raise OutputResolutionError(
+            "output path equals input; use --in-place to overwrite the input"
+        )
+    if output.exists() and not overwrite:
+        raise OutputCollisionError(output, suggest_versioned_name(output))
+    return output
