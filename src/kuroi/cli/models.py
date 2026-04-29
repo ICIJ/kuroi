@@ -84,7 +84,7 @@ def _resolve_config_or_default() -> Any:
             env={},
             file_path=xdg_config_home() / "kuroi" / "config.toml",
         )
-    except Exception:  # noqa: BLE001
+    except Exception:
         # Tolerate config errors here — `kuroi models` is informational.
         from types import SimpleNamespace
         return SimpleNamespace(
@@ -104,7 +104,7 @@ def _ollama_installed_models(url: str) -> set[str]:
         return set()
 
 
-def _to_json(pricing: Any, selected: dict, config: Any) -> dict:
+def _to_json(pricing: Any, selected: dict[str, Any], config: Any) -> dict[str, Any]:
     return {
         "pricing_updated_at": pricing.updated_at,
         "default_provider": config.provider,
