@@ -19,6 +19,13 @@ _ALIASES = {"pii": "pii-en"}
 
 @dataclass(frozen=True)
 class Category:
+    """A single detector definition within a rule set.
+
+    `detection` selects between regex matching (with `pattern`) and LLM
+    delegation (pattern unused). `confidence` is the level every Finding
+    emitted by this category will carry.
+    """
+
     id: str
     label: str
     detection: DetectionKind
@@ -28,6 +35,8 @@ class Category:
 
 @dataclass(frozen=True)
 class RuleSet:
+    """A named bundle of detector categories loaded from a rule pack YAML."""
+
     name: str
     display_name: str
     description: str
