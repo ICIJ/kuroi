@@ -81,7 +81,9 @@ def _prompt_anthropic_model(default: str) -> str:
         marker = "  *" if name == default else "   "
         console.print(f"{marker} {idx}. {name}")
     console.print(f"   {len(CURATED_ANTHROPIC_MODELS) + 1}. (other — type a model ID)")
-    raw = typer.prompt("Enter choice", default=_default_index(default, CURATED_ANTHROPIC_MODELS)).strip()
+    raw = typer.prompt(
+        "Enter choice", default=_default_index(default, CURATED_ANTHROPIC_MODELS)
+    ).strip()
     if raw.isdigit():
         n = int(raw)
         if 1 <= n <= len(CURATED_ANTHROPIC_MODELS):
@@ -137,7 +139,9 @@ def setup() -> None:
                 "[yellow]warning:[/] ANTHROPIC_API_KEY is not set. "
                 "Cloud redaction will fail until you export it."
             )
-        default_model = cur_model if (cur_model in CURATED_ANTHROPIC_MODELS) else CURATED_ANTHROPIC_MODELS[0]
+        default_model = (
+            cur_model if (cur_model in CURATED_ANTHROPIC_MODELS) else CURATED_ANTHROPIC_MODELS[0]
+        )
         model = _prompt_anthropic_model(default_model)
         ollama_url: str = cur_ollama_url
     else:

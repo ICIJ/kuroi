@@ -38,9 +38,7 @@ def models(
         console.print(f"[red]unknown provider:[/] {provider}")
         raise typer.Exit(code=2)
 
-    selected = (
-        {provider: pricing.providers[provider]} if provider else pricing.providers
-    )
+    selected = {provider: pricing.providers[provider]} if provider else pricing.providers
 
     config = _resolve_config_or_default()
 
@@ -50,30 +48,28 @@ def models(
 
     for prov_name, prov_models in selected.items():
         posture = PRIVACY_POSTURE.get(prov_name, "?")
-        console.print(f"\n[bold]{prov_name.title()}[/]                                                   {posture}")
+        console.print(
+            f"\n[bold]{prov_name.title()}[/]                                                   {posture}"
+        )
         installed: set[str] = set()
         if prov_name == "ollama":
             installed = _ollama_installed_models(config.ollama_url)
         for model_name, rates in prov_models.items():
             if model_name == "*":
                 continue
-            default_marker = "(default)" if (
-                config.provider == prov_name and config.model == model_name
-            ) else ""
+            default_marker = (
+                "(default)" if (config.provider == prov_name and config.model == model_name) else ""
+            )
             install_marker = "(installed)" if model_name in installed else ""
             cost = (
                 "free"
                 if rates.input_per_million == 0.0 and rates.output_per_million == 0.0
                 else f"${rates.input_per_million:.2f} / ${rates.output_per_million:.2f} per Mtok"
             )
-            console.print(
-                f"  {model_name:<22} {default_marker or install_marker:<11} {cost}"
-            )
+            console.print(f"  {model_name:<22} {default_marker or install_marker:<11} {cost}")
         console.print(f"  seed support: {SEED_SUPPORT.get(prov_name, 'unknown')}")
 
-    console.print(
-        f"\nDefault: {config.provider} / {config.model}   (configurable)"
-    )
+    console.print(f"\nDefault: {config.provider} / {config.model}   (configurable)")
     console.print(f"Pricing last updated: {pricing.updated_at}")
 
 
@@ -87,6 +83,7 @@ def _resolve_config_or_default() -> Any:
     except Exception:
         # Tolerate config errors here — `kuroi models` is informational.
         from types import SimpleNamespace
+
         return SimpleNamespace(
             provider="anthropic",
             model="claude-opus-4-7",

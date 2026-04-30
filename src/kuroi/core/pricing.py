@@ -51,6 +51,7 @@ def load_pricing(path: Path | None = None) -> Pricing:
     else:
         # Late import to avoid CLI dependency in core
         import os
+
         xdg = os.environ.get("XDG_DATA_HOME") or str(Path.home() / ".local" / "share")
         user_file = Path(xdg) / "kuroi" / "pricing.json"
         if user_file.exists():

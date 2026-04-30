@@ -157,4 +157,5 @@ def _now_iso() -> str:
 
 def _kuroi_version() -> str:
     from kuroi import __version__
+
     return __version__

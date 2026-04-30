@@ -106,9 +106,7 @@ class AnthropicProvider:
         )
         duration_ms = int((time.monotonic() - started) * 1000)
 
-        text = "".join(
-            block.text for block in response.content if hasattr(block, "text")
-        )
+        text = "".join(block.text for block in response.content if hasattr(block, "text"))
         response_sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
 
         usage = getattr(response, "usage", None)

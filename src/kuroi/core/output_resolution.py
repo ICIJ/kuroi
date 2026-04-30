@@ -39,9 +39,7 @@ class OutputCollisionError(Exception):
     """The output path exists and `--overwrite` was not passed."""
 
     def __init__(self, target: Path, suggestion: Path) -> None:
-        super().__init__(
-            f"output path {target} exists; pass --overwrite or use {suggestion}"
-        )
+        super().__init__(f"output path {target} exists; pass --overwrite or use {suggestion}")
         self.target = target
         self.suggestion = suggestion
 
@@ -59,9 +57,7 @@ def resolve_output_path(
     if in_place:
         return pdf
     if output is None:
-        raise OutputResolutionError(
-            "must pass either -o <path> or --in-place"
-        )
+        raise OutputResolutionError("must pass either -o <path> or --in-place")
     if output.resolve() == pdf.resolve():
         raise OutputResolutionError(
             "output path equals input; use --in-place to overwrite the input"

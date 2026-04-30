@@ -92,8 +92,8 @@ def write_config_file(path: Path, config: Config) -> None:
     body = (
         f'provider = "{config.provider}"\n'
         f'model = "{config.model}"\n'
-        f'\n'
-        f'[ollama]\n'
+        f"\n"
+        f"[ollama]\n"
         f'url = "{config.ollama_url}"\n'
     )
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -126,9 +126,7 @@ def _read_string(data: dict[str, Any], key: str, *, label: str | None = None) ->
         return None
     value = data[key]
     if not isinstance(value, str):
-        raise ConfigError(
-            f"Expected string for `{label or key}`, got {type(value).__name__}"
-        )
+        raise ConfigError(f"Expected string for `{label or key}`, got {type(value).__name__}")
     return value
 
 
@@ -157,18 +155,12 @@ def resolve_config(
         )
     provider: ProviderName = provider_raw
 
-    model = (
-        overrides.model
-        or env.get("KUROI_MODEL")
-        or _read_string(file_data, "model")
-    )
+    model = overrides.model or env.get("KUROI_MODEL") or _read_string(file_data, "model")
     if model is None:
         if provider == "anthropic":
             model = DEFAULT_ANTHROPIC_MODEL
         else:
-            raise ConfigError(
-                "No Ollama model configured. Run `kuroi setup` or pass --model."
-            )
+            raise ConfigError("No Ollama model configured. Run `kuroi setup` or pass --model.")
 
     ollama_url = (
         overrides.ollama_url
@@ -179,9 +171,7 @@ def resolve_config(
 
     audit_table = file_data.get("audit", {})
     if not isinstance(audit_table, dict):
-        raise ConfigError(
-            f"Expected table for `audit`, got {type(audit_table).__name__}"
-        )
+        raise ConfigError(f"Expected table for `audit`, got {type(audit_table).__name__}")
     audit_include_text_raw = audit_table.get("include_text", False)
     if not isinstance(audit_include_text_raw, bool):
         raise ConfigError(
@@ -190,9 +180,7 @@ def resolve_config(
 
     backup_table = file_data.get("backup", {})
     if not isinstance(backup_table, dict):
-        raise ConfigError(
-            f"Expected table for `backup`, got {type(backup_table).__name__}"
-        )
+        raise ConfigError(f"Expected table for `backup`, got {type(backup_table).__name__}")
     backup_retention_raw = backup_table.get("retention_hours", 24)
     if (
         not isinstance(backup_retention_raw, int)

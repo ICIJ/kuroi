@@ -17,9 +17,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-_BACKUP_DIR_RE = re.compile(
-    r"^(?P<ts>\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z)(-[0-9a-f]{6})?$"
-)
+_BACKUP_DIR_RE = re.compile(r"^(?P<ts>\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}Z)(-[0-9a-f]{6})?$")
 
 
 @dataclass(frozen=True)

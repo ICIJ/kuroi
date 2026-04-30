@@ -31,11 +31,17 @@ def _version_callback(value: bool) -> None:
 @app.callback()
 def main(
     verbose: int = typer.Option(
-        0, "-v", "--verbose", count=True,
+        0,
+        "-v",
+        "--verbose",
+        count=True,
         help="Show more detail (use -vv for debug).",
     ),
     quiet: bool = typer.Option(
-        False, "-q", "--quiet", help="Show less.",
+        False,
+        "-q",
+        "--quiet",
+        help="Show less.",
     ),
     version: bool = typer.Option(
         False,

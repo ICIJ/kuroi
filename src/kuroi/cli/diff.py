@@ -94,11 +94,17 @@ def render_html(d: Diff) -> str:
     parts.append(f"<style>{style}</style></head><body>")
     parts.append("<h1>kuroi diff</h1>")
     for page in d.pages:
-        parts.append(f'<div class="page"><h2>Page {page.page_number} '
-                     f'({len(page.redactions)} redactions)</h2>')
+        parts.append(
+            f'<div class="page"><h2>Page {page.page_number} '
+            f"({len(page.redactions)} redactions)</h2>"
+        )
         parts.append('<div class="cols">')
-        parts.append(f'<div class="col"><h3>Original</h3><pre>{escape(page.before_text)}</pre></div>')
-        parts.append(f'<div class="col"><h3>Redacted</h3><pre>{escape(page.after_text)}</pre></div>')
+        parts.append(
+            f'<div class="col"><h3>Original</h3><pre>{escape(page.before_text)}</pre></div>'
+        )
+        parts.append(
+            f'<div class="col"><h3>Redacted</h3><pre>{escape(page.after_text)}</pre></div>'
+        )
         parts.append("</div>")
         if page.redactions:
             parts.append('<ul class="redactions">')
