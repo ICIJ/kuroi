@@ -29,6 +29,7 @@ class Finding:
 
     @property
     def span_length(self) -> int:
+        """Number of words covered by this finding (inclusive)."""
         return self.end - self.start + 1
 
 
