@@ -6,7 +6,7 @@
 
 **Architecture:** `mkdocs.yml` → `zensical.toml`. The two MkDocs plugins Zensical does not support (`mkdocs-typer2`, `mkdocs-gen-files`) are replaced by Python scripts under `docs/_scripts/` that write `docs/reference/cli.md` and `docs/reference/rule-schema.md` directly. Generated files are committed; a `git diff --exit-code` step in CI fails the build if they drift from the source code.
 
-**Tech Stack:** Zensical ≥0.0.11, mkdocstrings[python] ≥0.27, Typer (existing), uv (existing), pytest (existing), GitHub Actions, GitHub Pages.
+**Tech Stack:** Zensical ≥0.0.11, `mkdocstrings[python]` ≥0.27, Typer (existing), uv (existing), pytest (existing), GitHub Actions, GitHub Pages.
 
 **Spec:** [`docs/superpowers/specs/2026-04-30-replace-mkdocs-with-zensical-design.md`](../specs/2026-04-30-replace-mkdocs-with-zensical-design.md)
 
