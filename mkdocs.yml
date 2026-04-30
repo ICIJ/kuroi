@@ -40,6 +40,32 @@ extra_css:
 
 nav:
   - Home: index.md
+  - User Guide:
+      - Install: user-guide/install.md
+      - Quick start: user-guide/quickstart.md
+      - Batch redaction: user-guide/batch.md
+      - LLM providers: user-guide/providers.md
+      - Audit, diff, undo & backups: user-guide/audit-and-undo.md
+      - Troubleshooting: user-guide/troubleshooting.md
+  - Developer Guide:
+      - Architecture: developer-guide/architecture.md
+      - Contributing: developer-guide/contributing.md
+      - Using kuroi as a library: developer-guide/library-usage.md
+      - Adding an LLM provider: developer-guide/adding-a-provider.md
+      - Writing rule packs: developer-guide/writing-rule-packs.md
+  - Reference:
+      - CLI: reference/cli.md
+      - Python API:
+          - kuroi.core.redaction: reference/api/redaction.md
+          - kuroi.core.findings: reference/api/findings.md
+          - kuroi.core.rules: reference/api/rules.md
+          - kuroi.providers.base: reference/api/providers.md
+      - Rule schema: reference/rule-schema.md
+      - Configuration: reference/config.md
+      - Exit codes: reference/exit-codes.md
+  - About:
+      - Changelog: about/changelog.md
+      - License: about/license.md
 
 markdown_extensions:
   - admonition
