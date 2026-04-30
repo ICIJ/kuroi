@@ -38,7 +38,7 @@ CI runs `lint`, `typecheck`, `test`, and a strict docs build on every PR.
 
 ```sh
 $ make docs
-INFO    -  Serving on http://127.0.0.1:8000/
+INFO    -  Serving on http://0.0.0.0:4000/
 ```
 
 The site live-reloads on every file save. Before opening a PR that
