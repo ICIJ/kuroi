@@ -127,7 +127,7 @@ docs: _check-uv docs-gen
 
 docs-build: _check-uv docs-gen
 	@uv run zensical build
-	@rm -rf site/superpowers
+	@rm -rf site/superpowers site/_scripts site/_snippets
 	@echo "Docs build OK (site/)"
 
 docs-gen: _check-uv
