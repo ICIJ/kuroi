@@ -30,6 +30,7 @@ docs = [
     "mkdocstrings[python]>=0.27",
     "mkdocs-gen-files>=0.5",
     "pymdown-extensions>=10.7",
+    "zensical>=0.0.11",
 ]
 
 [project.scripts]
