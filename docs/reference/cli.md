@@ -10,186 +10,162 @@ and subcommand below comes straight from the source — if it doesn't match
 ## `kuroi`
 
 ```
-                                                                                        
- Usage: kuroi [OPTIONS] COMMAND [ARGS]...                                               
-                                                                                        
- Strip sensitive data from PDFs with LLM assistance.                                    
-                                                                                        
-╭─ Options ────────────────────────────────────────────────────────────────────────────╮
-│ --verbose             -v      INTEGER  Show more detail (use -vv for debug).         │
-│                                        [default: 0]                                  │
-│ --quiet               -q               Show less.                                    │
-│ --version                              Print version and exit.                       │
-│ --install-completion                   Install completion for the current shell.     │
-│ --show-completion                      Show completion for the current shell, to     │
-│                                        copy it or customize the installation.        │
-│ --help                -h               Show this message and exit.                   │
-╰──────────────────────────────────────────────────────────────────────────────────────╯
-╭─ Commands ───────────────────────────────────────────────────────────────────────────╮
-│ run      Redact one or more PDFs.                                                    │
-│ diff     Show what changed between original and redacted.                            │
-│ models   List available LLM providers and models.                                    │
-│ doctor   Check that everything is working.                                           │
-│ verify   Check an already-redacted PDF for leaks.                                    │
-│ undo     Restore the most recent backup.                                             │
-│ setup    Interactively configure kuroi.                                              │
-│ config   Configuration management.                                                   │
-│ backups  Manage backups.                                                             │
-╰──────────────────────────────────────────────────────────────────────────────────────╯
+Usage: kuroi [OPTIONS] COMMAND [ARGS]...
+
+  Strip sensitive data from PDFs with LLM assistance.
+
+Options:
+  -v, --verbose         Show more detail (use -vv for debug).  [default: 0]
+  -q, --quiet           Show less.
+  --version             Print version and exit.
+  --install-completion  Install completion for the current shell.
+  --show-completion     Show completion for the current shell, to copy it or customize
+                        the installation.
+  --help                Show this message and exit.
+
+Commands:
+  run      Redact one or more PDFs.
+  diff     Show what changed between original and redacted.
+  models   List available LLM providers and models.
+  doctor   Check that everything is working.
+  verify   Check an already-redacted PDF for leaks.
+  undo     Restore the most recent backup.
+  setup    Interactively configure kuroi.
+  config   Configuration management.
+  backups  Manage backups.
 ```
 
 ## `kuroi run`
 
 ```
-                                                                                        
- Usage: kuroi run [OPTIONS] PDF                                                         
-                                                                                        
- Redact one or more PDFs.                                                               
-                                                                                        
-╭─ Arguments ──────────────────────────────────────────────────────────────────────────╮
-│ *    pdf      FILE  [required]                                                       │
-╰──────────────────────────────────────────────────────────────────────────────────────╯
-╭─ Options ────────────────────────────────────────────────────────────────────────────╮
-│ --output      -o      PATH                                                           │
-│ --in-place                     Write to the input path; backup is taken.             │
-│ --overwrite                    Replace an existing output file.                      │
-│ --rules               TEXT     Comma-separated rule set names. [default: pii]        │
-│               -y               Skip the apply confirmation.                          │
-│ --backup-dir          PATH     [default: /home/dev/Documents/kuroi-backups]          │
-│ --audit-dir           PATH     [default: /home/dev/.local/share/kuroi/audit]         │
-│ --provider            TEXT     LLM provider: 'anthropic' or 'ollama'. Overrides env  │
-│                                and config.                                           │
-│ --model               TEXT     Model ID. Overrides env and config.                   │
-│ --ollama-url          TEXT     Base URL of the Ollama daemon. Overrides env and      │
-│                                config.                                               │
-│ --seed                INTEGER  Reproducibility seed. Best-effort per provider;       │
-│                                recorded in audit.                                    │
-│ --help        -h               Show this message and exit.                           │
-╰──────────────────────────────────────────────────────────────────────────────────────╯
+Usage: kuroi run [OPTIONS] PDF
+
+  Redact one or more PDFs.
+
+Arguments:
+  PDF  [required]
+
+Options:
+  -o, --output PATH
+  --in-place         Write to the input path; backup is taken.
+  --overwrite        Replace an existing output file.
+  --rules TEXT       Comma-separated rule set names.  [default: pii]
+  -y                 Skip the apply confirmation.
+  --backup-dir PATH  [default: /home/dev/Documents/kuroi-backups]
+  --audit-dir PATH   [default: /home/dev/.local/share/kuroi/audit]
+  --provider TEXT    LLM provider: 'anthropic' or 'ollama'. Overrides env and config.
+  --model TEXT       Model ID. Overrides env and config.
+  --ollama-url TEXT  Base URL of the Ollama daemon. Overrides env and config.
+  --seed INTEGER     Reproducibility seed. Best-effort per provider; recorded in audit.
+  --help             Show this message and exit.
 ```
 
 ## `kuroi diff`
 
 ```
-                                                                                        
- Usage: kuroi diff [OPTIONS] ORIGINAL REDACTED                                          
-                                                                                        
- Show what changed between original and redacted.                                       
-                                                                                        
-╭─ Arguments ──────────────────────────────────────────────────────────────────────────╮
-│ *    original      FILE  [required]                                                  │
-│ *    redacted      FILE  [required]                                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────╯
-╭─ Options ────────────────────────────────────────────────────────────────────────────╮
-│ --format          TEXT  text, html, or json. [default: text]                         │
-│ --output  -o      PATH                                                               │
-│ --help    -h            Show this message and exit.                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────╯
+Usage: kuroi diff [OPTIONS] ORIGINAL REDACTED
+
+  Show what changed between original and redacted.
+
+Arguments:
+  ORIGINAL  [required]
+  REDACTED  [required]
+
+Options:
+  --format TEXT      text, html, or json.  [default: text]
+  -o, --output PATH
+  --help             Show this message and exit.
 ```
 
 ## `kuroi models`
 
 ```
-                                                                                        
- Usage: kuroi models [OPTIONS] [PROVIDER]                                               
-                                                                                        
- List available LLM providers and models.                                               
-                                                                                        
-╭─ Arguments ──────────────────────────────────────────────────────────────────────────╮
-│   provider      [PROVIDER]  Filter to one provider.                                  │
-╰──────────────────────────────────────────────────────────────────────────────────────╯
-╭─ Options ────────────────────────────────────────────────────────────────────────────╮
-│ --json            Machine-readable output.                                           │
-│ --help  -h        Show this message and exit.                                        │
-╰──────────────────────────────────────────────────────────────────────────────────────╯
+Usage: kuroi models [OPTIONS] [PROVIDER]
+
+  List available LLM providers and models.
+
+Arguments:
+  [PROVIDER]  Filter to one provider.
+
+Options:
+  --json  Machine-readable output.
+  --help  Show this message and exit.
 ```
 
 ## `kuroi doctor`
 
 ```
-                                                                                        
- Usage: kuroi doctor [OPTIONS] COMMAND [ARGS]...                                        
-                                                                                        
- Check that everything is working.                                                      
-                                                                                        
-╭─ Options ────────────────────────────────────────────────────────────────────────────╮
-│ --help  -h        Show this message and exit.                                        │
-╰──────────────────────────────────────────────────────────────────────────────────────╯
+Usage: kuroi doctor [OPTIONS] COMMAND [ARGS]...
+
+  Check that everything is working.
+
+Options:
+  --help  Show this message and exit.
 ```
 
 ## `kuroi verify`
 
 ```
-                                                                                        
- Usage: kuroi verify [OPTIONS] PDF COMMAND [ARGS]...                                    
-                                                                                        
- Check an already-redacted PDF for leaks.                                               
-                                                                                        
-╭─ Arguments ──────────────────────────────────────────────────────────────────────────╮
-│ *    pdf      FILE  [required]                                                       │
-╰──────────────────────────────────────────────────────────────────────────────────────╯
-╭─ Options ────────────────────────────────────────────────────────────────────────────╮
-│ --help  -h        Show this message and exit.                                        │
-╰──────────────────────────────────────────────────────────────────────────────────────╯
+Usage: kuroi verify [OPTIONS] PDF COMMAND [ARGS]...
+
+  Check an already-redacted PDF for leaks.
+
+Arguments:
+  PDF  [required]
+
+Options:
+  --help  Show this message and exit.
 ```
 
 ## `kuroi undo`
 
 ```
-                                                                                        
- Usage: kuroi undo [OPTIONS] COMMAND [ARGS]...                                          
-                                                                                        
- Restore the most recent backup.                                                        
-                                                                                        
-╭─ Options ────────────────────────────────────────────────────────────────────────────╮
-│               -y            Skip the restore confirmation.                           │
-│ --backup-dir          PATH  [default: /home/dev/Documents/kuroi-backups]             │
-│ --help        -h            Show this message and exit.                              │
-╰──────────────────────────────────────────────────────────────────────────────────────╯
+Usage: kuroi undo [OPTIONS] COMMAND [ARGS]...
+
+  Restore the most recent backup.
+
+Options:
+  -y                 Skip the restore confirmation.
+  --backup-dir PATH  [default: /home/dev/Documents/kuroi-backups]
+  --help             Show this message and exit.
 ```
 
 ## `kuroi setup`
 
 ```
-                                                                                        
- Usage: kuroi setup [OPTIONS] COMMAND [ARGS]...                                         
-                                                                                        
- Interactively configure kuroi.                                                         
-                                                                                        
-╭─ Options ────────────────────────────────────────────────────────────────────────────╮
-│ --help  -h        Show this message and exit.                                        │
-╰──────────────────────────────────────────────────────────────────────────────────────╯
+Usage: kuroi setup [OPTIONS] COMMAND [ARGS]...
+
+  Interactively configure kuroi.
+
+Options:
+  --help  Show this message and exit.
 ```
 
 ## `kuroi config`
 
 ```
-                                                                                        
- Usage: kuroi config [OPTIONS] COMMAND [ARGS]...                                        
-                                                                                        
- Configuration management.                                                              
-                                                                                        
-╭─ Options ────────────────────────────────────────────────────────────────────────────╮
-│ --help  -h        Show this message and exit.                                        │
-╰──────────────────────────────────────────────────────────────────────────────────────╯
-╭─ Commands ───────────────────────────────────────────────────────────────────────────╮
-│ refresh-pricing  Replace the user's pricing.json with the contents of `--from`.      │
-╰──────────────────────────────────────────────────────────────────────────────────────╯
+Usage: kuroi config [OPTIONS] COMMAND [ARGS]...
+
+  Configuration management.
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  refresh-pricing  Replace the user's pricing.json with the contents of `--from`.
 ```
 
 ## `kuroi backups`
 
 ```
-                                                                                        
- Usage: kuroi backups [OPTIONS] COMMAND [ARGS]...                                       
-                                                                                        
- Manage backups.                                                                        
-                                                                                        
-╭─ Options ────────────────────────────────────────────────────────────────────────────╮
-│ --help  -h        Show this message and exit.                                        │
-╰──────────────────────────────────────────────────────────────────────────────────────╯
-╭─ Commands ───────────────────────────────────────────────────────────────────────────╮
-│ list  List backup sessions with their ages.                                          │
-│ gc    Prune backups older than `--max-age` hours.                                    │
-╰──────────────────────────────────────────────────────────────────────────────────────╯
+Usage: kuroi backups [OPTIONS] COMMAND [ARGS]...
+
+  Manage backups.
+
+Options:
+  --help  Show this message and exit.
+
+Commands:
+  list  List backup sessions with their ages.
+  gc    Prune backups older than `--max-age` hours.
 ```
