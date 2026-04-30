@@ -12,6 +12,8 @@ exclude_docs: |
 theme:
   name: material
   language: en
+  logo: assets/logo.svg
+  favicon: assets/favicon.svg
   palette:
     scheme: slate
     primary: black
