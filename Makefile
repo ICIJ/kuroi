@@ -127,6 +127,7 @@ docs: _check-uv docs-gen
 
 docs-build: _check-uv docs-gen
 	@uv run zensical build
+	@# Zensical 0.0.38: exclude_docs is silently no-op'd, strip leaked source dirs.
 	@rm -rf site/superpowers site/_scripts site/_snippets
 	@echo "Docs build OK (site/)"
 
