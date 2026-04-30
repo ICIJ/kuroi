@@ -1,0 +1,14 @@
+site_name: kuroi
+site_description: Strip sensitive data from PDFs with LLM assistance.
+site_url: https://icij.github.io/kuroi/
+repo_url: https://github.com/ICIJ/kuroi
+repo_name: ICIJ/kuroi
+edit_uri: edit/main/docs/
+docs_dir: docs
+
+theme:
+  name: material
+  language: en
+
+nav:
+  - Home: index.md
