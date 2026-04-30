@@ -122,11 +122,12 @@ bump-major: _check-uv
 	@uvx bump-my-version bump major
 	@$(MAKE) --no-print-directory _bump-success
 
-docs: _check-uv
-	@uv run mkdocs serve
+docs: _check-uv docs-gen
+	@uv run zensical serve
 
-docs-build: _check-uv
-	@uv run mkdocs build --strict
+docs-build: _check-uv docs-gen
+	@uv run zensical build
+	@rm -rf site/superpowers
 	@echo "Docs build OK (site/)"
 
 docs-gen: _check-uv
