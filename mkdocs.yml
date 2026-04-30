@@ -6,6 +6,9 @@ repo_name: ICIJ/kuroi
 edit_uri: edit/main/docs/
 docs_dir: docs
 
+exclude_docs: |
+  superpowers/
+
 theme:
   name: material
   language: en
