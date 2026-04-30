@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import pathlib
+import re
 
 
 def _load_module():
@@ -32,5 +33,11 @@ def test_render_includes_category_fields() -> None:
 def test_render_includes_intro_paragraph() -> None:
     mod = _load_module()
     out = mod.render_schema_markdown()
-    assert out.lstrip().startswith("# Rule schema")
+    body = re.sub(r"^<!--.*?-->\n", "", out, count=1, flags=re.DOTALL).lstrip()
+    assert body.startswith("# Rule schema")
     assert "auto-generated" in out.lower()
+
+
+def test_render_is_deterministic() -> None:
+    mod = _load_module()
+    assert mod.render_schema_markdown() == mod.render_schema_markdown()
