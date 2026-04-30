@@ -17,7 +17,7 @@ instead — no API key required.
 ## 2. Run the redactor
 
 ```sh
-$ kuroi run report.pdf
+$ kuroi run report.pdf -o report.redacted.pdf
 ```
 
 kuroi prints a cost estimate, asks you to confirm, then writes the
@@ -35,8 +35,9 @@ A copy of the original is saved under
 `~/Documents/kuroi-backups/2026-04-30T09-31-02Z-a1b2c3/report.pdf` so you
 can roll back at any time.
 
-The redacted file is written next to the input as `report.redacted.pdf`
-by default. See [Batch redaction](batch.md) for output-resolution rules.
+The `-o` flag selects the output path. Use `--in-place` if you want
+kuroi to overwrite the input. Either flag is required. See
+[Batch redaction](batch.md) for output-resolution rules.
 
 ## 3. Inspect the diff
 
