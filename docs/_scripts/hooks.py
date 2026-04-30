@@ -3,12 +3,14 @@
 Currently fixes one quirk: `mkdocs-typer2` injects raw `<code>[FOO]</code>`
 elements whose `[text][id]` shape is then re-interpreted by `mkdocs-autorefs`
 as an unresolved cross-reference (e.g. `[OPTIONS][PROVIDER]` → warning about
-missing target `PROVIDER`). We escape the brackets inside the rendered HTML
-before autorefs runs in `on_env`.
+missing target `PROVIDER`). On the CLI reference page only, we unwrap the
+resulting `<autoref>` tags back to their literal `[title][identifier]` text
+so autorefs has nothing left to resolve.
 """
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -41,11 +43,13 @@ def on_page_content(
     return _unwrap_autorefs(html)
 
 
-def _unwrap_autorefs(html: str) -> str:
-    import re
+_AUTOREF_RE = re.compile(
+    r'<autoref [^>]*identifier=["\'](?P<id>[^"\']+)["\'][^>]*>(?P<title>.*?)</autoref>',
+    re.DOTALL,
+)
 
-    pattern = re.compile(
-        r'<autoref [^>]*identifier="(?P<id>[^"]+)"[^>]*>(?P<title>.*?)</autoref>',
-        re.DOTALL,
+
+def _unwrap_autorefs(html: str) -> str:
+    return _AUTOREF_RE.sub(
+        lambda m: f"[{m.group('title')}][{m.group('id')}]", html
     )
-    return pattern.sub(lambda m: f"[{m.group('title')}][{m.group('id')}]", html)
