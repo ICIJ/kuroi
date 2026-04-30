@@ -1,4 +1,4 @@
-.PHONY: help test lint format typecheck clean install setup doctor run verify models backups coverage build bump-patch bump-minor bump-major _check-bump _bump-success
+.PHONY: help test lint format typecheck clean install setup doctor run verify models backups coverage build bump-patch bump-minor bump-major _check-bump _bump-success docs docs-build
 
 PYTHON := python3
 SRC := src/kuroi
@@ -22,6 +22,8 @@ help:
 	@echo "  make typecheck      Run mypy"
 	@echo "  make clean          Remove cache files"
 	@echo "  make install        Install package in editable mode with dev deps"
+	@echo "  make docs           Serve the documentation site locally"
+	@echo "  make docs-build     Build docs in --strict mode (matches CI)"
 	@echo ""
 	@echo "Release:"
 	@echo "  make build          Build sdist and wheel into dist/"
@@ -53,8 +55,8 @@ clean:
 	@echo "Cleaned"
 
 install:
-	@$(PYTHON) -m pip install -e ".[dev]"
-	@echo "Installed kuroi in editable mode with dev deps"
+	@$(PYTHON) -m pip install -e ".[dev,docs]"
+	@echo "Installed kuroi in editable mode with dev + docs deps"
 
 setup:
 	@$(PYTHON) -m kuroi setup
@@ -131,3 +133,10 @@ bump-minor: _check-bump
 bump-major: _check-bump
 	@bump-my-version bump major
 	@$(MAKE) --no-print-directory _bump-success
+
+docs:
+	@$(PYTHON) -m mkdocs serve -a 127.0.0.1:8000
+
+docs-build:
+	@$(PYTHON) -m mkdocs build --strict
+	@echo "Docs build OK (site/)"
