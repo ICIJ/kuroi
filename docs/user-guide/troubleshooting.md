@@ -63,11 +63,11 @@ first, then redact each part:
 
 ```sh
 $ qpdf --split-pages large.pdf parts.pdf
-$ for part in parts*.pdf; do kuroi run "$part"; done
+$ for part in parts*.pdf; do kuroi run "$part" -o "${part%.pdf}.redacted.pdf"; done
 ```
 
-`pdftk burst large.pdf` works the same way if you prefer pdftk. Re-merge
-the redacted parts with `qpdf --empty --pages parts*.redacted.pdf -- merged.pdf`.
+Re-merge the redacted parts with
+`qpdf --empty --pages parts*.redacted.pdf -- merged.pdf`.
 
 ## "Verification gate failed"
 
@@ -77,12 +77,13 @@ written to the destination. To reproduce a problematic run with a fixed
 seed and full request/response logs:
 
 ```sh
-$ kuroi run --seed 42 -vv input.pdf
+$ kuroi -vv run --seed 42 input.pdf -o input.redacted.pdf
 ```
 
-Then re-run `kuroi verify <output>` to see exactly which spans the
-verifier flagged. Note that `--seed` is a flag on `kuroi run` (not on
-`kuroi verify`); `verify` takes only the PDF path.
+`-v`/`-vv` are top-level flags on the `kuroi` command and must come
+before the subcommand. `--seed` is a flag on `kuroi run` (not on
+`kuroi verify`); `verify` takes only the PDF path. Then re-run
+`kuroi verify <output>` to see exactly which spans the verifier flagged.
 
 ## Where logs live
 
@@ -103,5 +104,5 @@ with:
 
 1. The command you ran.
 2. `kuroi --version` and `kuroi doctor` output.
-3. The relevant audit JSONL excerpt (with `audit_include_text=false` so
-   you don't leak the data you're trying to redact).
+3. The relevant audit JSONL excerpt (with `include_text = false` under
+   `[audit]` so you don't leak the data you're trying to redact).

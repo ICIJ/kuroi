@@ -28,7 +28,7 @@ anything that slipped through:
 
 ```sh
 $ kuroi verify report.redacted.pdf
-✓ No regex matches detected
+  PASS  report.redacted.pdf: no residual leaks
 ```
 
 If it finds anything, the exit code is non-zero and the leaked spans are
@@ -56,13 +56,14 @@ Each backup is a timestamped subdirectory of the backup root containing a
 
 ```sh
 $ kuroi backups list
-  2026-04-30T09-31-02Z-a1b2c3  0h ago   /home/you/work/report.pdf
-  2026-04-29T14-15-22Z-9f0e21  19h ago  /home/you/work/report.pdf
   2026-04-28T08-00-01Z-44ab12  49h ago  /home/you/finance/invoice.pdf
+  2026-04-29T14-15-22Z-9f0e21  19h ago  /home/you/work/report.pdf
+  2026-04-30T09-31-02Z-a1b2c3  0h ago   /home/you/work/report.pdf
 ```
 
-Each row shows the session directory name, an age in hours, and the
-original path recorded in the manifest.
+Rows are sorted by directory name (oldest first). Each row shows the
+session directory name, an age in hours, and the original path recorded
+in the manifest.
 
 !!! warning "Destructive: review before running"
     `kuroi backups gc` permanently deletes backups older than `--max-age`
@@ -100,9 +101,10 @@ filename is the same timestamp string used for the matching backup
 `session_end` footer with the verification status. The dataclasses for
 each line live in `src/kuroi/core/audit_records.py`.
 
-Set `audit_include_text = true` in `~/.config/kuroi/config.toml` to
-capture matched snippets in the audit log (off by default — opt-in
-because audit logs themselves can be sensitive):
+Set `include_text = true` under `[audit]` in
+`~/.config/kuroi/config.toml` to capture matched snippets in the audit
+log (off by default — opt-in because audit logs themselves can be
+sensitive):
 
 ```toml
 [audit]
