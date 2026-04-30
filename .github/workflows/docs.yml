@@ -27,13 +27,29 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: pip
 
-      - name: Install package with docs extras
-        run: pip install -e ".[docs]"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
 
-      - name: Build docs (strict)
-        run: mkdocs build --strict
+      - name: Sync env with docs extras
+        run: uv sync --extra docs
+
+      - name: Regenerate auto-derived reference pages
+        run: make docs-gen
+
+      - name: Drift check (regenerated pages must match committed)
+        run: |
+          if ! git diff --exit-code docs/reference/cli.md docs/reference/rule-schema.md; then
+            echo "::error::Generated reference pages are out of date."
+            echo "Run 'make docs-gen' locally and commit the updated files."
+            exit 1
+          fi
+
+      - name: Build docs
+        run: uv run zensical build
+
+      - name: Strip leaked source dirs
+        run: rm -rf site/superpowers site/_scripts site/_snippets
 
       - name: Upload site artifact
         if: github.ref == 'refs/heads/main'
