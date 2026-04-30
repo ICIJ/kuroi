@@ -43,11 +43,21 @@ $ kuroi --version
 kuroi 0.1.0
 
 $ kuroi doctor
-✓ Python 3.12.4
-✓ Provider: anthropic (model: claude-opus-4-7)
-✓ Configuration directory: ~/.config/kuroi/
-✓ Ready
+  kuroi version 0.1.0                                                        ok
+  Python version 3.12.4                                                      ok
+  Anthropic API key                set (env: ANTHROPIC_API_KEY)              ok
+  tesseract                        /usr/bin/tesseract                        ok
+  qpdf                             /usr/bin/qpdf                             ok
+  Provider                         anthropic                                 ok
+  Model                            claude-opus-4-7                           ok
+
+Everything looks good.
 ```
+
+`kuroi doctor` checks the Python version, your Anthropic API key, the
+optional `tesseract` and `qpdf` binaries, and the resolved provider /
+model. When `provider = ollama`, it also probes the Ollama daemon's
+`/api/tags` endpoint so you know whether it's reachable.
 
 If `kuroi doctor` flags any issue, the [Troubleshooting](troubleshooting.md)
 page lists the common fixes.

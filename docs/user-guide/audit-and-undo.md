@@ -5,20 +5,21 @@ commands you need to inspect, verify, restore, and clean up.
 
 ## See what changed: `kuroi diff`
 
+`kuroi diff` takes the original and the redacted PDF and prints, per
+page, the bounding box and before-text snippet of every redaction:
+
 ```sh
-$ kuroi diff report.pdf
-report.pdf  →  report.redacted.pdf
-
-  page 3, words 12-13   email          anthropic    high      "j.doe@example.com"
-  page 3, word 88       phone          rules:pii-en high      "+33 6 12 34 56 78"
-  page 7, words 22-25   person_name    anthropic    medium    "Jane M. Doe"
-  ...
-
-47 findings (32 regex, 15 llm)
+$ kuroi diff report.pdf report.redacted.pdf
+Page 3: 2 redactions
+  - [40,120,180,138]  'j.doe@example.com'
+  - [200,400,310,418]  '+33 6 12 34 56 78'
+Page 7: 1 redaction
+  - [60,210,220,230]  'Jane M. Doe'
 ```
 
-`--include-text` and `--exclude-text` filter the listing. Use `--json`
-for machine-readable output.
+Use `--format json` for one JSON record per page (machine-readable),
+or `--format html -o diff.html` for a side-by-side view. Pass
+`-o <path>` with any format to write to a file instead of stdout.
 
 ## Re-check a redacted PDF: `kuroi verify`
 
@@ -36,53 +37,77 @@ listed. Wire `kuroi verify` into your batch pipeline as a gate.
 ## Restore the original: `kuroi undo`
 
 ```sh
-$ kuroi undo report.pdf
-✓ Restored report.pdf from backup report-20260430-093102.pdf
+$ kuroi undo
+  Last backup: 2026-04-30T09-31-02Z-a1b2c3
+  Will restore: /home/you/work/report.pdf
+Restore now? [Y/n]: y
+  Restored.
 ```
 
-`undo` finds the most recent backup matching the input filename and
-copies it back over the redacted output. The backup is retained.
+`undo` takes no positional argument: it restores the most recent backup
+in the configured backup directory (default `~/Documents/kuroi-backups/`,
+override with `--backup-dir`). The backup itself is retained until it
+falls outside the retention window.
 
 ## List & garbage-collect backups
 
+Each backup is a timestamped subdirectory of the backup root containing a
+`manifest.json` and the original PDF.
+
 ```sh
 $ kuroi backups list
-report-20260430-093102.pdf   124 KB    today, 09:31
-report-20260429-141522.pdf   118 KB    yesterday
-invoice-20260428-080001.pdf   42 KB    2 days ago
+  2026-04-30T09-31-02Z-a1b2c3  0h ago   /home/you/work/report.pdf
+  2026-04-29T14-15-22Z-9f0e21  19h ago  /home/you/work/report.pdf
+  2026-04-28T08-00-01Z-44ab12  49h ago  /home/you/finance/invoice.pdf
 ```
+
+Each row shows the session directory name, an age in hours, and the
+original path recorded in the manifest.
 
 !!! warning "Destructive: review before running"
-    `kuroi backups gc` permanently deletes backups older than the retention
-    window (default: 24h). Pass `--dry-run` first to preview.
+    `kuroi backups gc` permanently deletes backups older than `--max-age`
+    hours (default: 24). There is no preview / dry-run flag yet; run
+    `kuroi backups list --root <dir>` first to see what would be eligible,
+    or pass `--max-age 0` to disable pruning.
 
 ```sh
-$ kuroi backups gc --dry-run
-Would delete 3 backups (oldest: 2 days ago)
-
-$ kuroi backups gc
-Deleted 3 backups, 318 KB freed.
+$ kuroi backups gc --max-age 24
+  Pruned 1 backup.
 ```
 
-Tune retention with:
+To change the default retention window globally, edit
+`~/.config/kuroi/config.toml` and set:
 
-```sh
-$ kuroi config set backup_retention_hours 168   # one week
+```toml
+[backup]
+retention_hours = 168   # one week
 ```
+
+`retention_hours = 0` keeps every backup (legal-hold mode).
 
 ## Where audit logs live
 
 Each run writes a JSONL record to:
 
 ```
-~/.local/state/kuroi/audit/<input-hash>/<run-id>.jsonl
+~/.local/share/kuroi/audit/<timestamp>.jsonl
 ```
 
-One line per finding. The schema lives in
-`src/kuroi/core/audit_records.py`. Use
-`kuroi config set audit_include_text true` if you want the matched
-snippets stored in the audit log (off by default — opt-in because audit
-logs themselves can be sensitive).
+The directory is configurable with `kuroi run --audit-dir <path>`; the
+filename is the same timestamp string used for the matching backup
+(e.g. `2026-04-30T09-31-02Z-a1b2c3.jsonl`). Each file contains a
+`session_start` header, one `finding` line per applied redaction, and a
+`session_end` footer with the verification status. The dataclasses for
+each line live in `src/kuroi/core/audit_records.py`.
+
+Set `audit_include_text = true` in `~/.config/kuroi/config.toml` to
+capture matched snippets in the audit log (off by default — opt-in
+because audit logs themselves can be sensitive):
+
+```toml
+[audit]
+include_text = true
+```
 
 ## Next steps
 

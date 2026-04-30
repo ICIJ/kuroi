@@ -14,35 +14,50 @@ plain regex misses. Two providers ship with kuroi.
 
 ```sh
 $ kuroi models
-Anthropic
-  claude-opus-4-7         (default)
-  claude-sonnet-4-6
-  claude-haiku-4-5
 
-Ollama (http://localhost:11434)
-  llama3.1:8b
-  llama3.1:70b
+Anthropic                                                   cloud
+  claude-opus-4-7        (default)   $15.00 / $75.00 per Mtok
+  claude-sonnet-4-6                  $3.00 / $15.00 per Mtok
+  claude-haiku-4-5-20251001          $1.00 / $5.00 per Mtok
+  seed support: temperature=0 only (best-effort, recorded in audit)
+
+Ollama                                                      local
+  llama3.1:8b            (installed) free
+  llama3.1:70b                       free
+  seed support: full
+
+Default: anthropic / claude-opus-4-7   (configurable)
+Pricing last updated: 2026-04-01
 ```
 
-If Ollama is not running, the Ollama section reports `unreachable`.
+`(installed)` is shown for Ollama models the local daemon currently
+serves; if the Ollama daemon at the configured URL isn't reachable,
+the column is simply blank. Use `kuroi models --json` for machine-readable
+output, or `kuroi models ollama` to filter to one provider.
 
 ## Configure a provider
 
 === "Anthropic"
+
+    Pass per invocation:
 
     ```sh
     $ export ANTHROPIC_API_KEY=sk-ant-...
     $ kuroi run document.pdf --provider anthropic --model claude-opus-4-7
     ```
 
-    Or persist it:
+    Or persist by editing `~/.config/kuroi/config.toml`:
 
-    ```sh
-    $ kuroi config set provider anthropic
-    $ kuroi config set model claude-opus-4-7
+    ```toml
+    provider = "anthropic"
+    model = "claude-opus-4-7"
     ```
 
+    `kuroi setup` will write this file for you interactively.
+
 === "Ollama"
+
+    Pass per invocation:
 
     ```sh
     $ ollama serve &  # start the daemon if it's not already running
@@ -50,13 +65,18 @@ If Ollama is not running, the Ollama section reports `unreachable`.
     $ kuroi run document.pdf --provider ollama --model llama3.1:8b
     ```
 
-    Or persist it:
+    Or persist by editing `~/.config/kuroi/config.toml`:
 
-    ```sh
-    $ kuroi config set provider ollama
-    $ kuroi config set model llama3.1:8b
-    $ kuroi config set ollama_url http://localhost:11434
+    ```toml
+    provider = "ollama"
+    model = "llama3.1:8b"
+
+    [ollama]
+    url = "http://localhost:11434"
     ```
+
+    `kuroi setup` will probe the daemon, list installed models, and write
+    this file for you.
 
 ## Configuration precedence
 
@@ -73,21 +93,24 @@ See [Configuration](../reference/config.md) for the full key list.
 
 1. Install [Ollama](https://ollama.ai).
 2. Pull a model: `ollama pull llama3.1:8b`.
-3. `kuroi config set provider ollama && kuroi config set model llama3.1:8b`.
+3. Run `kuroi setup` and pick `ollama` + your model, or write
+   `~/.config/kuroi/config.toml` by hand (see the Ollama tab above).
 4. Run `kuroi run document.pdf`. No outbound HTTP except to `localhost`.
 
 ## Switching providers mid-project
 
-You can change provider per-invocation without losing state. The audit
-record stores which provider produced each finding:
+You can change provider per-invocation without persisting the choice. The
+audit record stores which provider produced each finding, so you can tell
+later which run did what:
 
 ```sh
 $ kuroi run document.pdf --provider anthropic
-$ kuroi diff document.pdf | head
-  page 3, words 12-13   email           anthropic    high
-  page 3, word 88       phone           rules:pii-en high
-  ...
+$ kuroi diff document.pdf document.redacted.pdf --format json | head -1
+{"page":3,"before_text":"...","after_text":"...","redactions":[{"bbox":[40,120,180,138],"kind":"","replacement":"","before_text":"j.doe@example.com"}]}
 ```
+
+For the per-finding `provider` and `kind`, read the audit JSONL directly
+(see [Audit & undo](audit-and-undo.md)).
 
 ## Next steps
 
