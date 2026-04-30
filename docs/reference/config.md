@@ -18,8 +18,8 @@ The merged result is an immutable `Config` object defined in
 | `provider`                   | string   | `anthropic`                   | top-level `provider`                | `--provider`     | `KUROI_PROVIDER`     |
 | `model`                      | string   | `claude-opus-4-7` (anthropic) | top-level `model`                   | `--model`        | `KUROI_MODEL`        |
 | `ollama_url`                 | string   | `http://localhost:11434`      | `[ollama]` table, `url`             | `--ollama-url`   | `KUROI_OLLAMA_URL`   |
-| `audit_include_text`         | bool     | `false`                       | `[audit]` table, `include_text`     | (file/env only)  | (file only)          |
-| `backup_retention_hours`     | int      | `24`                          | `[backup]` table, `retention_hours` | (file only)      | (file only)          |
+| `audit_include_text`         | bool     | `false`                       | `[audit]` table, `include_text`     | (file only)      | (none)               |
+| `backup_retention_hours`     | int      | `24`                          | `[backup]` table, `retention_hours` | (file only)      | (none)               |
 | `ANTHROPIC_API_KEY`          | string   | (unset)                       | (not in TOML)                       | (env only)       | `ANTHROPIC_API_KEY`  |
 
 When the provider is `ollama`, there is no built-in default model — you
