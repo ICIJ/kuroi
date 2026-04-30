@@ -12,6 +12,29 @@ exclude_docs: |
 theme:
   name: material
   language: en
+  palette:
+    scheme: slate
+    primary: black
+    accent: red
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+
+extra_css:
+  - stylesheets/extra.css
 
 nav:
   - Home: index.md

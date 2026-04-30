@@ -1,0 +1,29 @@
+/* kuroi — dark slate overrides + ICIJ red accent */
+
+[data-md-color-scheme="slate"] {
+  --md-default-bg-color: #0f1115;
+  --md-default-fg-color: #e6e6e6;
+  --md-default-fg-color--light: #c8c8c8;
+  --md-default-fg-color--lighter: #9a9a9a;
+
+  --md-primary-fg-color: #07080a;
+  --md-primary-bg-color: #f5f5f5;
+
+  --md-accent-fg-color: #d62828;
+  --md-accent-fg-color--transparent: rgba(214, 40, 40, 0.10);
+
+  --md-typeset-a-color: #ff5a5a;
+
+  --md-code-bg-color: #15171c;
+  --md-code-fg-color: #e6e6e6;
+}
+
+/* Lift fenced code blocks off the page background without a border. */
+.md-typeset pre > code {
+  background-color: var(--md-code-bg-color);
+}
+
+/* Subtle accent underline on links instead of the default Material highlight. */
+.md-typeset a:hover {
+  color: var(--md-accent-fg-color);
+}
