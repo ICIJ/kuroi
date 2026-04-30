@@ -113,3 +113,6 @@ plugins:
             separate_signature: true
             show_signature_annotations: true
             heading_level: 2
+  - gen-files:
+      scripts:
+        - docs/_scripts/gen_rule_schema.py
