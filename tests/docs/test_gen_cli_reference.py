@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import pathlib
+import re
 
 
 def _load_module():
@@ -37,3 +38,12 @@ def test_render_includes_every_subcommand() -> None:
 def test_render_is_deterministic() -> None:
     mod = _load_module()
     assert mod.render_cli_markdown() == mod.render_cli_markdown()
+
+
+def test_render_fences_contain_help_text() -> None:
+    mod = _load_module()
+    out = mod.render_cli_markdown()
+    fences = re.findall(r"```\n(.*?)\n```", out, re.DOTALL)
+    assert len(fences) >= 10, f"expected at least 10 fences, got {len(fences)}"
+    assert all(f.strip() for f in fences), "one or more fences are empty"
+    assert "Usage: kuroi" in fences[0], "root fence missing 'Usage: kuroi'"

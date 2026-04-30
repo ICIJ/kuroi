@@ -6,10 +6,10 @@ by `make docs-gen` (and verified in CI via `git diff --exit-code`).
 
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
 from pathlib import Path
-
-import click
 
 _ROOT = Path(__file__).resolve().parents[2]
 if str(_ROOT / "src") not in sys.path:
@@ -27,35 +27,49 @@ _BANNER = (
 _INTRO = """\
 # CLI reference
 
-Auto-generated from the live Typer app at `kuroi.cli:app`. Every option,
-subcommand, and exit code below comes straight from the source — if it
-doesn't match `kuroi --help`, file a bug.
+Auto-generated from the live Typer app at `kuroi.cli:app`. Every option
+and subcommand below comes straight from the source — if it doesn't match
+`kuroi --help`, file a bug.
 """
 
 _OUTPUT_PATH = _ROOT / "docs" / "reference" / "cli.md"
 
+# Locked to 88 cols so the rendered help is wider than the typical 80-col
+# default but still wraps cleanly inside a markdown code fence.
+_HELP_COLUMNS = "88"
 
-def _help_block(cmd: click.Command, info_name: str) -> str:
-    """Return the formatted `--help` output for a Click command, fenced as text."""
-    ctx = click.Context(cmd, info_name=info_name, terminal_width=88)
-    help_text = cmd.get_help(ctx).rstrip()
-    return f"```\n{help_text}\n```"
+
+def _help_block(args: list[str]) -> str:
+    """Capture `kuroi … --help` output via a subprocess.
+
+    Typer's default rich_markup_mode routes help formatting through Rich's
+    Console, which writes to stdout rather than populating Click's formatter
+    buffer — so calling `cmd.get_help(ctx)` returns "". Spawning the actual
+    `kuroi` CLI with NO_COLOR + a fixed COLUMNS gives deterministic plain
+    text we can fence verbatim.
+    """
+    kuroi_bin = Path(sys.executable).parent / "kuroi"
+    env = {**os.environ, "COLUMNS": _HELP_COLUMNS, "NO_COLOR": "1", "TERM": "dumb"}
+    result = subprocess.run(
+        [str(kuroi_bin), *args, "--help"],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=True,
+    )
+    return f"```\n{result.stdout.rstrip()}\n```"
 
 
 def render_cli_markdown() -> str:
     root = get_command(app)
-    assert isinstance(root, click.Group), "kuroi.cli:app must compile to a Click Group"
+    sections: list[str] = [_BANNER, _INTRO, "", "## `kuroi`", "", _help_block([]), ""]
 
-    sections: list[str] = [_BANNER, _INTRO, "", "## `kuroi`", "", _help_block(root, "kuroi"), ""]
-
-    # Iterate subcommands in declaration order on the Typer app, not Click's dict
-    # order — TyperGroup preserves registration order, so this is stable across
-    # Python versions.
+    # Iterate subcommands in declaration order on the Typer app — TyperGroup
+    # preserves registration order, so this is stable across Python versions.
     for name in root.commands:
-        sub = root.commands[name]
         sections.append(f"## `kuroi {name}`")
         sections.append("")
-        sections.append(_help_block(sub, f"kuroi {name}"))
+        sections.append(_help_block([name]))
         sections.append("")
 
     return "\n".join(sections).rstrip() + "\n"
