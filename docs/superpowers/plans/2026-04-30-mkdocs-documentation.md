@@ -6,7 +6,7 @@
 
 **Architecture:** A single MkDocs project rooted at `mkdocs.yml`, sourcing from `docs/` (with `docs/superpowers/` excluded). Three audience-led top-level tabs (User Guide / Developer Guide / Reference) plus an About section. The Reference section is fully auto-generated — CLI from Typer via `mkdocs-typer2`, Python API via `mkdocstrings`, rule-pack schema via a `mkdocs-gen-files` script that introspects the `Category`/`RuleSet` dataclasses in `kuroi.core.rules`. Look is permanent dark (Material `slate` scheme) with an ICIJ red accent applied via `extra.css`. CI runs `mkdocs build --strict` on every PR; merges to `main` deploy via the official `actions/upload-pages-artifact` + `actions/deploy-pages` flow.
 
-**Tech Stack:** MkDocs 1.6, mkdocs-material 9.5, mkdocs-typer2, mkdocstrings[python], mkdocs-gen-files, mkdocs-literate-nav, pymdown-extensions, GitHub Actions.
+**Tech Stack:** MkDocs 1.6, mkdocs-material 9.5, mkdocs-typer2, `mkdocstrings[python]`, mkdocs-gen-files, mkdocs-literate-nav, pymdown-extensions, GitHub Actions.
 
 **Spec:** `docs/superpowers/specs/2026-04-30-mkdocs-documentation-design.md`
 
