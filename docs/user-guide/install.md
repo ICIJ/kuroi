@@ -1,1 +1,58 @@
 # Install
+
+kuroi runs on Python 3.12 or newer. Pick whichever installation method
+matches your workflow.
+
+## Installation methods
+
+=== "pip"
+
+    ```sh
+    pip install kuroi
+    ```
+
+=== "uv (recommended for end users)"
+
+    ```sh
+    uv tool install kuroi
+    ```
+
+    `uv tool install` puts `kuroi` on your PATH inside an isolated
+    environment, so it never collides with your project dependencies.
+
+=== "From source"
+
+    ```sh
+    git clone https://github.com/ICIJ/kuroi.git
+    cd kuroi
+    pip install -e .
+    ```
+
+## System requirements
+
+- **Python 3.12 or newer.** Earlier versions are not supported.
+- **An LLM provider.** Either an Anthropic API key (cloud) or a running
+  [Ollama](https://ollama.ai) instance (local). See [LLM providers](providers.md).
+- **PDFs you have permission to redact.** kuroi never uploads files; only
+  extracted text snippets are sent to the LLM.
+
+## Verify the install
+
+```sh
+$ kuroi --version
+kuroi 0.1.0
+
+$ kuroi doctor
+✓ Python 3.12.4
+✓ Provider: anthropic (model: claude-opus-4-7)
+✓ Configuration directory: ~/.config/kuroi/
+✓ Ready
+```
+
+If `kuroi doctor` flags any issue, the [Troubleshooting](troubleshooting.md)
+page lists the common fixes.
+
+## Next steps
+
+- [Quick start](quickstart.md) — redact your first PDF.
+- [LLM providers](providers.md) — set up Anthropic or Ollama.
