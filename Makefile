@@ -1,4 +1,4 @@
-.PHONY: help test lint format typecheck clean install setup doctor run verify models backups coverage build bump-patch bump-minor bump-major _check-uv _bump-success docs docs-build
+.PHONY: help test lint format typecheck clean install setup doctor run verify models backups coverage build bump-patch bump-minor bump-major _check-uv _bump-success docs docs-build docs-gen
 
 SRC := src/kuroi
 
@@ -23,6 +23,7 @@ help:
 	@echo "  make install        Sync the uv environment with dev + docs extras"
 	@echo "  make docs           Serve the documentation site locally"
 	@echo "  make docs-build     Build docs in --strict mode (matches CI)"
+	@echo "  make docs-gen       Regenerate auto-derived reference pages"
 	@echo ""
 	@echo "Release:"
 	@echo "  make build          Build sdist and wheel into dist/"
@@ -127,3 +128,8 @@ docs: _check-uv
 docs-build: _check-uv
 	@uv run mkdocs build --strict
 	@echo "Docs build OK (site/)"
+
+docs-gen: _check-uv
+	@uv run python docs/_scripts/gen_cli_reference.py
+	@uv run python docs/_scripts/gen_rule_schema.py
+	@echo "Generated reference pages OK"
