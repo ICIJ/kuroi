@@ -11,7 +11,7 @@ to your shell rc file:
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-If you want to stay fully offline, use [Ollama](providers.md#ollama)
+If you want to stay fully offline, use [Ollama](providers.md)
 instead — no API key required.
 
 ## 2. Run the redactor
@@ -20,41 +20,54 @@ instead — no API key required.
 $ kuroi run report.pdf
 ```
 
-kuroi prints a live-updating Rich progress display:
+kuroi prints a cost estimate, asks you to confirm, then writes the
+redacted output:
 
 ```
-[1/1] report.pdf
-  Extracting words ........ done (12 pages, 4,832 words)
-  Applying regex rules .... 32 findings
-  LLM judge ............... 15 findings
-  Writing redacted PDF .... ✓
-  Backup .................. ~/.local/state/kuroi/backups/report-20260430-093102.pdf
+  Estimated cost: $0.0042  (3219 input tokens, anthropic/claude-opus-4-7)
+  Found 47 candidate redactions.
+Apply redactions? [Y/n]: y
+  Wrote report.redacted.pdf
+  Audit: ~/.local/share/kuroi/audit/2026-04-30T09-31-02Z-a1b2c3.jsonl
 ```
+
+A copy of the original is saved under
+`~/Documents/kuroi-backups/2026-04-30T09-31-02Z-a1b2c3/report.pdf` so you
+can roll back at any time.
 
 The redacted file is written next to the input as `report.redacted.pdf`
 by default. See [Batch redaction](batch.md) for output-resolution rules.
 
 ## 3. Inspect the diff
 
-To see what kuroi changed, run:
+To see what kuroi changed, run `kuroi diff` with both the original and
+redacted PDFs:
 
 ```sh
-$ kuroi diff report.pdf
+$ kuroi diff report.pdf report.redacted.pdf
+Page 3: 2 redactions
+  - [40,120,180,138]  'j.doe@example.com'
+  - [200,400,310,418]  '+33 6 12 34 56 78'
+Page 7: 1 redaction
+  - [60,210,220,230]  'Jane M. Doe'
 ```
 
-The diff shows each finding by page, category, and word range — colour-coded
-by confidence (high / medium / low).
+The text renderer prints each redaction as a bbox plus the before-text
+snippet. Use `--format json` for machine-readable output, `--format html`
+for a side-by-side view.
 
 ## 4. Restore if you need to
 
 If anything looks wrong, restore the latest backup:
 
 ```sh
-$ kuroi undo report.pdf
+$ kuroi undo
 ```
 
-`kuroi undo` writes the original back into place. Backups are kept for
-24 hours by default; tune the retention via [`kuroi config`](../reference/config.md).
+`kuroi undo` restores the most recent backup in `~/Documents/kuroi-backups/`.
+Pass `--backup-dir` to point at a different directory. Backups are kept
+for 24 hours by default; use `kuroi backups gc --max-age <hours>` to drop
+old backups manually.
 
 ## What just happened?
 

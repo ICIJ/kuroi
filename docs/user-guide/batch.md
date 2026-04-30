@@ -1,90 +1,64 @@
 # Batch redaction
 
-Run kuroi over a folder of PDFs in one go, with cost estimation and
-resumable state.
+The `kuroi run` command processes one PDF per invocation. To process many,
+loop over the inputs from your shell. This page shows the recipes for the
+common batch shapes.
 
-## Globbing a folder
-
-```sh
-$ kuroi run ./inbox/*.pdf
-```
-
-Or recursively:
+## Loop over a folder
 
 ```sh
-$ kuroi run ./inbox/**/*.pdf
+$ for pdf in inbox/*.pdf; do
+    kuroi run "$pdf" -o "redacted/$(basename "$pdf" .pdf).redacted.pdf"
+  done
 ```
 
-kuroi processes each file independently and prints a per-file progress
-line. A summary is written at the end.
+`-o` lets you place each output under a sibling tree. Use `--overwrite` if
+the destination may already exist.
 
-## Output resolution
+## Skip files that are already redacted
 
-By default, every redacted file is written next to the input as
-`<name>.redacted.pdf`. Override the destination with `--output-dir`:
+`kuroi run` writes a backup before redacting and leaves the redacted output
+in place. Re-running over the same input rewrites it. To avoid that in a
+loop, test the output path first:
 
 ```sh
-$ kuroi run ./inbox/*.pdf --output-dir ./redacted/
+$ for pdf in inbox/*.pdf; do
+    out="redacted/$(basename "$pdf" .pdf).redacted.pdf"
+    [ -e "$out" ] && continue
+    kuroi run "$pdf" -o "$out"
+  done
 ```
 
-The directory tree of the inputs is preserved under `--output-dir`. If a
-target file already exists, kuroi refuses to overwrite it unless you pass
-`--force`.
+## Recovering from interruption
 
-## Cost estimation
+If a loop is interrupted, the pre-redaction backup of every file kuroi
+already started is in `~/Documents/kuroi-backups/`. Use `kuroi backups list`
+to inspect them, then re-run the loop — the test above will skip files
+whose output was completed.
 
-Before running a large batch against a paid provider, dry-run the cost:
+## Cost considerations
 
-```sh
-$ kuroi run ./inbox/*.pdf --estimate
-Estimated cost: $0.84 across 50 files (claude-opus-4-7 @ ICIJ pricing)
-Run again without --estimate to proceed.
-```
+Each `kuroi run` invocation against Anthropic spends tokens. There is no
+built-in dry-run estimator today; budget by sampling a few representative
+PDFs first. To stay free of metered cost, switch to local Ollama —
+[LLM providers](providers.md).
 
-The estimate uses the per-token pricing baked into `kuroi.core.pricing`
-(refresh it with `kuroi config refresh-pricing`).
-
-## Resuming an interrupted batch
-
-If a batch is interrupted (`Ctrl-C`, network drop, machine restart),
-re-running the same command picks up where it left off. State is kept in
-`~/.local/state/kuroi/state/` keyed by input file content hash, so a
-half-finished file is re-attempted from scratch but completed files are
-skipped.
-
-```sh
-$ kuroi run ./inbox/*.pdf
-[3/50] invoice-april.pdf .......... ✓ (cached, skipped)
-[4/50] invoice-may.pdf ............ running ...
-```
-
-## Parallelism
-
-Process multiple files concurrently with `--workers`:
-
-```sh
-$ kuroi run ./inbox/*.pdf --workers 4
-```
-
-Default is 1 (sequential). Increase cautiously when using a paid provider
-— concurrent requests multiply your spend.
-
-## Worked example: 50 quarterly invoices
+## Worked example
 
 ```sh
 $ export ANTHROPIC_API_KEY=sk-ant-...
-$ kuroi run ./invoices/Q1/*.pdf --output-dir ./redacted/Q1/ --estimate
-Estimated cost: $0.84
-
-$ kuroi run ./invoices/Q1/*.pdf --output-dir ./redacted/Q1/ --workers 4
-[1/50] inv-001.pdf ................ ✓ (3.2s)
-...
-[50/50] inv-050.pdf ............... ✓ (2.9s)
-
-Summary: 50/50 succeeded, 412 findings, 0 errors, $0.81 spent
+$ mkdir -p redacted
+$ for pdf in invoices/Q1/*.pdf; do
+    out="redacted/$(basename "$pdf" .pdf).redacted.pdf"
+    [ -e "$out" ] && { echo "skip $pdf"; continue; }
+    kuroi run "$pdf" -o "$out" || break
+  done
 ```
+
+The `|| break` aborts the loop on the first failure; remove it if you
+want to push through and review failures afterwards.
 
 ## Next steps
 
-- [LLM providers](providers.md) — switch to free, local Ollama for batches.
-- [Audit & undo](audit-and-undo.md) — review the diff for one file in the batch.
+- [LLM providers](providers.md) — switch to free, local Ollama.
+- [Audit & undo](audit-and-undo.md) — review individual files.

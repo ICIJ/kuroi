@@ -7,13 +7,20 @@ most of these in one go.
 
 ```sh
 $ kuroi doctor
-✓ Python 3.12.4
-✓ Provider: anthropic (model: claude-opus-4-7)
-✗ ANTHROPIC_API_KEY not set
-✓ Configuration directory: ~/.config/kuroi/
+  kuroi version 0.1.0                                                        ok
+  Python version 3.12.4                                                      ok
+  Anthropic API key                ANTHROPIC_API_KEY is not set; cloud redaction is unavailable  PROBLEM
+  tesseract                        tesseract not found in PATH (optional for v0.1)               warn
+  qpdf                             /usr/bin/qpdf                                                 ok
+  Provider                         anthropic                                                     ok
+  Model                            claude-opus-4-7                                               ok
+
+One or more checks failed. See messages above.
 ```
 
-The first failing line tells you what to fix.
+Each line shows a label, a detail message, and a status (`ok`, `warn`,
+or `PROBLEM`). A `PROBLEM` exits non-zero; `warn` is informational. Fix
+the highest-listed `PROBLEM` first.
 
 ## "ANTHROPIC_API_KEY not set"
 
@@ -24,41 +31,67 @@ $ export ANTHROPIC_API_KEY=sk-ant-...
 Persist by adding the export to your shell rc file. Or switch to Ollama
 for offline runs (see [LLM providers](providers.md)).
 
-## "File is locked" / `LockTimeout`
+## "File is locked" / `LockHeldError`
 
-kuroi uses an advisory lock file alongside each input PDF to prevent two
-runs from racing on the same file. If a previous run crashed without
-releasing the lock, remove the stray `<pdf>.kuroi.lock` file:
+kuroi creates an advisory lock file alongside each redacted **output** to
+prevent two runs from racing on the same destination. The lockfile path
+is the output path with `.kuroi.lock` appended. For an output written to
+`document.redacted.pdf`, the lock is `document.redacted.pdf.kuroi.lock`.
+
+If a previous run crashed without releasing the lock, the next run will
+fail with a message that names the stray file. Delete it manually:
 
 ```sh
-$ rm path/to/document.pdf.kuroi.lock
+$ rm path/to/document.redacted.pdf.kuroi.lock
 ```
+
+Stale locks are intentionally not auto-removed: they're a real signal of
+a prior crash, and the user clears them deliberately.
 
 ## Provider rate limits
 
-If you see `429 Too Many Requests` from Anthropic, lower `--workers` and
-re-run; kuroi resumes where it stopped.
+If you see `429 Too Many Requests` from Anthropic, wait a moment before
+retrying. `kuroi run` processes one PDF per invocation, so when you're
+batching in a shell loop, sleep between iterations or break the input
+list into smaller chunks.
 
 ## "PDF is too large to extract"
 
-Very large PDFs (hundreds of megabytes / thousands of pages) may exceed
-PyMuPDF's word-extraction limits. Split the file with
-`pymupdf.open(...).save(..., from=, to=)` or `pdftk`, redact each part,
-then re-merge.
+Very large PDFs (hundreds of megabytes / thousands of pages) can exceed
+PyMuPDF's word-extraction limits. Split the file at the shell level
+first, then redact each part:
+
+```sh
+$ qpdf --split-pages large.pdf parts.pdf
+$ for part in parts*.pdf; do kuroi run "$part"; done
+```
+
+`pdftk burst large.pdf` works the same way if you prefer pdftk. Re-merge
+the redacted parts with `qpdf --empty --pages parts*.redacted.pdf -- merged.pdf`.
 
 ## "Verification gate failed"
 
-`kuroi verify` re-runs the regex rules over a redacted output. If it
-flags a match, the original redaction missed it. Re-run with `--seed`
-fixed and `-vv` to see the LLM's reasoning, then file an issue with the
-audit record attached.
+`kuroi run` calls `kuroi verify` on its own output before writing it; if
+the verifier finds residual sensitive text, the run aborts and nothing is
+written to the destination. To reproduce a problematic run with a fixed
+seed and full request/response logs:
+
+```sh
+$ kuroi run --seed 42 -vv input.pdf
+```
+
+Then re-run `kuroi verify <output>` to see exactly which spans the
+verifier flagged. Note that `--seed` is a flag on `kuroi run` (not on
+`kuroi verify`); `verify` takes only the PDF path.
 
 ## Where logs live
 
-- **Audit records (per finding):** `~/.local/state/kuroi/audit/<hash>/<run>.jsonl`
-- **Backups (full PDFs):** `~/.local/state/kuroi/backups/`
-- **State (resume info):** `~/.local/state/kuroi/state/`
-- **Config:** `~/.config/kuroi/config.toml`
+- **Audit records (per finding):** `~/.local/share/kuroi/audit/<timestamp>.jsonl`
+  — one JSONL file per run. Configurable with `kuroi run --audit-dir <path>`.
+- **Backups (full PDFs):** `~/Documents/kuroi-backups/<timestamp>/<filename>.pdf`
+  — one timestamped subdirectory per run. Configurable with
+  `kuroi run --backup-dir <path>` (and `kuroi undo --backup-dir <path>`).
+- **Config:** `~/.config/kuroi/config.toml` (or `$XDG_CONFIG_HOME/kuroi/config.toml`).
 
 `-v` (info) and `-vv` (debug) on any command print a runtime trace to
 stderr.
