@@ -6,10 +6,11 @@ by `make docs-gen` (and verified in CI via `git diff --exit-code`).
 
 from __future__ import annotations
 
-import os
-import subprocess
 import sys
 from pathlib import Path
+
+import click
+import typer
 
 _ROOT = Path(__file__).resolve().parents[2]
 if str(_ROOT / "src") not in sys.path:
@@ -36,40 +37,41 @@ _OUTPUT_PATH = _ROOT / "docs" / "reference" / "cli.md"
 
 # Locked to 88 cols so the rendered help is wider than the typical 80-col
 # default but still wraps cleanly inside a markdown code fence.
-_HELP_COLUMNS = "88"
+_HELP_COLUMNS = 88
 
 
-def _help_block(args: list[str]) -> str:
-    """Capture `kuroi … --help` output via a subprocess.
+def _disable_rich(typer_app: typer.Typer) -> None:
+    """Recursively disable Typer's Rich-driven help formatter.
 
-    Typer's default rich_markup_mode routes help formatting through Rich's
-    Console, which writes to stdout rather than populating Click's formatter
-    buffer — so calling `cmd.get_help(ctx)` returns "". Spawning the actual
-    `kuroi` CLI with NO_COLOR + a fixed COLUMNS gives deterministic plain
-    text we can fence verbatim.
+    Rich's output depends on terminal capabilities, locale, and Rich version,
+    making the rendered help text non-deterministic across environments
+    (e.g. local dev vs CI). Falling back to Click's built-in formatter gives
+    plain text that's stable everywhere — required for the CI drift check.
     """
-    kuroi_bin = Path(sys.executable).parent / "kuroi"
-    env = {**os.environ, "COLUMNS": _HELP_COLUMNS, "NO_COLOR": "1", "TERM": "dumb"}
-    result = subprocess.run(
-        [str(kuroi_bin), *args, "--help"],
-        capture_output=True,
-        text=True,
-        env=env,
-        check=True,
-    )
-    return f"```\n{result.stdout.rstrip()}\n```"
+    typer_app.rich_markup_mode = None
+    for grp in typer_app.registered_groups:
+        if grp.typer_instance is not None:
+            _disable_rich(grp.typer_instance)
+
+
+def _help_block(cmd: click.Command, info_name: str) -> str:
+    """Return the formatted `--help` output for a Click command, fenced as text."""
+    ctx = click.Context(cmd, info_name=info_name, terminal_width=_HELP_COLUMNS)
+    return f"```\n{cmd.get_help(ctx).rstrip()}\n```"
 
 
 def render_cli_markdown() -> str:
+    _disable_rich(app)
     root = get_command(app)
-    sections: list[str] = [_BANNER, _INTRO, "", "## `kuroi`", "", _help_block([]), ""]
+    sections: list[str] = [_BANNER, _INTRO, "", "## `kuroi`", "", _help_block(root, "kuroi"), ""]
 
     # Iterate subcommands in declaration order on the Typer app — TyperGroup
     # preserves registration order, so this is stable across Python versions.
     for name in root.commands:
+        sub = root.commands[name]
         sections.append(f"## `kuroi {name}`")
         sections.append("")
-        sections.append(_help_block([name]))
+        sections.append(_help_block(sub, f"kuroi {name}"))
         sections.append("")
 
     return "\n".join(sections).rstrip() + "\n"
