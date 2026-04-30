@@ -23,6 +23,15 @@ dev = [
     "mypy>=1.10",
     "types-pyyaml",
 ]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+    "mkdocs-typer2>=0.1",
+    "mkdocstrings[python]>=0.27",
+    "mkdocs-gen-files>=0.5",
+    "mkdocs-literate-nav>=0.6",
+    "pymdown-extensions>=10.7",
+]
 
 [project.scripts]
 kuroi = "kuroi.cli:app"
