@@ -114,17 +114,9 @@ class OllamaProvider:
 
         message = envelope.get("message") if isinstance(envelope, dict) else None
         content = message.get("content") if isinstance(message, dict) else None
-        response_sha = hashlib.sha256(
-            (content or "").encode("utf-8")
-        ).hexdigest()
-        tokens_in = (
-            int(envelope.get("prompt_eval_count", 0))
-            if isinstance(envelope, dict)
-            else 0
-        )
-        tokens_out = (
-            int(envelope.get("eval_count", 0)) if isinstance(envelope, dict) else 0
-        )
+        response_sha = hashlib.sha256((content or "").encode("utf-8")).hexdigest()
+        tokens_in = int(envelope.get("prompt_eval_count", 0)) if isinstance(envelope, dict) else 0
+        tokens_out = int(envelope.get("eval_count", 0)) if isinstance(envelope, dict) else 0
 
         chunk = ChunkRecord(
             chunk_idx=0,

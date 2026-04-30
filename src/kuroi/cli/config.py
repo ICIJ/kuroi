@@ -31,7 +31,11 @@ def user_pricing_path() -> Path:
 @config_app.command("refresh-pricing")
 def refresh_pricing(
     from_path: Path = typer.Option(
-        ..., "--from", exists=True, dir_okay=False, readable=True,
+        ...,
+        "--from",
+        exists=True,
+        dir_okay=False,
+        readable=True,
         help="Path to a pricing.json file to install.",
     ),
 ) -> None:

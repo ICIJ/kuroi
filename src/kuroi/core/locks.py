@@ -25,8 +25,7 @@ class LockHeldError(Exception):
 
     def __init__(self, target: Path, lock_path: Path) -> None:
         super().__init__(
-            f"another kuroi run is writing to {target}; "
-            f"if that's wrong, delete {lock_path}"
+            f"another kuroi run is writing to {target}; if that's wrong, delete {lock_path}"
         )
         self.target = target
         self.lock_path = lock_path

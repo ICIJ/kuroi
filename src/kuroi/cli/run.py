@@ -43,9 +43,7 @@ def run(
     in_place: bool = typer.Option(
         False, "--in-place", help="Write to the input path; backup is taken."
     ),
-    overwrite: bool = typer.Option(
-        False, "--overwrite", help="Replace an existing output file."
-    ),
+    overwrite: bool = typer.Option(False, "--overwrite", help="Replace an existing output file."),
     rules: str = typer.Option("pii", "--rules", help="Comma-separated rule set names."),
     yes: bool = typer.Option(False, "-y", help="Skip the apply confirmation."),
     backup_dir: Path = typer.Option(
@@ -105,9 +103,7 @@ def run(
         with output_lock(final_output):
             try:
                 config = resolve_config(
-                    ConfigOverrides(
-                        provider=provider_name, model=model, ollama_url=ollama_url
-                    ),
+                    ConfigOverrides(provider=provider_name, model=model, ollama_url=ollama_url),
                     env=os.environ,
                     file_path=xdg_config_home() / "kuroi" / "config.toml",
                 )

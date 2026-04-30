@@ -41,9 +41,7 @@ def compute_diff(original: Path, redacted: Path) -> Diff:
     red_doc = pymupdf.open(str(redacted))  # type: ignore[no-untyped-call]
     try:
         if len(orig_doc) != len(red_doc):
-            raise ValueError(
-                f"page count differs: {len(orig_doc)} vs {len(red_doc)}"
-            )
+            raise ValueError(f"page count differs: {len(orig_doc)} vs {len(red_doc)}")
         pages: list[DiffPage] = []
         for idx in range(len(orig_doc)):
             orig_page = orig_doc[idx]
@@ -55,9 +53,7 @@ def compute_diff(original: Path, redacted: Path) -> Diff:
             for x0, y0, x1, y1, word, *_ in orig_words:
                 key = (round(x0, 1), round(y0, 1), word)
                 if key not in red_word_set:
-                    redactions.append(
-                        DiffRedaction(bbox=(x0, y0, x1, y1), before_text=word)
-                    )
+                    redactions.append(DiffRedaction(bbox=(x0, y0, x1, y1), before_text=word))
             pages.append(
                 DiffPage(
                     page_number=idx + 1,
