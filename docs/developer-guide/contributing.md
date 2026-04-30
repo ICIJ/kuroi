@@ -27,6 +27,8 @@ when you need to build the documentation site locally.
 | `make format`    | Auto-format with ruff.                               |
 | `make typecheck` | Run mypy in strict mode.                             |
 | `make doctor`    | Run `kuroi doctor` to validate your environment.     |
+| `make docs`      | Serve the documentation site locally.                |
+| `make docs-build`| Build docs in `--strict` mode (matches CI).          |
 | `make clean`     | Remove caches and build artifacts.                   |
 | `make build`     | Build sdist and wheel into `dist/`.                  |
 
@@ -35,7 +37,7 @@ CI runs `lint`, `typecheck`, `test`, and a strict docs build on every PR.
 ## Running the docs site
 
 ```sh
-$ uv run mkdocs serve
+$ make docs
 INFO    -  Serving on http://127.0.0.1:8000/
 ```
 
@@ -44,7 +46,7 @@ touches docs, run the strict build — that's what CI runs, and it fails
 on any unresolved link or missing nav entry:
 
 ```sh
-$ uv run mkdocs build --strict
+$ make docs-build
 ```
 
 ## Commit conventions
@@ -78,11 +80,10 @@ hand-edited:
   `kuroi.core.rules`.
 
 Both `mkdocs-typer2` and `mkdocstrings` are listed in the `docs` extras
-in `pyproject.toml`; the wiring lands in a follow-up batch. Until then,
-those pages are placeholders.
+in `pyproject.toml`.
 
 If your PR removes or renames a public Typer command, public function,
-or rule-schema field, run `uv run mkdocs build --strict` locally —
+or rule-schema field, run `make docs-build` locally —
 `--strict` will fail if any hand-written prose page links to a symbol
 that no longer exists. Update the cross-references in the same PR.
 
