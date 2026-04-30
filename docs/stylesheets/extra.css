@@ -1,4 +1,6 @@
-/* kuroi — dark slate overrides + ICIJ red accent */
+/* kuroi — dark slate overrides + ICIJ red accent
+   Zensical ships the same --md-* CSS variable surface and [data-md-color-scheme]
+   selector convention as Material for MkDocs, so these overrides work unchanged. */
 
 [data-md-color-scheme="slate"] {
   --md-default-bg-color: #0f1115;
@@ -23,7 +25,7 @@
   background-color: var(--md-code-bg-color);
 }
 
-/* Subtle accent underline on links instead of the default Material highlight. */
+/* Subtle accent on links instead of the default theme highlight. */
 .md-typeset a:hover {
   color: var(--md-accent-fg-color);
 }
