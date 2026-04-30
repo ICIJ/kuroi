@@ -5,6 +5,8 @@ repo_url: https://github.com/ICIJ/kuroi
 repo_name: ICIJ/kuroi
 edit_uri: edit/main/docs/
 docs_dir: docs
+dev_addr: 0.0.0.0:4000
+copyright: Copyright &copy; International Consortium of Investigative Journalists
 
 exclude_docs: |
   superpowers/
@@ -19,9 +21,10 @@ theme:
     primary: black
     accent: red
   font:
-    text: Inter
-    code: JetBrains Mono
+    text: Poppins
+    code: Noto Sans Mono
   features:
+    - announce.dismiss
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.sections
@@ -31,12 +34,20 @@ theme:
     - toc.follow
     - search.suggest
     - search.highlight
+    - search.share
     - content.code.copy
     - content.code.annotate
     - content.tabs.link
 
 extra_css:
   - stylesheets/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/ICIJ/kuroi
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/kuroi/
 
 nav:
   - Home: index.md
