@@ -187,7 +187,7 @@ $ make test
 - Document any new config keys.
 
 The CLI reference and Python API reference update automatically when
-you re-run `make docs-build`.
+you re-run `uv run mkdocs build --strict`.
 
 ## Worked example: Ollama
 
