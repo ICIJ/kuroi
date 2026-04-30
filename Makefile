@@ -122,7 +122,7 @@ bump-major: _check-uv
 	@$(MAKE) --no-print-directory _bump-success
 
 docs: _check-uv
-	@uv run mkdocs serve -a 0.0.0.0:4000
+	@uv run mkdocs serve
 
 docs-build: _check-uv
 	@uv run mkdocs build --strict
