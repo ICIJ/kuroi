@@ -164,9 +164,7 @@ def test_run_aborts_when_verification_fails(
     assert not out.exists()
 
 
-def test_run_seed_flag_anthropic_prints_not_honored_notice(
-    monkeypatch, make_pdf, tmp_path
-):
+def test_run_seed_flag_anthropic_prints_not_honored_notice(monkeypatch, make_pdf, tmp_path):
     """When --seed is set against Anthropic, kuroi prints a one-line notice."""
     monkeypatch.setenv("KUROI_PROVIDER", "anthropic")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
@@ -187,9 +185,7 @@ def test_run_seed_flag_anthropic_prints_not_honored_notice(
     monkeypatch.setattr(
         ap,
         "AnthropicProvider",
-        lambda **kw: real_provider(
-            client=_StubClient(), model=kw.get("model", "claude-opus-4-7")
-        ),
+        lambda **kw: real_provider(client=_StubClient(), model=kw.get("model", "claude-opus-4-7")),
     )
 
     pdf = make_pdf(["dummy text"])
@@ -237,9 +233,7 @@ def test_run_displays_pre_flight_cost_estimate(monkeypatch, make_pdf, tmp_path):
     monkeypatch.setattr(
         ap,
         "AnthropicProvider",
-        lambda **kw: real_provider(
-            client=_StubClient(), model=kw.get("model", "claude-opus-4-7")
-        ),
+        lambda **kw: real_provider(client=_StubClient(), model=kw.get("model", "claude-opus-4-7")),
     )
 
     pdf = make_pdf(["short"])
@@ -296,9 +290,7 @@ def test_run_writes_chunk_request_audit_event(monkeypatch, make_pdf, tmp_path):
         self._max_tokens = max_tokens
         self._client = client or _StubClient()
 
-    monkeypatch.setattr(
-        "kuroi.providers.anthropic.AnthropicProvider.__init__", _fake_init
-    )
+    monkeypatch.setattr("kuroi.providers.anthropic.AnthropicProvider.__init__", _fake_init)
 
     pdf = make_pdf(["alice@example.com"])
     out = tmp_path / "out.pdf"
@@ -325,9 +317,7 @@ def test_run_writes_chunk_request_audit_event(monkeypatch, make_pdf, tmp_path):
     assert len(files) == 1
     lines = files[0].read_text().splitlines()
     chunk_lines = [
-        _json2.loads(line)
-        for line in lines
-        if _json2.loads(line).get("event") == "chunk_request"
+        _json2.loads(line) for line in lines if _json2.loads(line).get("event") == "chunk_request"
     ]
     assert len(chunk_lines) == 1
     assert chunk_lines[0]["tokens_in"] == 50
@@ -342,9 +332,7 @@ def test_run_sweeps_expired_backups(
 ) -> None:
     backup_dir = tmp_path / "backups"
     backup_dir.mkdir()
-    old_name = (datetime.now(UTC) - timedelta(hours=48)).strftime(
-        "%Y-%m-%dT%H-%M-%SZ-deadbe"
-    )
+    old_name = (datetime.now(UTC) - timedelta(hours=48)).strftime("%Y-%m-%dT%H-%M-%SZ-deadbe")
     (backup_dir / old_name).mkdir()
     (backup_dir / old_name / "manifest.json").write_text("{}")
 
@@ -464,9 +452,7 @@ def test_run_in_place_with_output_flag_is_usage_error(
     assert "mutually exclusive" in result.stdout
 
 
-def test_run_held_lock_refuses(
-    make_pdf: Callable[..., Path], tmp_path: Path
-) -> None:
+def test_run_held_lock_refuses(make_pdf: Callable[..., Path], tmp_path: Path) -> None:
     pdf = make_pdf(["x"])
     out = tmp_path / "out.pdf"
     lock_path = out.with_suffix(out.suffix + ".kuroi.lock")
@@ -599,6 +585,7 @@ def test_run_both_rules_and_instruct_run_together(
 
 def test_run_prints_ocr_notice_when_scanned_pages_found(
     make_pdf: Callable[..., Path],
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     stub_anthropic_client: dict[str, Any],
 ) -> None:
@@ -611,13 +598,28 @@ def test_run_prints_ocr_notice_when_scanned_pages_found(
         lambda path: ExtractionResult(pages=(Page(number=1, words=()),), ocr_page_count=2),
     )
 
-    result = runner.invoke(app, ["run", str(pdf), "--instruct", "redact all", "-y", "--in-place"])
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "--instruct",
+            "redact all",
+            "-y",
+            "--in-place",
+            "--backup-dir",
+            str(tmp_path / "backups"),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
 
     assert "OCR applied to 2 scanned page(s)." in result.stdout
 
 
 def test_run_exits_2_when_ocr_required_error(
     make_pdf: Callable[..., Path],
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     stub_anthropic_client: dict[str, Any],
 ) -> None:
@@ -631,8 +633,58 @@ def test_run_exits_2_when_ocr_required_error(
 
     monkeypatch.setattr("kuroi.cli.run.extract_word_index", _raise)
 
-    result = runner.invoke(app, ["run", str(pdf), "--instruct", "redact all", "-y", "--in-place"])
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "--instruct",
+            "redact all",
+            "-y",
+            "--in-place",
+            "--backup-dir",
+            str(tmp_path / "backups"),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
 
     assert result.exit_code == 2
     assert "3, 7" in result.stdout
     assert "tesseract" in result.stdout.lower()
+
+
+def test_run_clean_error_when_backup_dir_uncreatable(
+    make_pdf: Callable[..., Path], tmp_path: Path
+) -> None:
+    """When --backup-dir can't be created, exit 2 with a path-naming message
+    that points the user at --backup-dir."""
+    dangling = tmp_path / "dangling-link"
+    dangling.symlink_to(tmp_path / "missing-target")
+    backup_dir = dangling / "backups"
+
+    pdf = make_pdf(["x"])
+    out = tmp_path / "out.pdf"
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "--rules",
+            "pii",
+            "-o",
+            str(out),
+            "-y",
+            "--backup-dir",
+            str(backup_dir),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+
+    assert result.exit_code == 2
+    flat = "".join(result.stdout.split())
+    assert "".join(str(backup_dir).split()) in flat
+    assert "--backup-dir" in result.stdout
+    assert not out.exists()

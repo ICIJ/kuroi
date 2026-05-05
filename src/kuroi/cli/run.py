@@ -120,6 +120,15 @@ def run(
                 console.print(f"[red]Config error:[/] {exc}")
                 raise typer.Exit(code=2) from exc
 
+            try:
+                backup_dir.mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                console.print(
+                    f"  [red]Cannot create backup directory {backup_dir}:[/] {exc}\n"
+                    f"  Pass --backup-dir to specify a writable location."
+                )
+                raise typer.Exit(code=2) from exc
+
             sweep_backups(backup_dir, retention_hours=config.backup_retention_hours)
 
             try:
