@@ -76,3 +76,26 @@ def test_extract_word_index_skips_blank_pages(make_pdf: Callable[..., Path]) -> 
     assert result.ocr_page_count == 0
     assert len(result.pages) == 1
     assert result.pages[0].words == ()
+
+
+def test_extract_word_index_ocrs_image_pages(
+    make_image_only_pdf: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pdf = make_image_only_pdf
+    monkeypatch.setattr(
+        "kuroi.core.pdf.shutil.which",
+        lambda name: "/usr/bin/tesseract" if name == "tesseract" else None,
+    )
+    # Stub _ocr_page_words to return one known word without shelling out to tesseract.
+    monkeypatch.setattr(
+        "kuroi.core.pdf._ocr_page_words",
+        lambda page: [(10.0, 20.0, 50.0, 30.0, "redacted", 0, 0, 0)],
+    )
+
+    result = extract_word_index(pdf)
+
+    assert result.ocr_page_count == 1
+    assert len(result.pages) == 1
+    assert result.pages[0].words[0].text == "redacted"
+    assert result.pages[0].words[0].idx == 0
+    assert result.pages[0].words[0].bbox == (10.0, 20.0, 50.0, 30.0)
