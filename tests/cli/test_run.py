@@ -200,6 +200,8 @@ def test_run_seed_flag_anthropic_prints_not_honored_notice(
         [
             "run",
             str(pdf),
+            "--rules",
+            "pii",
             "-o",
             str(out),
             "--seed",
@@ -248,6 +250,8 @@ def test_run_displays_pre_flight_cost_estimate(monkeypatch, make_pdf, tmp_path):
         [
             "run",
             str(pdf),
+            "--rules",
+            "pii",
             "-o",
             str(out),
             "-y",
@@ -352,6 +356,8 @@ def test_run_sweeps_expired_backups(
         [
             "run",
             str(pdf),
+            "--rules",
+            "pii",
             "-o",
             str(out),
             "-y",
@@ -373,7 +379,7 @@ def test_run_refuses_existing_output_without_overwrite(
     out = tmp_path / "out.pdf"
     out.write_bytes(b"existing")
 
-    result = runner.invoke(app, ["run", str(pdf), "-o", str(out)])
+    result = runner.invoke(app, ["run", str(pdf), "--rules", "pii", "-o", str(out)])
 
     assert result.exit_code == 2
     assert "out.v2.pdf" in result.stdout
@@ -393,6 +399,8 @@ def test_run_overwrite_replaces_existing(
         [
             "run",
             str(pdf),
+            "--rules",
+            "pii",
             "-o",
             str(out),
             "-y",
@@ -420,6 +428,8 @@ def test_run_in_place_writes_to_input_and_keeps_backup(
         [
             "run",
             str(pdf),
+            "--rules",
+            "pii",
             "--in-place",
             "-y",
             "--backup-dir",
@@ -443,6 +453,8 @@ def test_run_in_place_with_output_flag_is_usage_error(
         [
             "run",
             str(pdf),
+            "--rules",
+            "pii",
             "-o",
             str(tmp_path / "out.pdf"),
             "--in-place",
@@ -460,6 +472,126 @@ def test_run_held_lock_refuses(
     lock_path = out.with_suffix(out.suffix + ".kuroi.lock")
     lock_path.write_text("")  # someone else's lock
 
-    result = runner.invoke(app, ["run", str(pdf), "-o", str(out)])
+    result = runner.invoke(app, ["run", str(pdf), "--rules", "pii", "-o", str(out)])
     assert result.exit_code == 2
     assert "another kuroi run" in result.stdout
+
+
+def test_run_instruct_flag_passes_instruction_to_provider(
+    make_pdf: Callable[..., Path], tmp_path: Path, monkeypatch
+) -> None:
+    """--instruct with no --rules skips rule loading and passes instruction to provider."""
+    captured: dict[str, Any] = {}
+
+    from kuroi.providers import anthropic as ap
+
+    def _spy_detect(
+        self: Any,
+        pages: Any,
+        llm_category_ids: Any,
+        *,
+        instructions: Any = (),
+        seed: Any = None,
+    ) -> Any:
+        captured["instructions"] = instructions
+        captured["llm_category_ids"] = llm_category_ids
+        return [], []
+
+    monkeypatch.setattr(ap.AnthropicProvider, "detect_redactions", _spy_detect)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    pdf = make_pdf(["Alice Smith, IP: 10.0.0.1"])
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "--instruct",
+            "redact names and IP addresses",
+            "-o",
+            str(tmp_path / "out.pdf"),
+            "-y",
+            "--backup-dir",
+            str(tmp_path / "backups"),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+
+    # No findings → exits 0 with "No redactions proposed" message
+    assert result.exit_code == 0, result.stdout
+    assert captured.get("instructions") == ("redact names and IP addresses",)
+    assert captured.get("llm_category_ids") == ()
+
+
+def test_run_no_rules_no_instruct_noninteractive_errors(
+    make_pdf: Callable[..., Path], tmp_path: Path, stub_anthropic_client: dict[str, Any]
+) -> None:
+    """-y with no --rules and no --instruct prints an error and exits 2."""
+    pdf = make_pdf(["Alice Smith"])
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "-o",
+            str(tmp_path / "out.pdf"),
+            "-y",
+            "--backup-dir",
+            str(tmp_path / "backups"),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+    assert result.exit_code == 2
+    assert "--rules" in result.stdout or "--instruct" in result.stdout
+
+
+def test_run_both_rules_and_instruct_run_together(
+    make_pdf: Callable[..., Path], tmp_path: Path, monkeypatch
+) -> None:
+    """--rules and --instruct together: regex rules run AND instruction passed to LLM."""
+    captured: dict[str, Any] = {}
+
+    from kuroi.providers import anthropic as ap
+
+    def _spy_detect(
+        self: Any,
+        pages: Any,
+        llm_category_ids: Any,
+        *,
+        instructions: Any = (),
+        seed: Any = None,
+    ) -> Any:
+        captured["instructions"] = instructions
+        captured["llm_category_ids"] = llm_category_ids
+        return [], []
+
+    monkeypatch.setattr(ap.AnthropicProvider, "detect_redactions", _spy_detect)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+
+    pdf = make_pdf(["Contact alice@example.com today"])
+    out = tmp_path / "redacted.pdf"
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "--rules",
+            "pii",
+            "--instruct",
+            "also redact URLs",
+            "-o",
+            str(out),
+            "-y",
+            "--backup-dir",
+            str(tmp_path / "backups"),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert captured.get("instructions") == ("also redact URLs",)
+    # pii rule set has llm categories (person_name, street_address)
+    assert len(captured.get("llm_category_ids", ())) > 0

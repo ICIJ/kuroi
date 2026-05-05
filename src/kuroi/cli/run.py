@@ -44,7 +44,10 @@ def run(
         False, "--in-place", help="Write to the input path; backup is taken."
     ),
     overwrite: bool = typer.Option(False, "--overwrite", help="Replace an existing output file."),
-    rules: str = typer.Option("pii", "--rules", help="Comma-separated rule set names."),
+    rules: str = typer.Option("", "--rules", help="Comma-separated rule set names."),
+    instruct: str | None = typer.Option(
+        None, "--instruct", "-i", help="Natural-language redaction instruction."
+    ),
     yes: bool = typer.Option(False, "-y", help="Skip the apply confirmation."),
     backup_dir: Path = typer.Option(
         Path.home() / "Documents" / "kuroi-backups",
@@ -77,9 +80,15 @@ def run(
 ) -> None:
     """Redact a PDF using rules and/or instructions, with verification gating."""
     rule_set_names = tuple(name.strip() for name in rules.split(",") if name.strip())
-    if not rule_set_names:
-        console.print("[red]No rule sets specified.[/]")
-        raise typer.Exit(code=2)
+    has_rules = bool(rule_set_names)
+    has_instruct = bool(instruct)
+
+    if not has_rules and not has_instruct:
+        if yes:
+            console.print("[red]Pass --rules, --instruct, or both; -y cannot prompt.[/]")
+            raise typer.Exit(code=2)
+        instruct = typer.prompt("Redaction instructions")
+        has_instruct = True
 
     rule_sets = [load_rule_set(name) for name in rule_set_names]
 
@@ -137,8 +146,9 @@ def run(
                     "  [yellow]note:[/] --seed recorded but only temperature=0 "
                     "is enforced for this provider"
                 )
+            instruction_tuple: tuple[str, ...] = (instruct,) if instruct else ()
             provider_findings, chunks = provider.detect_redactions(
-                pages, tuple(llm_cat_ids), seed=seed
+                pages, tuple(llm_cat_ids), instructions=instruction_tuple, seed=seed
             )
             findings.extend(provider_findings)
             actual_cost = 0.0
@@ -173,7 +183,7 @@ def run(
                 input_pages=len(pages),
                 input_bytes=len(input_bytes),
                 model_version=getattr(provider, "model_version", provider.model),
-                instructions=(),
+                instructions=({"text": instruct},) if instruct else (),
                 config_resolved_from=(),
             )
 
