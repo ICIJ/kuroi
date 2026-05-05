@@ -12,7 +12,7 @@ def test_apply_redactions_removes_text_from_stream(
     make_pdf: Callable[..., Path], tmp_path: Path
 ) -> None:
     pdf = make_pdf(["Hello Sarah Chen and others"])
-    pages = extract_word_index(pdf)
+    pages = extract_word_index(pdf).pages
     # words are: [0]Hello [1]Sarah [2]Chen [3]and [4]others
     findings = [
         Finding(page=1, start=1, end=2, kind="person_name", confidence="high", source="test"),
@@ -39,7 +39,7 @@ def test_apply_redactions_clears_metadata(make_pdf: Callable[..., Path], tmp_pat
     doc.save(str(pdf), incremental=True, encryption=pymupdf.PDF_ENCRYPT_KEEP)
     doc.close()
 
-    pages = extract_word_index(pdf)
+    pages = extract_word_index(pdf).pages
     out = tmp_path / "redacted.pdf"
     apply_redactions(pdf, [], pages, out)
 
@@ -54,7 +54,7 @@ def test_apply_redactions_writes_no_file_with_no_findings(
     make_pdf: Callable[..., Path], tmp_path: Path
 ) -> None:
     pdf = make_pdf(["Hello world"])
-    pages = extract_word_index(pdf)
+    pages = extract_word_index(pdf).pages
 
     out = tmp_path / "redacted.pdf"
     apply_redactions(pdf, [], pages, out)
