@@ -53,7 +53,7 @@ def test_doctor_reports_ollama_unreachable(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def test_doctor_tesseract_detail_when_missing(monkeypatch: pytest.MonkeyPatch) -> None:
-    import shutil as _shutil
-    monkeypatch.setattr(_shutil, "which", lambda name: None if name == "tesseract" else f"/usr/bin/{name}")
+    from kuroi.cli import doctor as doctor_module
+    monkeypatch.setattr(doctor_module.shutil, "which", lambda name: None if name == "tesseract" else f"/usr/bin/{name}")
     result = CliRunner().invoke(app, ["doctor"])
     assert "required for scanned PDFs" in result.stdout
