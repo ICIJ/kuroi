@@ -8,7 +8,7 @@ def test_extract_word_index_returns_words_with_bboxes(make_pdf: Callable[..., Pa
     pdf = make_pdf(["Hello world"])
 
     result = extract_word_index(pdf)
-    pages = result.pages  # ← was: pages = extract_word_index(pdf)
+    pages = result.pages
 
     assert len(pages) == 1
     page = pages[0]
@@ -26,8 +26,8 @@ def test_extract_word_index_returns_words_with_bboxes(make_pdf: Callable[..., Pa
 
 def test_serialize_for_llm_emits_numbered_tokens(make_pdf: Callable[..., Path]) -> None:
     pdf = make_pdf(["Hello world", "Second page"])
-    result = extract_word_index(pdf)  # ← was: pages = extract_word_index(pdf)
-    pages = result.pages              # ← new line
+    result = extract_word_index(pdf)
+    pages = result.pages
 
     text = serialize_for_llm(pages)
 
