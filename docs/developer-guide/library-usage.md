@@ -89,7 +89,7 @@ apply_redactions(
 - Anything under `kuroi.cli.*` — the CLI is for end users.
 - Internal config helpers (`_read_string`, `load_config_file`,
   `write_config_file`) — names lead with `_` or are file-format-specific.
-- The on-disk shapes under `~/Documents/kuroi-backups/` and
+- The on-disk shapes under `$XDG_DATA_HOME/kuroi/backups/` and
   `~/.local/share/kuroi/audit/` — internal, versioned.
 - `providers/_shared.py` — implementation helpers, name leads with `_`.
 - The exact prompt text sent to the LLM — refined release-to-release.

@@ -32,9 +32,10 @@ $ for pdf in inbox/*.pdf; do
 ## Recovering from interruption
 
 If a loop is interrupted, the pre-redaction backup of every file kuroi
-already started is in `~/Documents/kuroi-backups/`. Use `kuroi backups list`
-to inspect them, then re-run the loop — the test above will skip files
-whose output was completed.
+already started is in `~/.local/share/kuroi/backups/` (or
+`$XDG_DATA_HOME/kuroi/backups/`). Use `kuroi backups list` to inspect
+them, then re-run the loop — the test above will skip files whose output
+was completed.
 
 ## Cost considerations
 

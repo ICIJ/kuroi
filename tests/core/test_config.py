@@ -15,6 +15,7 @@ from kuroi.core.config import (
     resolve_config,
     write_config_file,
     xdg_config_home,
+    xdg_data_home,
 )
 
 
@@ -30,6 +31,20 @@ def test_xdg_config_home_falls_back_to_home_dot_config(
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
     monkeypatch.setenv("HOME", str(tmp_path))
     assert xdg_config_home() == tmp_path / ".config"
+
+
+def test_xdg_data_home_honors_env_var(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    target = tmp_path / "custom-xdg-data"
+    monkeypatch.setenv("XDG_DATA_HOME", str(target))
+    assert xdg_data_home() == target
+
+
+def test_xdg_data_home_falls_back_to_home_local_share(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert xdg_data_home() == tmp_path / ".local" / "share"
 
 
 def test_config_is_frozen() -> None:
@@ -58,11 +73,7 @@ def test_load_returns_empty_dict_when_file_absent(tmp_path: Path) -> None:
 def test_load_parses_known_keys(tmp_path: Path) -> None:
     path = tmp_path / "config.toml"
     path.write_text(
-        'provider = "ollama"\n'
-        'model = "llama3.1:8b"\n'
-        '\n'
-        '[ollama]\n'
-        'url = "http://localhost:11434"\n'
+        'provider = "ollama"\nmodel = "llama3.1:8b"\n\n[ollama]\nurl = "http://localhost:11434"\n'
     )
     data = load_config_file(path)
     assert data["provider"] == "ollama"
@@ -99,7 +110,9 @@ def test_write_creates_parent_directories(tmp_path: Path) -> None:
 def test_write_is_atomic(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """If os.replace fails, the original file is untouched."""
     path = tmp_path / "config.toml"
-    cfg_a = Config(provider="anthropic", model="claude-opus-4-7", ollama_url="http://localhost:11434")
+    cfg_a = Config(
+        provider="anthropic", model="claude-opus-4-7", ollama_url="http://localhost:11434"
+    )
     write_config_file(path, cfg_a)
     original = path.read_text()
 
@@ -229,7 +242,7 @@ def test_resolve_rejects_wrong_type_in_file(tmp_path: Path) -> None:
 
 
 def test_resolve_rejects_wrong_type_in_nested_table(tmp_path: Path) -> None:
-    path = _file(tmp_path, '[ollama]\nurl = 7\n')
+    path = _file(tmp_path, "[ollama]\nurl = 7\n")
     with pytest.raises(ConfigError) as exc:
         resolve_config(ConfigOverrides(), env={}, file_path=path)
     assert "ollama.url" in str(exc.value) or "url" in str(exc.value)
@@ -255,9 +268,7 @@ def test_config_audit_include_text_default_false(tmp_path: Path) -> None:
 
 def test_config_audit_include_text_from_file(tmp_path: Path) -> None:
     cfg_file = tmp_path / "config.toml"
-    cfg_file.write_text(
-        'provider = "anthropic"\nmodel = "m"\n\n[audit]\ninclude_text = true\n'
-    )
+    cfg_file.write_text('provider = "anthropic"\nmodel = "m"\n\n[audit]\ninclude_text = true\n')
     config = resolve_config(
         ConfigOverrides(),
         env={},
@@ -275,17 +286,13 @@ def test_config_backup_retention_default_24(tmp_path: Path) -> None:
 
 def test_config_backup_retention_zero_means_keep_forever(tmp_path: Path) -> None:
     cfg = tmp_path / "c.toml"
-    cfg.write_text(
-        'provider = "anthropic"\nmodel = "m"\n[backup]\nretention_hours = 0\n'
-    )
+    cfg.write_text('provider = "anthropic"\nmodel = "m"\n[backup]\nretention_hours = 0\n')
     config = resolve_config(ConfigOverrides(), env={}, file_path=cfg)
     assert config.backup_retention_hours == 0
 
 
 def test_config_backup_retention_negative_rejected(tmp_path: Path) -> None:
     cfg = tmp_path / "c.toml"
-    cfg.write_text(
-        'provider = "anthropic"\nmodel = "m"\n[backup]\nretention_hours = -1\n'
-    )
+    cfg.write_text('provider = "anthropic"\nmodel = "m"\n[backup]\nretention_hours = -1\n')
     with pytest.raises(ConfigError, match="positive integer or 0"):
         resolve_config(ConfigOverrides(), env={}, file_path=cfg)

@@ -688,3 +688,37 @@ def test_run_clean_error_when_backup_dir_uncreatable(
     assert "".join(str(backup_dir).split()) in flat
     assert "--backup-dir" in result.stdout
     assert not out.exists()
+
+
+def test_default_backup_dir_uses_xdg_data_home(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    stub_anthropic_client: dict[str, Any],
+) -> None:
+    """Without --backup-dir, backups land under $XDG_DATA_HOME/kuroi/backups."""
+    fake_xdg = tmp_path / "xdg-data"
+    monkeypatch.setenv("XDG_DATA_HOME", str(fake_xdg))
+
+    pdf = make_pdf(["Contact alice@example.com today"])
+    out = tmp_path / "out.pdf"
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "--rules",
+            "pii",
+            "-o",
+            str(out),
+            "-y",
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    expected = fake_xdg / "kuroi" / "backups"
+    assert expected.is_dir()
+    assert any(p.is_dir() for p in expected.iterdir())

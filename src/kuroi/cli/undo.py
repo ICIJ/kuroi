@@ -10,7 +10,13 @@ import typer
 from rich.console import Console
 
 from kuroi.core.backup import latest_backup, sweep_backups
-from kuroi.core.config import ConfigError, ConfigOverrides, resolve_config, xdg_config_home
+from kuroi.core.config import (
+    ConfigError,
+    ConfigOverrides,
+    resolve_config,
+    xdg_config_home,
+    xdg_data_home,
+)
 
 undo_app = typer.Typer(invoke_without_command=True)
 console = Console()
@@ -19,12 +25,15 @@ console = Console()
 @undo_app.callback(invoke_without_command=True)
 def undo(
     yes: bool = typer.Option(False, "-y", help="Skip the restore confirmation."),
-    backup_dir: Path = typer.Option(
-        Path.home() / "Documents" / "kuroi-backups",
+    backup_dir: Path | None = typer.Option(
+        None,
         "--backup-dir",
+        help="Backup directory [default: $XDG_DATA_HOME/kuroi/backups].",
     ),
 ) -> None:
     """Restore the original file from the most recent backup."""
+    if backup_dir is None:
+        backup_dir = xdg_data_home() / "kuroi" / "backups"
     try:
         config = resolve_config(
             ConfigOverrides(),

@@ -45,9 +45,11 @@ Restore now? [Y/n]: y
 ```
 
 `undo` takes no positional argument: it restores the most recent backup
-in the configured backup directory (default `~/Documents/kuroi-backups/`,
-override with `--backup-dir`). The backup itself is retained until it
-falls outside the retention window.
+in the configured backup directory (default
+`$XDG_DATA_HOME/kuroi/backups/`, falling back to
+`~/.local/share/kuroi/backups/` when the env var is unset; override with
+`--backup-dir`). The backup itself is retained until it falls outside the
+retention window.
 
 ## List & garbage-collect backups
 
