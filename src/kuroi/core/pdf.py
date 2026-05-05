@@ -49,11 +49,14 @@ def _ocr_page_words(page: pymupdf.Page) -> list[Any]:  # type: ignore[type-arg]
 def extract_word_index(pdf_path: Path) -> ExtractionResult:
     """Extract every word on every page with its bounding box.
 
-    Pages with zero words and at least one embedded image are scan candidates.
-    If any scan candidates are found and tesseract is not in PATH, raises
+    Any page with at least one embedded image is treated as a scan candidate
+    so OCR can recover text drawn inside the image — including the common case
+    where a court-stamped header sits on top of a screenshot exhibit. If any
+    scan candidates are found and tesseract is not in PATH, raises
     OcrRequiredError. Otherwise OCRs scan candidates via PyMuPDF's tesseract
-    bridge. Returns an ExtractionResult whose ocr_page_count reflects how many
-    pages were OCR'd (0 if none).
+    bridge; the OCR pass replaces the page's word list, since `full=True` OCR
+    re-extracts the rendered native text alongside the image content. Returns
+    an ExtractionResult whose ocr_page_count reflects how many pages were OCR'd.
     """
     doc = pymupdf.open(str(pdf_path))  # type: ignore[no-untyped-call]
     try:
@@ -72,7 +75,7 @@ def extract_word_index(pdf_path: Path) -> ExtractionResult:
                 for i, w in enumerate(raw)
             )
             pages.append(Page(number=page_idx + 1, words=words))
-            if not words and pdf_page.get_images():  # type: ignore[no-untyped-call]
+            if pdf_page.get_images():  # type: ignore[no-untyped-call]
                 scan_candidates.append(page_idx + 1)
 
         if scan_candidates:
