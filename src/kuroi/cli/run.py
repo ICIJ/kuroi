@@ -60,9 +60,10 @@ def run(
         "--no-backup",
         help="Skip backup creation. With --in-place the original is unrecoverable.",
     ),
-    audit_dir: Path = typer.Option(
-        Path.home() / ".local" / "share" / "kuroi" / "audit",
+    audit_dir: Path | None = typer.Option(
+        None,
         "--audit-dir",
+        help="Audit log directory [default: $XDG_DATA_HOME/kuroi/audit].",
     ),
     provider_name: str | None = typer.Option(
         None,
@@ -88,6 +89,8 @@ def run(
     """Redact a PDF using rules and/or instructions, with verification gating."""
     if backup_dir is None:
         backup_dir = xdg_data_home() / "kuroi" / "backups"
+    if audit_dir is None:
+        audit_dir = xdg_data_home() / "kuroi" / "audit"
     if no_backup and in_place:
         console.print(
             "  [yellow]warning:[/] --no-backup with --in-place: "
