@@ -30,7 +30,7 @@ class Backup:
 
 def create_backup(original: Path, *, backup_root: Path) -> Backup:
     """Copy `original` into a fresh timestamped subdirectory of `backup_root`."""
-    ts = _next_timestamp(backup_root)
+    ts = session_timestamp()
     session_dir = backup_root / ts
     session_dir.mkdir(parents=True, exist_ok=False)
 
@@ -76,8 +76,8 @@ def latest_backup(backup_root: Path) -> Backup | None:
     )
 
 
-def _next_timestamp(backup_root: Path) -> str:
-    """Generate a timestamp with a 6-char random suffix.
+def session_timestamp() -> str:
+    """Generate a session timestamp with a 6-char random suffix.
 
     The suffix avoids collisions across concurrent runs even within the same
     second; the lazy sweep parses the leading timestamp and ignores the suffix.
