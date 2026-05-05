@@ -68,9 +68,7 @@ class AnthropicProvider:
         user_prompt = build_user_prompt(pages, llm_category_ids, instructions)
         prompt_sha = hashlib.sha256(user_prompt.encode("utf-8")).hexdigest()
 
-        extra: dict[str, Any] = (
-            {} if self.model in _NO_TEMPERATURE_MODELS else {"temperature": 0}
-        )
+        extra: dict[str, Any] = {} if self.model in _NO_TEMPERATURE_MODELS else {"temperature": 0}
 
         started = time.monotonic()
         response = self._client.messages.create(
