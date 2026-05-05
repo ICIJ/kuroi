@@ -55,24 +55,11 @@ def test_extract_word_index_returns_extraction_result(make_pdf: Callable[..., Pa
     assert result.pages[0].words[1].text == "world"
 
 
-def _make_image_only_pdf(tmp_path: Path) -> Path:
-    """Build a one-page PDF containing only a pixmap (no text layer)."""
-    doc = pymupdf.open()
-    page = doc.new_page()
-    pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 128, 128))
-    pix.clear_with(200)
-    page.insert_image(pymupdf.Rect(72, 72, 200, 200), pixmap=pix)
-    path = tmp_path / "scanned.pdf"
-    doc.save(str(path))
-    doc.close()
-    return path
-
-
 def test_extract_word_index_raises_ocr_required_when_tesseract_missing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    make_image_only_pdf: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    pdf = _make_image_only_pdf(tmp_path)
-    monkeypatch.setattr("shutil.which", lambda name: None)
+    pdf = make_image_only_pdf
+    monkeypatch.setattr("kuroi.core.pdf.shutil.which", lambda name: None)
 
     with pytest.raises(OcrRequiredError) as exc_info:
         extract_word_index(pdf)

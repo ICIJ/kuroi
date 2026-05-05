@@ -49,6 +49,24 @@ def make_overlay_pdf(tmp_path: Path) -> Callable[..., Path]:
     return _make
 
 
+@pytest.fixture
+def make_image_only_pdf(tmp_path: Path) -> Path:
+    """Build a one-page PDF containing only a pixmap — no text layer.
+
+    Used to test OCR detection: the page has zero words but at least one image,
+    so it qualifies as a scan candidate.
+    """
+    doc = pymupdf.open()
+    page = doc.new_page()
+    pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 128, 128))
+    pix.clear_with(200)
+    page.insert_image(pymupdf.Rect(72, 72, 200, 200), pixmap=pix)
+    path = tmp_path / "scanned.pdf"
+    doc.save(str(path))
+    doc.close()
+    return path
+
+
 @pytest.fixture(autouse=True)
 def _isolate_kuroi_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Keep tests deterministic: clear KUROI_* vars and point XDG_CONFIG_HOME at tmp_path.
