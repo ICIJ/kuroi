@@ -93,6 +93,7 @@ before the subcommand. `--seed` is a flag on `kuroi run` (not on
   (or `$XDG_DATA_HOME/kuroi/backups/...` when the env var is set) — one
   timestamped subdirectory per run. Configurable with
   `kuroi run --backup-dir <path>` (and `kuroi undo --backup-dir <path>`).
+  Skip the backup copy with `kuroi run --no-backup`.
 - **Config:** `~/.config/kuroi/config.toml` (or `$XDG_CONFIG_HOME/kuroi/config.toml`).
 
 `-v` (info) and `-vv` (debug) on any command print a runtime trace to

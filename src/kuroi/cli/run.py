@@ -13,7 +13,7 @@ import typer
 from rich.console import Console
 
 from kuroi.core.audit import AuditLog
-from kuroi.core.backup import create_backup, sweep_backups
+from kuroi.core.backup import create_backup, session_timestamp, sweep_backups
 from kuroi.core.config import (
     ConfigError,
     ConfigOverrides,
@@ -55,6 +55,11 @@ def run(
         "--backup-dir",
         help="Backup directory [default: $XDG_DATA_HOME/kuroi/backups].",
     ),
+    no_backup: bool = typer.Option(
+        False,
+        "--no-backup",
+        help="Skip backup creation. With --in-place the original is unrecoverable.",
+    ),
     audit_dir: Path = typer.Option(
         Path.home() / ".local" / "share" / "kuroi" / "audit",
         "--audit-dir",
@@ -83,6 +88,11 @@ def run(
     """Redact a PDF using rules and/or instructions, with verification gating."""
     if backup_dir is None:
         backup_dir = xdg_data_home() / "kuroi" / "backups"
+    if no_backup and in_place:
+        console.print(
+            "  [yellow]warning:[/] --no-backup with --in-place: "
+            "the original file will be unrecoverable."
+        )
 
     rule_set_names = tuple(name.strip() for name in rules.split(",") if name.strip())
     has_rules = bool(rule_set_names)
@@ -125,16 +135,18 @@ def run(
                 console.print(f"[red]Config error:[/] {exc}")
                 raise typer.Exit(code=2) from exc
 
-            try:
-                backup_dir.mkdir(parents=True, exist_ok=True)
-            except OSError as exc:
-                console.print(
-                    f"  [red]Cannot create backup directory {backup_dir}:[/] {exc}\n"
-                    f"  Pass --backup-dir to specify a writable location."
-                )
-                raise typer.Exit(code=2) from exc
+            if not no_backup:
+                try:
+                    backup_dir.mkdir(parents=True, exist_ok=True)
+                except OSError as exc:
+                    console.print(
+                        f"  [red]Cannot create backup directory {backup_dir}:[/] {exc}\n"
+                        f"  Pass --backup-dir to specify a writable location, "
+                        f"or --no-backup to skip the backup."
+                    )
+                    raise typer.Exit(code=2) from exc
 
-            sweep_backups(backup_dir, retention_hours=config.backup_retention_hours)
+                sweep_backups(backup_dir, retention_hours=config.backup_retention_hours)
 
             try:
                 result = extract_word_index(pdf)
@@ -196,8 +208,12 @@ def run(
             input_sha256 = hashlib.sha256(input_bytes).hexdigest()
             session_id = str(uuid.uuid4())
 
-            backup = create_backup(pdf, backup_root=backup_dir)
-            audit_path = audit_dir / f"{backup.timestamp}.jsonl"
+            if no_backup:
+                timestamp = session_timestamp()
+            else:
+                backup = create_backup(pdf, backup_root=backup_dir)
+                timestamp = backup.timestamp
+            audit_path = audit_dir / f"{timestamp}.jsonl"
             audit = AuditLog.open(
                 audit_path,
                 original=pdf,

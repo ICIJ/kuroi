@@ -51,6 +51,11 @@ in the configured backup directory (default
 `--backup-dir`). The backup itself is retained until it falls outside the
 retention window.
 
+Pass `--no-backup` to `kuroi run` to skip the backup copy entirely. With
+`--in-place` the original file becomes unrecoverable, so kuroi prints a
+warning before proceeding; with `-o` the source PDF is untouched and no
+backup is needed for rollback.
+
 ## List & garbage-collect backups
 
 Each backup is a timestamped subdirectory of the backup root containing a

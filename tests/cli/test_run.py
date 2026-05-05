@@ -690,6 +690,70 @@ def test_run_clean_error_when_backup_dir_uncreatable(
     assert not out.exists()
 
 
+def test_run_no_backup_skips_backup_creation(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    stub_anthropic_client: dict[str, Any],
+) -> None:
+    """--no-backup writes the redacted output and audit log but creates no backup dir."""
+    pdf = make_pdf(["Contact alice@example.com today"])
+    out = tmp_path / "out.pdf"
+    backup_dir = tmp_path / "backups"
+    audit_dir = tmp_path / "audit"
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "--rules",
+            "pii",
+            "-o",
+            str(out),
+            "-y",
+            "--no-backup",
+            "--backup-dir",
+            str(backup_dir),
+            "--audit-dir",
+            str(audit_dir),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert out.is_file()
+    assert not backup_dir.exists()
+    assert len(list(audit_dir.glob("*.jsonl"))) == 1
+
+
+def test_run_no_backup_with_in_place_warns_but_proceeds(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    stub_anthropic_client: dict[str, Any],
+) -> None:
+    """--no-backup --in-place prints a yellow warning about unrecoverable original
+    but proceeds with the redaction."""
+    pdf = make_pdf(["Contact alice@example.com today"])
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "--rules",
+            "pii",
+            "--in-place",
+            "-y",
+            "--no-backup",
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert pdf.exists()
+    assert "unrecoverable" in result.stdout.lower()
+
+
 def test_default_backup_dir_uses_xdg_data_home(
     make_pdf: Callable[..., Path],
     tmp_path: Path,

@@ -52,6 +52,7 @@ Options:
   --rules TEXT       Comma-separated rule set names.  [default: pii]
   -y                 Skip the apply confirmation.
   --backup-dir PATH  Backup directory [default: $XDG_DATA_HOME/kuroi/backups].
+  --no-backup        Skip backup creation. With --in-place the original is unrecoverable.
   --audit-dir PATH   [default: /home/dev/.local/share/kuroi/audit]
   --provider TEXT    LLM provider: 'anthropic' or 'ollama'. Overrides env and config.
   --model TEXT       Model ID. Overrides env and config.
