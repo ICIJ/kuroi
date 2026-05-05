@@ -29,6 +29,27 @@ def test_scan_text_under_overlays_clean(make_pdf: Callable[..., Path]) -> None:
     assert leaks == []
 
 
+def test_scan_text_under_overlays_ignores_white_page_background(tmp_path: Path) -> None:
+    """A white-fill page background is not a redaction overlay.
+
+    Some PDF generators emit a full-page white-fill rectangle behind the text;
+    that should not be flagged as a text-under-overlay leak.
+    """
+    doc = pymupdf.open()  # type: ignore[no-untyped-call]
+    page = doc.new_page()  # type: ignore[no-untyped-call]
+    page.draw_rect(  # type: ignore[no-untyped-call]
+        pymupdf.Rect(0, 0, 612, 792), color=(1, 1, 1), fill=(1, 1, 1)
+    )
+    page.insert_text((72, 72), "Hello world", fontsize=11)  # type: ignore[no-untyped-call]
+    out = tmp_path / "white_bg.pdf"
+    doc.save(str(out))  # type: ignore[no-untyped-call]
+    doc.close()  # type: ignore[no-untyped-call]
+
+    leaks = scan_text_under_overlays(out)
+
+    assert leaks == []
+
+
 def test_scan_metadata_flags_author(tmp_path: Path) -> None:
     doc = pymupdf.open()  # type: ignore[no-untyped-call]
     page = doc.new_page()  # type: ignore[no-untyped-call]
