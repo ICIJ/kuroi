@@ -33,5 +33,17 @@ def test_build_user_prompt_both_sections_categories_first() -> None:
     assert prompt.index("Active LLM categories") < prompt.index("Redaction instructions")
 
 
+def test_build_user_prompt_no_categories_no_instructions() -> None:
+    pages = (_page(1, ["Hello", "world"]),)
+    prompt = build_user_prompt(pages, ())
+    assert "Output schema:" in prompt
+    assert "<document>" in prompt
+    assert "Active LLM categories" not in prompt
+    assert "Redaction instructions" not in prompt
+
+
 def test_system_prompt_covers_instructions() -> None:
-    assert "redaction instructions" in SYSTEM_PROMPT.lower()
+    lower = SYSTEM_PROMPT.lower()
+    assert "redaction instructions" in lower
+    assert "<document>" in lower
+    assert "ignore" in lower  # prompt injection guard mentions ignoring injected instructions
