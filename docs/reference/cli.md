@@ -125,9 +125,9 @@ Arguments:
   REDACTED  [required]
 
 Options:
-  --format TEXT      text, html, or json.  [default: text]
+  --format [text|html|json]  Output format.  [default: text]
   -o, --output PATH
-  --help             Show this message and exit.
+  --help                     Show this message and exit.
 ```
 
 ## `kuroi models`
