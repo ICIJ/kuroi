@@ -28,12 +28,12 @@ redacted output:
   Found 47 candidate redactions.
 Apply redactions? [Y/n]: y
   Wrote report.redacted.pdf
+  Backup: ~/.local/share/kuroi/backups/2026-04-30T09-31-02Z-a1b2c3/report.pdf
   Audit: ~/.local/share/kuroi/audit/2026-04-30T09-31-02Z-a1b2c3.jsonl
 ```
 
-A copy of the original is saved under
-`~/.local/share/kuroi/backups/2026-04-30T09-31-02Z-a1b2c3/report.pdf` so you
-can roll back at any time. Pass `--no-backup` to skip the copy when you
+The `Backup:` line points at a copy of the original, kept so you can
+roll back at any time. Pass `--no-backup` to skip the copy when you
 don't need an undo path.
 
 The `-o` flag selects the output path. Use `--in-place` if you want
