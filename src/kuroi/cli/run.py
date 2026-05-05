@@ -19,6 +19,7 @@ from kuroi.core.config import (
     ConfigOverrides,
     resolve_config,
     xdg_config_home,
+    xdg_data_home,
 )
 from kuroi.core.findings import Finding, bbox_union
 from kuroi.core.locks import LockHeldError, output_lock
@@ -49,9 +50,10 @@ def run(
         None, "--instruct", "-i", help="Natural-language redaction instruction."
     ),
     yes: bool = typer.Option(False, "-y", help="Skip the apply confirmation."),
-    backup_dir: Path = typer.Option(
-        Path.home() / "Documents" / "kuroi-backups",
+    backup_dir: Path | None = typer.Option(
+        None,
         "--backup-dir",
+        help="Backup directory [default: $XDG_DATA_HOME/kuroi/backups].",
     ),
     audit_dir: Path = typer.Option(
         Path.home() / ".local" / "share" / "kuroi" / "audit",
@@ -79,6 +81,9 @@ def run(
     ),
 ) -> None:
     """Redact a PDF using rules and/or instructions, with verification gating."""
+    if backup_dir is None:
+        backup_dir = xdg_data_home() / "kuroi" / "backups"
+
     rule_set_names = tuple(name.strip() for name in rules.split(",") if name.strip())
     has_rules = bool(rule_set_names)
     has_instruct = bool(instruct)

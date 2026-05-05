@@ -10,19 +10,25 @@ import typer
 from rich.console import Console
 
 from kuroi.core.backup import sweep_backups
+from kuroi.core.config import xdg_data_home
 
 backups_app = typer.Typer(help="Manage the kuroi backup directory.")
 console = Console()
 
 
-DEFAULT_ROOT = Path.home() / "Documents" / "kuroi-backups"
+def _default_root() -> Path:
+    return xdg_data_home() / "kuroi" / "backups"
 
 
 @backups_app.command("list")
 def list_(
-    root: Path = typer.Option(DEFAULT_ROOT, "--root", help="Backup directory."),
+    root: Path | None = typer.Option(
+        None, "--root", help="Backup directory [default: $XDG_DATA_HOME/kuroi/backups]."
+    ),
 ) -> None:
     """List backup sessions with their ages."""
+    if root is None:
+        root = _default_root()
     if not root.is_dir():
         console.print(f"  No backups directory at {root}.")
         return
@@ -49,9 +55,13 @@ def list_(
 
 @backups_app.command("gc")
 def gc(
-    root: Path = typer.Option(DEFAULT_ROOT, "--root", help="Backup directory."),
+    root: Path | None = typer.Option(
+        None, "--root", help="Backup directory [default: $XDG_DATA_HOME/kuroi/backups]."
+    ),
     max_age: int = typer.Option(24, "--max-age", help="Hours; 0 = keep all."),
 ) -> None:
     """Prune backups older than `--max-age` hours."""
+    if root is None:
+        root = _default_root()
     pruned = sweep_backups(root, retention_hours=max_age)
     console.print(f"  Pruned {pruned} backup{'s' if pruned != 1 else ''}.")

@@ -62,6 +62,17 @@ def xdg_config_home() -> Path:
     return Path.home() / ".config"
 
 
+def xdg_data_home() -> Path:
+    """Return the XDG data directory.
+
+    Honors `$XDG_DATA_HOME` when set; otherwise falls back to `~/.local/share`.
+    """
+    xdg = os.environ.get("XDG_DATA_HOME")
+    if xdg:
+        return Path(xdg)
+    return Path.home() / ".local" / "share"
+
+
 def load_config_file(path: Path) -> dict[str, Any]:
     """Read a kuroi config TOML file. Returns `{}` if the file does not exist.
 

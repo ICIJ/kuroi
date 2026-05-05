@@ -51,7 +51,7 @@ Options:
   --overwrite        Replace an existing output file.
   --rules TEXT       Comma-separated rule set names.  [default: pii]
   -y                 Skip the apply confirmation.
-  --backup-dir PATH  [default: /home/dev/Documents/kuroi-backups]
+  --backup-dir PATH  Backup directory [default: $XDG_DATA_HOME/kuroi/backups].
   --audit-dir PATH   [default: /home/dev/.local/share/kuroi/audit]
   --provider TEXT    LLM provider: 'anthropic' or 'ollama'. Overrides env and config.
   --model TEXT       Model ID. Overrides env and config.
@@ -126,7 +126,7 @@ Usage: kuroi undo [OPTIONS] COMMAND [ARGS]...
 
 Options:
   -y                 Skip the restore confirmation.
-  --backup-dir PATH  [default: /home/dev/Documents/kuroi-backups]
+  --backup-dir PATH  Backup directory [default: $XDG_DATA_HOME/kuroi/backups].
   --help             Show this message and exit.
 ```
 

@@ -89,8 +89,9 @@ before the subcommand. `--seed` is a flag on `kuroi run` (not on
 
 - **Audit records (per finding):** `~/.local/share/kuroi/audit/<timestamp>.jsonl`
   — one JSONL file per run. Configurable with `kuroi run --audit-dir <path>`.
-- **Backups (full PDFs):** `~/Documents/kuroi-backups/<timestamp>/<filename>.pdf`
-  — one timestamped subdirectory per run. Configurable with
+- **Backups (full PDFs):** `~/.local/share/kuroi/backups/<timestamp>/<filename>.pdf`
+  (or `$XDG_DATA_HOME/kuroi/backups/...` when the env var is set) — one
+  timestamped subdirectory per run. Configurable with
   `kuroi run --backup-dir <path>` (and `kuroi undo --backup-dir <path>`).
 - **Config:** `~/.config/kuroi/config.toml` (or `$XDG_CONFIG_HOME/kuroi/config.toml`).
 

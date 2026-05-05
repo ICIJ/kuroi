@@ -32,7 +32,7 @@ Apply redactions? [Y/n]: y
 ```
 
 A copy of the original is saved under
-`~/Documents/kuroi-backups/2026-04-30T09-31-02Z-a1b2c3/report.pdf` so you
+`~/.local/share/kuroi/backups/2026-04-30T09-31-02Z-a1b2c3/report.pdf` so you
 can roll back at any time.
 
 The `-o` flag selects the output path. Use `--in-place` if you want
@@ -65,7 +65,8 @@ If anything looks wrong, restore the latest backup:
 $ kuroi undo
 ```
 
-`kuroi undo` restores the most recent backup in `~/Documents/kuroi-backups/`.
+`kuroi undo` restores the most recent backup in
+`$XDG_DATA_HOME/kuroi/backups/` (default `~/.local/share/kuroi/backups/`).
 Pass `--backup-dir` to point at a different directory. Backups are kept
 for 24 hours by default; use `kuroi backups gc --max-age <hours>` to drop
 old backups manually.
