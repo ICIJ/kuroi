@@ -7,6 +7,7 @@ map back to bounding-box unions for redaction.
 
 from __future__ import annotations
 
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -26,18 +27,38 @@ class Page:
     words: tuple[Word, ...]
 
 
-def extract_word_index(pdf_path: Path) -> tuple[Page, ...]:
+class OcrRequiredError(Exception):
+    def __init__(self, page_numbers: tuple[int, ...]) -> None:
+        self.page_numbers = page_numbers
+
+
+@dataclass(frozen=True)
+class ExtractionResult:
+    pages: tuple[Page, ...]
+    ocr_page_count: int  # 0 if no OCR was needed
+
+
+def _ocr_page_words(page: pymupdf.Page) -> list:  # type: ignore[type-arg]
+    tp = page.get_textpage_ocr(full=True, language="eng", dpi=300)  # type: ignore[no-untyped-call]
+    return page.get_text("words", textpage=tp)  # type: ignore[no-untyped-call]
+
+
+def extract_word_index(pdf_path: Path) -> ExtractionResult:
     """Extract every word on every page with its bounding box.
 
-    Returns a tuple of Page objects in document order. Each Word has a stable
-    per-page index used by the LLM to refer back to it.
+    Pages with zero words and at least one embedded image are scan candidates.
+    If any scan candidates are found and tesseract is not in PATH, raises
+    OcrRequiredError. Otherwise OCRs scan candidates via PyMuPDF's tesseract
+    bridge. Returns an ExtractionResult whose ocr_page_count reflects how many
+    pages were OCR'd (0 if none).
     """
     doc = pymupdf.open(str(pdf_path))  # type: ignore[no-untyped-call]
     try:
         pages: list[Page] = []
+        scan_candidates: list[int] = []  # 1-indexed page numbers
+
         for page_idx in range(doc.page_count):
             pdf_page = doc[page_idx]
-            # get_text("words") → tuple of (x0, y0, x1, y1, "word", block_no, line_no, word_no)
             raw = pdf_page.get_text("words")  # type: ignore[no-untyped-call]
             words = tuple(
                 Word(
@@ -48,7 +69,26 @@ def extract_word_index(pdf_path: Path) -> tuple[Page, ...]:
                 for i, w in enumerate(raw)
             )
             pages.append(Page(number=page_idx + 1, words=words))
-        return tuple(pages)
+            if not words and pdf_page.get_images():  # type: ignore[no-untyped-call]
+                scan_candidates.append(page_idx + 1)
+
+        if scan_candidates:
+            if shutil.which("tesseract") is None:
+                raise OcrRequiredError(tuple(scan_candidates))
+            for page_1idx in scan_candidates:
+                pdf_page = doc[page_1idx - 1]
+                raw = _ocr_page_words(pdf_page)
+                words = tuple(
+                    Word(
+                        idx=i,
+                        text=str(w[4]),
+                        bbox=(float(w[0]), float(w[1]), float(w[2]), float(w[3])),
+                    )
+                    for i, w in enumerate(raw)
+                )
+                pages[page_1idx - 1] = Page(number=page_1idx, words=words)
+
+        return ExtractionResult(pages=tuple(pages), ocr_page_count=len(scan_candidates))
     finally:
         doc.close()  # type: ignore[no-untyped-call]
 
