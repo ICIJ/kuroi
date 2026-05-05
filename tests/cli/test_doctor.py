@@ -50,3 +50,10 @@ def test_doctor_reports_ollama_unreachable(monkeypatch: pytest.MonkeyPatch) -> N
     assert "unreachable" in result.stdout.lower()
     # No traceback should leak into output
     assert "Traceback" not in result.stdout
+
+
+def test_doctor_tesseract_detail_when_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    import shutil as _shutil
+    monkeypatch.setattr(_shutil, "which", lambda name: None if name == "tesseract" else f"/usr/bin/{name}")
+    result = CliRunner().invoke(app, ["doctor"])
+    assert "required for scanned PDFs" in result.stdout
