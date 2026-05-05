@@ -10,6 +10,7 @@ from __future__ import annotations
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pymupdf
 
@@ -29,6 +30,8 @@ class Page:
 
 class OcrRequiredError(Exception):
     def __init__(self, page_numbers: tuple[int, ...]) -> None:
+        pages_str = ", ".join(str(p) for p in page_numbers)
+        super().__init__(f"OCR required for image-only pages: {pages_str}")
         self.page_numbers = page_numbers
 
 
@@ -38,7 +41,7 @@ class ExtractionResult:
     ocr_page_count: int  # 0 if no OCR was needed
 
 
-def _ocr_page_words(page: pymupdf.Page) -> list:  # type: ignore[type-arg]
+def _ocr_page_words(page: pymupdf.Page) -> list[Any]:  # type: ignore[type-arg]
     tp = page.get_textpage_ocr(full=True, language="eng", dpi=300)  # type: ignore[no-untyped-call]
     return page.get_text("words", textpage=tp)  # type: ignore[no-untyped-call]
 
