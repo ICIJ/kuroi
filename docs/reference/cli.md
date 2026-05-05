@@ -47,18 +47,21 @@ Arguments:
 
 Options:
   -o, --output PATH
-  --in-place         Write to the input path; backup is taken.
-  --overwrite        Replace an existing output file.
-  --rules TEXT       Comma-separated rule set names.  [default: pii]
-  -y                 Skip the apply confirmation.
-  --backup-dir PATH  Backup directory [default: $XDG_DATA_HOME/kuroi/backups].
-  --no-backup        Skip backup creation. With --in-place the original is unrecoverable.
-  --audit-dir PATH   [default: /home/dev/.local/share/kuroi/audit]
-  --provider TEXT    LLM provider: 'anthropic' or 'ollama'. Overrides env and config.
-  --model TEXT       Model ID. Overrides env and config.
-  --ollama-url TEXT  Base URL of the Ollama daemon. Overrides env and config.
-  --seed INTEGER     Reproducibility seed. Best-effort per provider; recorded in audit.
-  --help             Show this message and exit.
+  --in-place           Write to the input path; backup is taken.
+  --overwrite          Replace an existing output file.
+  --rules TEXT         Comma-separated rule set names.
+  -i, --instruct TEXT  Natural-language redaction instruction.
+  -y                   Skip the apply confirmation.
+  --backup-dir PATH    Backup directory [default: $XDG_DATA_HOME/kuroi/backups].
+  --no-backup          Skip backup creation. With --in-place the original is
+                       unrecoverable.
+  --audit-dir PATH     Audit log directory [default: $XDG_DATA_HOME/kuroi/audit].
+  --provider TEXT      LLM provider: 'anthropic' or 'ollama'. Overrides env and config.
+  --model TEXT         Model ID. Overrides env and config.
+  --ollama-url TEXT    Base URL of the Ollama daemon. Overrides env and config.
+  --seed INTEGER       Reproducibility seed. Best-effort per provider; recorded in
+                       audit.
+  --help               Show this message and exit.
 ```
 
 ## `kuroi diff`
