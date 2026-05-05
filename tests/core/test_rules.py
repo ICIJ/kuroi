@@ -18,7 +18,7 @@ def test_pii_alias_resolves_to_pii_en() -> None:
 
 def test_apply_regex_rules_finds_email(make_pdf: Callable[..., Path]) -> None:
     pdf = make_pdf(["Contact alice@example.com for details"])
-    pages = extract_word_index(pdf)
+    pages = extract_word_index(pdf).pages
     rs = load_rule_set("pii-en")
 
     findings = apply_regex_rules(pages, rs)
