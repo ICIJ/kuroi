@@ -20,7 +20,6 @@ from kuroi.core.config import (
     xdg_config_home,
 )
 
-setup_app = typer.Typer(invoke_without_command=True)
 console = Console()
 
 CURATED_ANTHROPIC_MODELS: tuple[str, ...] = (
@@ -113,7 +112,6 @@ def _prompt_ollama_model(default: str | None, available: list[str] | None) -> st
     return str(typer.prompt("Model name", default=default or "")).strip()
 
 
-@setup_app.callback(invoke_without_command=True)
 def setup() -> None:
     """Interactively configure provider, model, and Ollama URL."""
     cfg_path = xdg_config_home() / "kuroi" / "config.toml"

@@ -24,15 +24,40 @@ Options:
   --help                Show this message and exit.
 
 Commands:
-  run      Redact a PDF.
-  diff     Show what changed between original and redacted.
-  models   List available LLM providers and models.
   doctor   Check that everything is working.
   verify   Check an already-redacted PDF for leaks.
+  run      Redact a PDF.
   undo     Restore the most recent backup.
   setup    Interactively configure kuroi.
+  diff     Show what changed between original and redacted.
+  models   List available LLM providers and models.
   config   Configuration management.
   backups  Manage backups.
+```
+
+## `kuroi doctor`
+
+```
+Usage: kuroi doctor [OPTIONS]
+
+  Check that everything is working.
+
+Options:
+  --help  Show this message and exit.
+```
+
+## `kuroi verify`
+
+```
+Usage: kuroi verify [OPTIONS] PDF
+
+  Check an already-redacted PDF for leaks.
+
+Arguments:
+  PDF  [required]
+
+Options:
+  --help  Show this message and exit.
 ```
 
 ## `kuroi run`
@@ -64,6 +89,30 @@ Options:
   --help               Show this message and exit.
 ```
 
+## `kuroi undo`
+
+```
+Usage: kuroi undo [OPTIONS]
+
+  Restore the most recent backup.
+
+Options:
+  -y                 Skip the restore confirmation.
+  --backup-dir PATH  Backup directory [default: $XDG_DATA_HOME/kuroi/backups].
+  --help             Show this message and exit.
+```
+
+## `kuroi setup`
+
+```
+Usage: kuroi setup [OPTIONS]
+
+  Interactively configure kuroi.
+
+Options:
+  --help  Show this message and exit.
+```
+
 ## `kuroi diff`
 
 ```
@@ -93,55 +142,6 @@ Arguments:
 
 Options:
   --json  Machine-readable output.
-  --help  Show this message and exit.
-```
-
-## `kuroi doctor`
-
-```
-Usage: kuroi doctor [OPTIONS] COMMAND [ARGS]...
-
-  Check that everything is working.
-
-Options:
-  --help  Show this message and exit.
-```
-
-## `kuroi verify`
-
-```
-Usage: kuroi verify [OPTIONS] PDF COMMAND [ARGS]...
-
-  Check an already-redacted PDF for leaks.
-
-Arguments:
-  PDF  [required]
-
-Options:
-  --help  Show this message and exit.
-```
-
-## `kuroi undo`
-
-```
-Usage: kuroi undo [OPTIONS] COMMAND [ARGS]...
-
-  Restore the most recent backup.
-
-Options:
-  -y                 Skip the restore confirmation.
-  --backup-dir PATH  Backup directory [default: $XDG_DATA_HOME/kuroi/backups].
-  --help             Show this message and exit.
-```
-
-## `kuroi setup`
-
-```
-Usage: kuroi setup [OPTIONS] COMMAND [ARGS]...
-
-  Interactively configure kuroi.
-
-Options:
   --help  Show this message and exit.
 ```
 

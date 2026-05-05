@@ -9,11 +9,9 @@ from rich.console import Console
 
 from kuroi.core.verification import verify_pdf
 
-verify_app = typer.Typer(invoke_without_command=True)
 console = Console()
 
 
-@verify_app.callback(invoke_without_command=True)
 def verify(
     pdf: Path = typer.Argument(..., exists=True, dir_okay=False, readable=True),
 ) -> None:
