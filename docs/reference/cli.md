@@ -24,7 +24,7 @@ Options:
   --help                Show this message and exit.
 
 Commands:
-  run      Redact one or more PDFs.
+  run      Redact a PDF.
   diff     Show what changed between original and redacted.
   models   List available LLM providers and models.
   doctor   Check that everything is working.
@@ -40,7 +40,7 @@ Commands:
 ```
 Usage: kuroi run [OPTIONS] PDF
 
-  Redact one or more PDFs.
+  Redact a PDF.
 
 Arguments:
   PDF  [required]
