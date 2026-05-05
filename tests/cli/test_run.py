@@ -595,3 +595,44 @@ def test_run_both_rules_and_instruct_run_together(
     assert captured.get("instructions") == ("also redact URLs",)
     # pii rule set has llm categories (person_name, street_address)
     assert len(captured.get("llm_category_ids", ())) > 0
+
+
+def test_run_prints_ocr_notice_when_scanned_pages_found(
+    make_pdf: Callable[..., Path],
+    monkeypatch: pytest.MonkeyPatch,
+    stub_anthropic_client: dict[str, Any],
+) -> None:
+    from kuroi.core.pdf import ExtractionResult, Page
+
+    pdf = make_pdf(["Hello world"])
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+    monkeypatch.setattr(
+        "kuroi.cli.run.extract_word_index",
+        lambda path: ExtractionResult(pages=(Page(number=1, words=()),), ocr_page_count=2),
+    )
+
+    result = runner.invoke(app, ["run", str(pdf), "--instruct", "redact all", "-y", "--in-place"])
+
+    assert "OCR applied to 2 scanned page(s)." in result.stdout
+
+
+def test_run_exits_2_when_ocr_required_error(
+    make_pdf: Callable[..., Path],
+    monkeypatch: pytest.MonkeyPatch,
+    stub_anthropic_client: dict[str, Any],
+) -> None:
+    from kuroi.core.pdf import OcrRequiredError
+
+    pdf = make_pdf(["Hello world"])
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+
+    def _raise(path: Path) -> None:
+        raise OcrRequiredError((3, 7))
+
+    monkeypatch.setattr("kuroi.cli.run.extract_word_index", _raise)
+
+    result = runner.invoke(app, ["run", str(pdf), "--instruct", "redact all", "-y", "--in-place"])
+
+    assert result.exit_code == 2
+    assert "3, 7" in result.stdout
+    assert "tesseract" in result.stdout.lower()
