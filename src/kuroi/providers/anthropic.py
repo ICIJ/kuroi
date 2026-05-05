@@ -16,13 +16,15 @@ from kuroi.core.audit_records import ChunkRecord
 from kuroi.core.findings import Finding
 from kuroi.core.pdf import Page
 from kuroi.providers._shared import (
-    OUTPUT_SCHEMA_HINT,
     SYSTEM_PROMPT,
     build_user_prompt,
     parse_findings_payload,
 )
 
 __all__ = ["AnthropicProvider", "build_user_prompt", "parse_findings_payload"]
+
+# claude-opus-4-x and newer extended-thinking models reject temperature
+_NO_TEMPERATURE_MODELS = {"claude-opus-4-7", "claude-opus-4-6", "claude-opus-4-5"}
 
 
 class AnthropicProvider:
@@ -66,10 +68,8 @@ class AnthropicProvider:
         user_prompt = build_user_prompt(pages, llm_category_ids, instructions)
         prompt_sha = hashlib.sha256(user_prompt.encode("utf-8")).hexdigest()
 
-        # claude-opus-4-x and newer extended-thinking models reject temperature
-        _temperature_models = {"claude-opus-4-7", "claude-opus-4-6", "claude-opus-4-5"}
         extra: dict[str, Any] = (
-            {} if self.model in _temperature_models else {"temperature": 0}
+            {} if self.model in _NO_TEMPERATURE_MODELS else {"temperature": 0}
         )
 
         started = time.monotonic()
