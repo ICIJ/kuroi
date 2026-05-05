@@ -21,7 +21,12 @@ class _StubProvider:
         self.model = model
 
     def detect_redactions(
-        self, pages: Any, llm_category_ids: Any, *, seed: int | None = None
+        self,
+        pages: Any,
+        llm_category_ids: Any,
+        *,
+        instructions: tuple[str, ...] = (),
+        seed: int | None = None,
     ) -> tuple[list[Finding], list[Any]]:
         return [], []
 
