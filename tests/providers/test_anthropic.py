@@ -207,7 +207,7 @@ def test_detect_redactions_with_instructions_only_makes_llm_call() -> None:
     provider = AnthropicProvider(model="claude-opus-4-7", client=client)
     pages = (_page(1, ["Alice", "Smith"]),)
 
-    findings, chunks = provider.detect_redactions(
+    findings, _ = provider.detect_redactions(
         pages, llm_category_ids=(), instructions=("redact all complainant names",)
     )
 
