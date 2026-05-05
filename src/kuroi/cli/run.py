@@ -209,6 +209,7 @@ def run(
             session_id = str(uuid.uuid4())
 
             if no_backup:
+                backup = None
                 timestamp = session_timestamp()
             else:
                 backup = create_backup(pdf, backup_root=backup_dir)
@@ -310,6 +311,8 @@ def run(
                     output_sha256=output_sha256,
                 )
                 console.print(f"  Wrote {final_output}")
+                if backup is not None:
+                    console.print(f"  Backup: {backup.copy_path}")
                 console.print(f"  Audit: {audit_path}")
             except typer.Exit:
                 raise

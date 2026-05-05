@@ -59,6 +59,7 @@ def test_run_redacts_emails_via_regex_rule(
 ) -> None:
     pdf = make_pdf(["Contact alice@example.com today"])
     out = tmp_path / "redacted.pdf"
+    backup_dir = tmp_path / "backups"
 
     runner = CliRunner()
     result = runner.invoke(
@@ -72,7 +73,7 @@ def test_run_redacts_emails_via_regex_rule(
             str(out),
             "-y",
             "--backup-dir",
-            str(tmp_path / "backups"),
+            str(backup_dir),
             "--audit-dir",
             str(tmp_path / "audit"),
         ],
@@ -85,6 +86,11 @@ def test_run_redacts_emails_via_regex_rule(
     redacted.close()
     assert "alice@example.com" not in text
     assert "Contact" in text and "today" in text
+    flat = "".join(result.stdout.split())
+    assert "Backup:" in result.stdout
+    sessions = [p for p in backup_dir.iterdir() if p.is_dir()]
+    assert len(sessions) == 1
+    assert "".join(str(sessions[0] / pdf.name).split()) in flat
 
 
 def test_run_refuses_to_overwrite_input(
@@ -723,6 +729,7 @@ def test_run_no_backup_skips_backup_creation(
     assert out.is_file()
     assert not backup_dir.exists()
     assert len(list(audit_dir.glob("*.jsonl"))) == 1
+    assert "Backup:" not in result.stdout
 
 
 def test_run_no_backup_with_in_place_warns_but_proceeds(
