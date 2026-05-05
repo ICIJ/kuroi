@@ -99,3 +99,35 @@ def test_extract_word_index_ocrs_image_pages(
     assert result.pages[0].words[0].text == "redacted"
     assert result.pages[0].words[0].idx == 0
     assert result.pages[0].words[0].bbox == (10.0, 20.0, 50.0, 30.0)
+
+
+def test_extract_word_index_ocrs_pages_with_text_and_image(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A page with native text (e.g. a court-stamped header) AND an embedded
+    image (e.g. an email screenshot) must still be OCR'd — the image content is
+    invisible to native text extraction and would otherwise be missed."""
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "Case header text", fontsize=11)
+    pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 128, 128))
+    pix.clear_with(200)
+    page.insert_image(pymupdf.Rect(72, 200, 400, 500), pixmap=pix)
+    pdf = tmp_path / "header_plus_image.pdf"
+    doc.save(str(pdf))
+    doc.close()
+
+    monkeypatch.setattr(
+        "kuroi.core.pdf.shutil.which",
+        lambda name: "/usr/bin/tesseract" if name == "tesseract" else None,
+    )
+    monkeypatch.setattr(
+        "kuroi.core.pdf._ocr_page_words",
+        lambda page: [(10.0, 20.0, 50.0, 30.0, "ocred", 0, 0, 0)],
+    )
+
+    result = extract_word_index(pdf)
+
+    assert result.ocr_page_count == 1
+    assert len(result.pages) == 1
+    assert result.pages[0].words[0].text == "ocred"
