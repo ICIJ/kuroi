@@ -52,11 +52,12 @@ def _anthropic_key() -> CheckResult:
     )
 
 
-def _binary_check(name: str) -> CheckResult:
+def _binary_check(name: str, detail_missing: str | None = None) -> CheckResult:
     path = shutil.which(name)
     if path:
         return CheckResult(name, "ok", path)
-    return CheckResult(name, "warn", f"{name} not found in PATH (optional for v0.1)")
+    missing = detail_missing if detail_missing is not None else f"{name} not found in PATH"
+    return CheckResult(name, "warn", missing)
 
 
 def _config_checks() -> list[CheckResult]:
@@ -94,7 +95,7 @@ def doctor() -> None:
         CheckResult(f"kuroi version {__version__}", "ok", ""),
         _python_version(),
         _anthropic_key(),
-        _binary_check("tesseract"),
+        _binary_check("tesseract", detail_missing="required for scanned PDFs"),
         _binary_check("qpdf"),
         *_config_checks(),
     ]
