@@ -240,3 +240,45 @@ def test_ollama_seed_is_sent_and_marked_honored() -> None:
     body = client.last_call_kwargs["json"]
     assert body["options"]["seed"] == 99
     assert body["options"]["temperature"] == 0
+
+
+def test_ollama_instructions_only_makes_call_and_sets_source() -> None:
+    """Ollama calls the model when instructions are given and no categories."""
+    client = _StubClient2(
+        {
+            "findings": [
+                {"page": 1, "start": 0, "end": 0, "kind": "ip_address", "confidence": "high"}
+            ]
+        },
+        prompt_eval=50,
+        eval_count=10,
+    )
+    provider = OllamaProvider(model="llama3.1:8b", url="http://x", client=client)
+    pages = (_page(1, ["192.168.1.1"]),)
+
+    findings, chunks = provider.detect_redactions(
+        pages, llm_category_ids=(), instructions=("redact all IP addresses",)
+    )
+
+    assert len(findings) == 1
+    assert findings[0].source == "instruction"
+    assert findings[0].kind == "ip_address"
+    assert client.last_call_kwargs is not None
+    user_msg = client.last_call_kwargs["json"]["messages"][1]["content"]
+    assert "redact all IP addresses" in user_msg
+    assert "Active LLM categories" not in user_msg
+
+
+def test_ollama_mixed_source_is_llm() -> None:
+    """When both categories and instructions are given, source is 'llm'."""
+    client = _StubClient2(
+        {"findings": [{"page": 1, "start": 0, "end": 0, "kind": "email", "confidence": "high"}]},
+    )
+    provider = OllamaProvider(model="llama3.1:8b", url="http://x", client=client)
+    pages = (_page(1, ["alice@example.com"]),)
+
+    findings, _ = provider.detect_redactions(
+        pages, llm_category_ids=("email",), instructions=("also redact names",)
+    )
+
+    assert findings[0].source == "llm"
