@@ -3,15 +3,15 @@
 import typer
 
 import kuroi.cli.diff as _diff_module
+import kuroi.cli.doctor as _doctor_module
 import kuroi.cli.models as _models_module
 import kuroi.cli.run as _run_module
+import kuroi.cli.setup as _setup_module
+import kuroi.cli.undo as _undo_module
+import kuroi.cli.verify as _verify_module
 from kuroi import __version__
 from kuroi.cli.backups import backups_app
 from kuroi.cli.config import config_app
-from kuroi.cli.doctor import doctor_app
-from kuroi.cli.setup import setup_app
-from kuroi.cli.undo import undo_app
-from kuroi.cli.verify import verify_app
 from kuroi.core.log import setup_logging, warn_vv_once
 
 app = typer.Typer(
@@ -57,11 +57,11 @@ def main(
         warn_vv_once()
 
 
-app.add_typer(doctor_app, name="doctor", help="Check that everything is working.")
-app.add_typer(verify_app, name="verify", help="Check an already-redacted PDF for leaks.")
+app.command("doctor", help="Check that everything is working.")(_doctor_module.doctor)
+app.command("verify", help="Check an already-redacted PDF for leaks.")(_verify_module.verify)
 app.command("run", help="Redact a PDF.")(_run_module.run)
-app.add_typer(undo_app, name="undo", help="Restore the most recent backup.")
-app.add_typer(setup_app, name="setup", help="Interactively configure kuroi.")
+app.command("undo", help="Restore the most recent backup.")(_undo_module.undo)
+app.command("setup", help="Interactively configure kuroi.")(_setup_module.setup)
 app.add_typer(config_app, name="config", help="Configuration management.")
 app.add_typer(backups_app, name="backups", help="Manage backups.")
 app.command("diff", help="Show what changed between original and redacted.")(_diff_module.diff)

@@ -18,11 +18,9 @@ from kuroi.core.config import (
     xdg_data_home,
 )
 
-undo_app = typer.Typer(invoke_without_command=True)
 console = Console()
 
 
-@undo_app.callback(invoke_without_command=True)
 def undo(
     yes: bool = typer.Option(False, "-y", help="Skip the restore confirmation."),
     backup_dir: Path | None = typer.Option(

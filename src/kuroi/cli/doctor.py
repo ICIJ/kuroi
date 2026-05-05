@@ -20,7 +20,6 @@ from kuroi.core.config import (
     xdg_config_home,
 )
 
-doctor_app = typer.Typer(invoke_without_command=True)
 console = Console()
 
 CheckStatus = Literal["ok", "warn", "problem"]
@@ -88,7 +87,6 @@ def _config_checks() -> list[CheckResult]:
     return results
 
 
-@doctor_app.callback(invoke_without_command=True)
 def doctor() -> None:
     """Check that everything kuroi needs is in working order."""
     checks: list[CheckResult] = [
