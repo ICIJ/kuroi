@@ -7,6 +7,8 @@ by `make docs-gen` (and verified in CI via `git diff --exit-code`).
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 import click
@@ -40,18 +42,33 @@ _OUTPUT_PATH = _ROOT / "docs" / "reference" / "cli.md"
 _HELP_COLUMNS = 88
 
 
-def _disable_rich(typer_app: typer.Typer) -> None:
-    """Recursively disable Typer's Rich-driven help formatter.
+@contextmanager
+def _rich_disabled(typer_app: typer.Typer) -> Iterator[None]:
+    """Temporarily disable Typer's Rich-driven help formatter, restoring on exit.
 
     Rich's output depends on terminal capabilities, locale, and Rich version,
     making the rendered help text non-deterministic across environments
     (e.g. local dev vs CI). Falling back to Click's built-in formatter gives
     plain text that's stable everywhere — required for the CI drift check.
+
+    Restores the prior `rich_markup_mode` so that callers (e.g. tests sharing
+    the same `app` instance) see no mutation.
     """
-    typer_app.rich_markup_mode = None
-    for grp in typer_app.registered_groups:
-        if grp.typer_instance is not None:
-            _disable_rich(grp.typer_instance)
+    saved: list[tuple[typer.Typer, str | None]] = []
+
+    def _disable(t: typer.Typer) -> None:
+        saved.append((t, t.rich_markup_mode))
+        t.rich_markup_mode = None
+        for grp in t.registered_groups:
+            if grp.typer_instance is not None:
+                _disable(grp.typer_instance)
+
+    _disable(typer_app)
+    try:
+        yield
+    finally:
+        for t, mode in saved:
+            t.rich_markup_mode = mode
 
 
 def _help_block(cmd: click.Command, info_name: str) -> str:
@@ -61,18 +78,20 @@ def _help_block(cmd: click.Command, info_name: str) -> str:
 
 
 def render_cli_markdown() -> str:
-    _disable_rich(app)
-    root = get_command(app)
-    sections: list[str] = [_BANNER, _INTRO, "", "## `kuroi`", "", _help_block(root, "kuroi"), ""]
+    with _rich_disabled(app):
+        root = get_command(app)
+        sections: list[str] = [
+            _BANNER, _INTRO, "", "## `kuroi`", "", _help_block(root, "kuroi"), "",
+        ]
 
-    # Iterate subcommands in declaration order on the Typer app — TyperGroup
-    # preserves registration order, so this is stable across Python versions.
-    for name in root.commands:
-        sub = root.commands[name]
-        sections.append(f"## `kuroi {name}`")
-        sections.append("")
-        sections.append(_help_block(sub, f"kuroi {name}"))
-        sections.append("")
+        # Iterate subcommands in declaration order on the Typer app — TyperGroup
+        # preserves registration order, so this is stable across Python versions.
+        for name in root.commands:
+            sub = root.commands[name]
+            sections.append(f"## `kuroi {name}`")
+            sections.append("")
+            sections.append(_help_block(sub, f"kuroi {name}"))
+            sections.append("")
 
     return "\n".join(sections).rstrip() + "\n"
 

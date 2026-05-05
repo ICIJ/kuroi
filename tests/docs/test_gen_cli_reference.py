@@ -47,3 +47,13 @@ def test_render_fences_contain_help_text() -> None:
     assert len(fences) >= 10, f"expected at least 10 fences, got {len(fences)}"
     assert all(f.strip() for f in fences), "one or more fences are empty"
     assert "Usage: kuroi" in fences[0], "root fence missing 'Usage: kuroi'"
+
+
+def test_render_does_not_mutate_app_rich_markup_mode() -> None:
+    """Render must not leave `app.rich_markup_mode` flipped off for later tests."""
+    from kuroi.cli import app
+
+    before = app.rich_markup_mode
+    mod = _load_module()
+    mod.render_cli_markdown()
+    assert app.rich_markup_mode == before
