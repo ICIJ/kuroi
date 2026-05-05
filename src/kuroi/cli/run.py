@@ -27,7 +27,7 @@ from kuroi.core.output_resolution import (
     OutputResolutionError,
     resolve_output_path,
 )
-from kuroi.core.pdf import extract_word_index, serialize_for_llm
+from kuroi.core.pdf import OcrRequiredError, extract_word_index, serialize_for_llm
 from kuroi.core.pricing import count_tokens, estimate_cost, load_pricing
 from kuroi.core.redaction import apply_redactions
 from kuroi.core.rules import apply_regex_rules, llm_categories, load_rule_set
@@ -122,7 +122,20 @@ def run(
 
             sweep_backups(backup_dir, retention_hours=config.backup_retention_hours)
 
-            pages = extract_word_index(pdf)
+            try:
+                result = extract_word_index(pdf)
+            except OcrRequiredError as exc:
+                pages_str = ", ".join(str(p) for p in exc.page_numbers)
+                console.print(
+                    f"  [red]Scanned pages detected (pages {pages_str}) but tesseract is not installed.[/]\n"
+                    f"  Install tesseract and re-run, or run `kuroi doctor` for details."
+                )
+                raise typer.Exit(code=2) from exc
+
+            pages = result.pages
+
+            if result.ocr_page_count > 0:
+                console.print(f"  OCR applied to {result.ocr_page_count} scanned page(s).")
 
             pricing = load_pricing()
             input_tokens = count_tokens(serialize_for_llm(pages))
