@@ -256,7 +256,7 @@ def test_ollama_instructions_only_makes_call_and_sets_source() -> None:
     provider = OllamaProvider(model="llama3.1:8b", url="http://x", client=client)
     pages = (_page(1, ["192.168.1.1"]),)
 
-    findings, chunks = provider.detect_redactions(
+    findings, _chunks = provider.detect_redactions(
         pages, llm_category_ids=(), instructions=("redact all IP addresses",)
     )
 
