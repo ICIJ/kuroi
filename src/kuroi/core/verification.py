@@ -60,13 +60,38 @@ def scan_text_under_overlays(pdf_path: Path) -> list[Leak]:
     return leaks
 
 
+_DARK_FILL_THRESHOLD = 0.5  # all RGB components below this count as redaction-dark
+
+
+def _is_redaction_fill(fill: object) -> bool:
+    """True when `fill` is near-black across all RGB components.
+
+    PDFs commonly include non-redaction filled rectangles (white page
+    backgrounds, colored highlights). Only treat dark fills as candidate
+    redaction overlays so the verifier doesn't trip on those.
+    """
+    if fill is None:
+        return False
+    try:
+        rgb = tuple(fill)[:3]  # type: ignore[arg-type]
+    except TypeError:
+        return False
+    if not rgb:
+        return False
+    return all(float(c) < _DARK_FILL_THRESHOLD for c in rgb)
+
+
 def _filled_rectangles(
     page: pymupdf.Page,
 ) -> list[tuple[float, float, float, float]]:
-    """Return rectangles drawn with a fill on this page."""
+    """Return dark-filled rectangles drawn on this page.
+
+    Light fills (e.g. a white page background) are excluded — they aren't
+    redaction overlays, and treating them as such yields false-positive leaks.
+    """
     out: list[tuple[float, float, float, float]] = []
     for drawing in page.get_drawings():
-        if drawing.get("fill") is None:
+        if not _is_redaction_fill(drawing.get("fill")):
             continue
         rect = drawing.get("rect")
         if rect is None:
