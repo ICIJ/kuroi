@@ -184,7 +184,8 @@ def test_anthropic_records_seed_but_does_not_send_it() -> None:
     assert chunks[0].seed_honored is False
     call_kwargs = client.messages.create.call_args.kwargs
     assert "seed" not in call_kwargs
-    assert call_kwargs["temperature"] == 0
+    # claude-opus-4-7 rejects temperature; it must not be sent
+    assert "temperature" not in call_kwargs
 
 
 def test_anthropic_no_categories_returns_empty_lists() -> None:
@@ -194,3 +195,45 @@ def test_anthropic_no_categories_returns_empty_lists() -> None:
     assert findings == []
     assert chunks == []
     client.messages.create.assert_not_called()
+
+
+def test_detect_redactions_with_instructions_only_makes_llm_call() -> None:
+    """Provider makes an LLM call when instructions are given even with no categories."""
+    response_text = (
+        '{"findings": [{"page": 1, "start": 0, "end": 1, '
+        '"kind": "complainant_name", "confidence": "high"}]}'
+    )
+    client = _StubClient(response_text)
+    provider = AnthropicProvider(model="claude-opus-4-7", client=client)
+    pages = (_page(1, ["Alice", "Smith"]),)
+
+    findings, chunks = provider.detect_redactions(
+        pages, llm_category_ids=(), instructions=("redact all complainant names",)
+    )
+
+    assert len(findings) == 1
+    assert findings[0].source == "instruction"
+    assert findings[0].kind == "complainant_name"
+    assert client.messages.last_call is not None
+    user_msg = client.messages.last_call["messages"][0]["content"]
+    assert "redact all complainant names" in user_msg
+    assert "Active LLM categories" not in user_msg
+
+
+def test_detect_redactions_mixed_source_is_llm() -> None:
+    """When both categories and instructions given, source is 'llm'."""
+    response_text = (
+        '{"findings": [{"page": 1, "start": 0, "end": 0, '
+        '"kind": "email", "confidence": "high"}]}'
+    )
+    client = _StubClient(response_text)
+    provider = AnthropicProvider(model="claude-opus-4-7", client=client)
+    pages = (_page(1, ["alice@example.com"]),)
+
+    findings, _ = provider.detect_redactions(
+        pages,
+        llm_category_ids=("email",),
+        instructions=("also redact all names",),
+    )
+
+    assert findings[0].source == "llm"
