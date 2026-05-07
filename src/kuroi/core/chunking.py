@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import math
 from collections.abc import Callable
+from dataclasses import replace
 
 from kuroi.core.audit_records import ChunkRecord
 from kuroi.core.findings import Finding
@@ -53,10 +54,11 @@ def detect_redactions_chunked(
             seed=seed,
         )
 
+        renumbered = [replace(c, chunk_idx=batch_idx) for c in chunks]
         aggregate_findings.extend(findings)
-        aggregate_chunks.extend(chunks)
+        aggregate_chunks.extend(renumbered)
 
-        if on_batch_complete is not None and chunks:
-            on_batch_complete(batch_idx, total_batches, page_numbers, chunks[0])
+        if on_batch_complete is not None and renumbered:
+            on_batch_complete(batch_idx, total_batches, page_numbers, renumbered[0])
 
     return aggregate_findings, aggregate_chunks
