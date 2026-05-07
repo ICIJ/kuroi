@@ -8,6 +8,7 @@ import shutil
 import uuid
 from dataclasses import asdict
 from pathlib import Path
+from typing import Any
 
 import typer
 from rich.console import Console
@@ -204,6 +205,27 @@ def run(
                     pages, tuple(llm_cat_ids), instructions=instruction_tuple, seed=seed
                 )
             else:
+
+                def _on_batch_start(
+                    batch_idx: int, total: int, page_numbers: tuple[int, ...]
+                ) -> None:
+                    if len(page_numbers) > 1:
+                        rng = f"{page_numbers[0]}-{page_numbers[-1]}"
+                    else:
+                        rng = f"{page_numbers[0]}"
+                    console.print(f"  Batch {batch_idx + 1}/{total} (pages {rng})...", end="")
+
+                def _on_batch_complete(
+                    batch_idx: int,
+                    total: int,
+                    page_numbers: tuple[int, ...],
+                    chunk: Any,
+                ) -> None:
+                    console.print(
+                        f" done in {chunk.duration_ms} ms, "
+                        f"tokens_in={chunk.tokens_in} tokens_out={chunk.tokens_out}"
+                    )
+
                 try:
                     provider_findings, chunks = detect_redactions_chunked(
                         provider,
@@ -212,6 +234,8 @@ def run(
                         instructions=instruction_tuple,
                         seed=seed,
                         pages_per_batch=pages_per_batch,
+                        on_batch_start=_on_batch_start,
+                        on_batch_complete=_on_batch_complete,
                     )
                 except BatchError as exc:
                     console.print(
