@@ -870,3 +870,66 @@ def test_run_with_pages_per_batch_invokes_orchestrator(
 
     assert result.exit_code == 0, result.stdout
     assert call_page_groups == [(1, 2), (3, 4)]
+
+
+def test_run_with_pages_per_batch_prints_progress_per_batch(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    stub_anthropic_client: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdf = make_pdf(["one", "two", "three", "four"])
+
+    def _stub_detect(
+        self: Any,
+        pages: tuple[Any, ...],
+        llm_category_ids: tuple[str, ...],
+        *,
+        instructions: tuple[str, ...] = (),
+        seed: int | None = None,
+    ) -> tuple[list[Any], list[Any]]:
+        from kuroi.core.audit_records import ChunkRecord
+
+        return [], [
+            ChunkRecord(
+                chunk_idx=0,
+                pages=tuple(p.number for p in pages),
+                temperature=0.0,
+                seed_requested=None,
+                seed_honored=False,
+                system_fingerprint=None,
+                prompt_sha256="a" * 64,
+                response_sha256="b" * 64,
+                tokens_in=10,
+                tokens_out=2,
+                duration_ms=123,
+            )
+        ]
+
+    monkeypatch.setattr(
+        "kuroi.providers.anthropic.AnthropicProvider.detect_redactions",
+        _stub_detect,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "--instruct",
+            "redact",
+            "-o",
+            str(tmp_path / "out.pdf"),
+            "-y",
+            "--pages-per-batch",
+            "2",
+            "--backup-dir",
+            str(tmp_path / "backups"),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert "Batch 1/2 (pages 1-2)" in result.stdout
+    assert "Batch 2/2 (pages 3-4)" in result.stdout
