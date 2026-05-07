@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import time
 from typing import Any
@@ -23,8 +24,13 @@ from kuroi.providers._shared import (
 
 __all__ = ["AnthropicProvider", "build_user_prompt", "parse_findings_payload"]
 
+logger = logging.getLogger("kuroi.providers.anthropic")
+
 # claude-opus-4-x and newer extended-thinking models reject temperature
 _NO_TEMPERATURE_MODELS = {"claude-opus-4-7", "claude-opus-4-6", "claude-opus-4-5"}
+
+# Above this fraction of max_tokens we assume the response was truncated.
+_TRUNCATION_THRESHOLD = 0.95
 
 
 class AnthropicProvider:
@@ -70,6 +76,16 @@ class AnthropicProvider:
 
         extra: dict[str, Any] = {} if self.model in _NO_TEMPERATURE_MODELS else {"temperature": 0}
 
+        logger.debug(
+            "anthropic request model=%s max_tokens=%d prompt_chars=%d prompt_sha=%s\n"
+            "FULL PROMPT:\n%s",
+            self.model,
+            self._max_tokens,
+            len(user_prompt),
+            prompt_sha[:8],
+            user_prompt,
+        )
+
         started = time.monotonic()
         response = self._client.messages.create(
             model=self.model,
@@ -87,6 +103,25 @@ class AnthropicProvider:
         tokens_in = int(getattr(usage, "input_tokens", 0)) if usage else 0
         tokens_out = int(getattr(usage, "output_tokens", 0)) if usage else 0
 
+        logger.info(
+            "anthropic response duration_ms=%d tokens_in=%d tokens_out=%d response_chars=%d",
+            duration_ms,
+            tokens_in,
+            tokens_out,
+            len(text),
+        )
+        logger.debug("anthropic response sha=%s\nFULL RESPONSE:\n%s", response_sha[:8], text)
+
+        if tokens_out and tokens_out >= int(self._max_tokens * _TRUNCATION_THRESHOLD):
+            logger.warning(
+                "anthropic response likely truncated: tokens_out=%d hit %.0f%% of "
+                "max_tokens=%d. Increase max_tokens or split the document; the JSON "
+                "is probably cut mid-array and findings will be lost.",
+                tokens_out,
+                100 * tokens_out / self._max_tokens,
+                self._max_tokens,
+            )
+
         chunk = ChunkRecord(
             chunk_idx=0,
             pages=tuple(p.number for p in pages),
@@ -103,7 +138,13 @@ class AnthropicProvider:
 
         try:
             payload = json.loads(text)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as exc:
+            logger.warning(
+                "anthropic returned non-JSON response (%s). The model may have wrapped "
+                "the JSON in markdown or added preamble. First 500 chars: %r",
+                exc,
+                text[:500],
+            )
             return [], [chunk]
 
         source = "instruction" if not llm_category_ids else "llm"

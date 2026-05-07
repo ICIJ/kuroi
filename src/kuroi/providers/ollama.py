@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import time
 from typing import Any
 
@@ -17,6 +18,8 @@ from kuroi.providers._shared import (
     build_user_prompt,
     parse_findings_payload,
 )
+
+logger = logging.getLogger("kuroi.providers.ollama")
 
 CONNECT_TIMEOUT_SECONDS = 5.0
 READ_TIMEOUT_SECONDS = 120.0
@@ -72,12 +75,38 @@ class OllamaProvider:
             ],
         }
 
+        logger.debug(
+            "ollama request model=%s url=%s prompt_chars=%d prompt_sha=%s\nFULL PROMPT:\n%s",
+            self.model,
+            self._url,
+            len(user_prompt),
+            prompt_sha[:8],
+            user_prompt,
+        )
+
         started = time.monotonic()
         try:
             response = self._client.post(f"{self._url}/api/chat", json=body)
             response.raise_for_status()
             envelope = response.json()
-        except (httpx.HTTPError, json.JSONDecodeError, ValueError):
+        except httpx.TimeoutException as exc:
+            logger.warning(
+                "ollama request timed out after %.0fs (read timeout). The model is "
+                "either not loaded yet or the prompt is too large to process in time. "
+                "Detail: %s",
+                READ_TIMEOUT_SECONDS,
+                exc,
+            )
+            return [], []
+        except httpx.HTTPStatusError as exc:
+            logger.warning(
+                "ollama returned HTTP %d: %s",
+                exc.response.status_code,
+                exc.response.text[:500],
+            )
+            return [], []
+        except (httpx.HTTPError, json.JSONDecodeError, ValueError) as exc:
+            logger.warning("ollama call failed: %s: %s", type(exc).__name__, exc)
             return [], []
         duration_ms = int((time.monotonic() - started) * 1000)
 
@@ -86,6 +115,15 @@ class OllamaProvider:
         response_sha = hashlib.sha256((content or "").encode("utf-8")).hexdigest()
         tokens_in = int(envelope.get("prompt_eval_count", 0)) if isinstance(envelope, dict) else 0
         tokens_out = int(envelope.get("eval_count", 0)) if isinstance(envelope, dict) else 0
+
+        logger.info(
+            "ollama response duration_ms=%d tokens_in=%d tokens_out=%d response_chars=%d",
+            duration_ms,
+            tokens_in,
+            tokens_out,
+            len(content or ""),
+        )
+        logger.debug("ollama response sha=%s\nFULL RESPONSE:\n%s", response_sha[:8], content or "")
 
         chunk = ChunkRecord(
             chunk_idx=0,
@@ -102,12 +140,22 @@ class OllamaProvider:
         )
 
         if not isinstance(content, str):
+            logger.warning(
+                "ollama envelope missing message.content; got envelope keys: %r",
+                list(envelope.keys()) if isinstance(envelope, dict) else type(envelope),
+            )
             return [], [chunk]
         try:
             payload = json.loads(content)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as exc:
+            logger.warning(
+                "ollama returned non-JSON content despite format=json (%s). First 500 chars: %r",
+                exc,
+                content[:500],
+            )
             return [], [chunk]
         if not isinstance(payload, dict):
+            logger.warning("ollama JSON payload is not an object (got %s)", type(payload).__name__)
             return [], [chunk]
 
         source = "instruction" if not llm_category_ids else "llm"
