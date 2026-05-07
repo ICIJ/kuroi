@@ -823,6 +823,7 @@ def test_run_with_pages_per_batch_invokes_orchestrator(
         *,
         instructions: tuple[str, ...] = (),
         seed: int | None = None,
+        attempt: int = 0,
     ) -> tuple[list[Any], list[Any]]:
         from kuroi.core.audit_records import ChunkRecord
 
@@ -886,6 +887,7 @@ def test_run_with_pages_per_batch_prints_progress_per_batch(
         *,
         instructions: tuple[str, ...] = (),
         seed: int | None = None,
+        attempt: int = 0,
     ) -> tuple[list[Any], list[Any]]:
         from kuroi.core.audit_records import ChunkRecord
 
@@ -950,6 +952,7 @@ def test_run_with_pages_per_batch_aborts_on_batch_error(
         *,
         instructions: tuple[str, ...] = (),
         seed: int | None = None,
+        attempt: int = 0,
     ) -> tuple[list[Any], list[Any]]:
         return [], []  # hard failure on every call
 
@@ -979,5 +982,7 @@ def test_run_with_pages_per_batch_aborts_on_batch_error(
     )
 
     assert result.exit_code == 1
-    assert "failed twice" in result.stdout
+    from kuroi.core.chunking import MAX_ATTEMPTS
+
+    assert f"failed {MAX_ATTEMPTS} times" in result.stdout
     assert "smaller --pages-per-batch" in result.stdout
