@@ -269,3 +269,83 @@ def test_chunked_call_does_not_retry_on_soft_empty_findings() -> None:
     assert len(provider.calls) == 1
     assert findings == []
     assert len(chunks) == 1
+
+
+def test_on_batch_start_fires_once_per_batch_before_provider_call() -> None:
+    from kuroi.core.chunking import detect_redactions_chunked
+
+    pages = tuple(_page(i) for i in range(1, 5))
+    provider = _RecordingProvider(
+        scripts=[
+            ([], [_chunk((1, 2))]),
+            ([], [_chunk((3, 4))]),
+        ]
+    )
+    starts: list[tuple[int, int, tuple[int, ...]]] = []
+
+    detect_redactions_chunked(
+        provider,
+        pages,
+        ("x",),
+        pages_per_batch=2,
+        on_batch_start=lambda i, n, ps: starts.append((i, n, ps)),
+    )
+
+    assert starts == [(0, 2, (1, 2)), (1, 2, (3, 4))]
+
+
+def test_on_batch_complete_receives_renumbered_chunk(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from kuroi.core.chunking import detect_redactions_chunked
+
+    pages = tuple(_page(i) for i in range(1, 5))
+    provider = _RecordingProvider(
+        scripts=[
+            ([], [_chunk((1, 2))]),
+            ([], [_chunk((3, 4))]),
+        ]
+    )
+    completes: list[tuple[int, int, tuple[int, ...], int]] = []
+
+    def _capture(
+        batch_idx: int,
+        total: int,
+        page_numbers: tuple[int, ...],
+        chunk: ChunkRecord,
+    ) -> None:
+        completes.append((batch_idx, total, page_numbers, chunk.chunk_idx))
+
+    detect_redactions_chunked(
+        provider,
+        pages,
+        ("x",),
+        pages_per_batch=2,
+        on_batch_complete=_capture,
+    )
+
+    assert completes == [(0, 2, (1, 2), 0), (1, 2, (3, 4), 1)]
+
+
+def test_on_batch_complete_does_not_fire_on_hard_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import kuroi.core.chunking as chunking_mod
+    from kuroi.core.chunking import BatchError, detect_redactions_chunked
+
+    monkeypatch.setattr(chunking_mod.time, "sleep", lambda _: None)
+
+    pages = (_page(1), _page(2))
+    provider = _RecordingProvider(scripts=[([], []), ([], [])])
+    completes: list[Any] = []
+
+    with pytest.raises(BatchError):
+        detect_redactions_chunked(
+            provider,
+            pages,
+            ("x",),
+            pages_per_batch=2,
+            on_batch_complete=lambda *args: completes.append(args),
+        )
+
+    assert completes == []
