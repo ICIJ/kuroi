@@ -24,18 +24,20 @@ logger = logging.getLogger("kuroi.core.chunking")
 RETRY_BACKOFF_SECONDS = 2.0
 
 
+def _format_page_range(page_numbers: tuple[int, ...]) -> str:
+    if len(page_numbers) > 1:
+        return f"{page_numbers[0]}–{page_numbers[-1]}"  # noqa: RUF001
+    return f"{page_numbers[0]}"
+
+
 class BatchError(Exception):
     """Raised when a batch fails twice (initial call + retry)."""
 
     def __init__(self, batch_idx: int, page_numbers: tuple[int, ...]) -> None:
         self.batch_idx = batch_idx
         self.page_numbers = page_numbers
-        if len(page_numbers) > 1:
-            page_range = f"{page_numbers[0]}-{page_numbers[-1]}"
-        else:
-            page_range = f"{page_numbers[0]}"
         super().__init__(
-            f"Batch {batch_idx + 1} (pages {page_range}) failed twice and was aborted."
+            f"Batch {batch_idx + 1} (pages {_format_page_range(page_numbers)}) failed twice and was aborted."
         )
 
 
@@ -77,7 +79,7 @@ def detect_redactions_chunked(
                 "retrying batch %d/%d (pages %s) after %.0fs",
                 batch_idx + 1,
                 total_batches,
-                page_numbers,
+                _format_page_range(page_numbers),
                 RETRY_BACKOFF_SECONDS,
             )
             time.sleep(RETRY_BACKOFF_SECONDS)
@@ -94,6 +96,10 @@ def detect_redactions_chunked(
         aggregate_findings.extend(findings)
         aggregate_chunks.extend(renumbered)
 
+        if renumbered:
+            assert len(renumbered) == 1, (
+                f"providers must return exactly one ChunkRecord per call, got {len(renumbered)}"
+            )
         if on_batch_complete is not None and renumbered:
             on_batch_complete(batch_idx, total_batches, page_numbers, renumbered[0])
 

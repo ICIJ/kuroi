@@ -801,8 +801,7 @@ def test_run_with_pages_per_batch_invokes_orchestrator(
     stub_anthropic_client: dict[str, Any],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """--pages-per-batch 2 on a 4-page document produces 2 LLM calls
-    and 2 chunk_request audit events."""
+    """--pages-per-batch 2 on a 4-page document produces 2 LLM calls."""
     pdf = make_pdf(
         [
             "Page one alice@example.com",
@@ -931,5 +930,54 @@ def test_run_with_pages_per_batch_prints_progress_per_batch(
     )
 
     assert result.exit_code == 0, result.stdout
-    assert "Batch 1/2 (pages 1-2)" in result.stdout
-    assert "Batch 2/2 (pages 3-4)" in result.stdout
+    assert "Batch 1/2 (pages 1–2)" in result.stdout
+    assert "Batch 2/2 (pages 3–4)" in result.stdout
+
+
+def test_run_with_pages_per_batch_aborts_on_batch_error(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    stub_anthropic_client: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A batch that hard-fails twice exits 1 with a BatchError message."""
+    pdf = make_pdf(["one", "two"])
+
+    def _stub_detect(
+        self: Any,
+        pages: tuple[Any, ...],
+        llm_category_ids: tuple[str, ...],
+        *,
+        instructions: tuple[str, ...] = (),
+        seed: int | None = None,
+    ) -> tuple[list[Any], list[Any]]:
+        return [], []  # hard failure on every call
+
+    monkeypatch.setattr(
+        "kuroi.providers.anthropic.AnthropicProvider.detect_redactions",
+        _stub_detect,
+    )
+    monkeypatch.setattr("kuroi.core.chunking.time.sleep", lambda _: None)
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "--instruct",
+            "redact",
+            "-o",
+            str(tmp_path / "out.pdf"),
+            "-y",
+            "--pages-per-batch",
+            "1",
+            "--backup-dir",
+            str(tmp_path / "backups"),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "failed twice" in result.stdout
+    assert "smaller --pages-per-batch" in result.stdout
