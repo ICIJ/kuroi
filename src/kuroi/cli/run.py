@@ -14,6 +14,7 @@ from rich.console import Console
 
 from kuroi.core.audit import AuditLog
 from kuroi.core.backup import create_backup, session_timestamp, sweep_backups
+from kuroi.core.chunking import BatchError, detect_redactions_chunked
 from kuroi.core.config import (
     ConfigError,
     ConfigOverrides,
@@ -33,7 +34,6 @@ from kuroi.core.pricing import count_tokens, estimate_cost, load_pricing
 from kuroi.core.redaction import apply_redactions
 from kuroi.core.rules import apply_regex_rules, llm_categories, load_rule_set
 from kuroi.core.verification import verify_pdf
-from kuroi.core.chunking import BatchError, detect_redactions_chunked
 from kuroi.providers.factory import make_provider
 
 console = Console()
