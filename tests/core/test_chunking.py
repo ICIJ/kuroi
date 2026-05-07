@@ -177,3 +177,24 @@ def test_chunked_call_forwards_categories_instructions_and_seed() -> None:
         "instructions": ("redact all names",),
         "seed": 42,
     }
+
+
+def test_chunked_call_renumbers_chunk_idx_to_batch_position() -> None:
+    """Providers hardcode chunk_idx=0; the orchestrator owns global ordering."""
+    from kuroi.core.chunking import detect_redactions_chunked
+
+    pages = tuple(_page(i) for i in range(1, 7))  # 6 pages, batch=2 -> 3 batches
+    provider = _RecordingProvider(
+        scripts=[
+            ([], [_chunk((1, 2))]),
+            ([], [_chunk((3, 4))]),
+            ([], [_chunk((5, 6))]),
+        ]
+    )
+
+    _, chunks = detect_redactions_chunked(
+        provider, pages, ("x",), pages_per_batch=2
+    )
+
+    assert [c.chunk_idx for c in chunks] == [0, 1, 2]
+    assert [c.pages for c in chunks] == [(1, 2), (3, 4), (5, 6)]
