@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import math
+import time
 from collections.abc import Callable
 from dataclasses import replace
 
@@ -19,6 +20,23 @@ from kuroi.core.pdf import Page
 from kuroi.providers.base import Provider
 
 logger = logging.getLogger("kuroi.core.chunking")
+
+RETRY_BACKOFF_SECONDS = 2.0
+
+
+class BatchError(Exception):
+    """Raised when a batch fails twice (initial call + retry)."""
+
+    def __init__(self, batch_idx: int, page_numbers: tuple[int, ...]) -> None:
+        self.batch_idx = batch_idx
+        self.page_numbers = page_numbers
+        if len(page_numbers) > 1:
+            page_range = f"{page_numbers[0]}-{page_numbers[-1]}"
+        else:
+            page_range = f"{page_numbers[0]}"
+        super().__init__(
+            f"Batch {batch_idx + 1} (pages {page_range}) failed twice and was aborted."
+        )
 
 
 def detect_redactions_chunked(
@@ -53,6 +71,24 @@ def detect_redactions_chunked(
             instructions=instructions,
             seed=seed,
         )
+
+        if not chunks:
+            logger.info(
+                "retrying batch %d/%d (pages %s) after %.0fs",
+                batch_idx + 1,
+                total_batches,
+                page_numbers,
+                RETRY_BACKOFF_SECONDS,
+            )
+            time.sleep(RETRY_BACKOFF_SECONDS)
+            findings, chunks = provider.detect_redactions(
+                batch,
+                llm_category_ids,
+                instructions=instructions,
+                seed=seed,
+            )
+            if not chunks:
+                raise BatchError(batch_idx, page_numbers)
 
         renumbered = [replace(c, chunk_idx=batch_idx) for c in chunks]
         aggregate_findings.extend(findings)

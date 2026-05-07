@@ -198,3 +198,74 @@ def test_chunked_call_renumbers_chunk_idx_to_batch_position() -> None:
 
     assert [c.chunk_idx for c in chunks] == [0, 1, 2]
     assert [c.pages for c in chunks] == [(1, 2), (3, 4), (5, 6)]
+
+
+def test_chunked_call_retries_once_on_hard_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """chunks == [] is the hard-failure signal; orchestrator retries once."""
+    import kuroi.core.chunking as chunking_mod
+    from kuroi.core.chunking import detect_redactions_chunked
+
+    sleeps: list[float] = []
+    monkeypatch.setattr(chunking_mod.time, "sleep", sleeps.append)
+
+    pages = (_page(1), _page(2))
+    provider = _RecordingProvider(
+        scripts=[
+            ([], []),  # hard fail
+            ([_finding(1)], [_chunk((1, 2))]),  # retry succeeds
+        ]
+    )
+
+    findings, chunks = detect_redactions_chunked(
+        provider, pages, ("x",), pages_per_batch=2
+    )
+
+    assert len(provider.calls) == 2
+    assert [f.page for f in findings] == [1]
+    assert [c.chunk_idx for c in chunks] == [0]
+    assert sleeps == [chunking_mod.RETRY_BACKOFF_SECONDS]
+
+
+def test_chunked_call_aborts_after_two_hard_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import kuroi.core.chunking as chunking_mod
+    from kuroi.core.chunking import BatchError, detect_redactions_chunked
+
+    monkeypatch.setattr(chunking_mod.time, "sleep", lambda _: None)
+
+    pages = tuple(_page(i) for i in range(1, 5))  # batch_idx=1 will fail
+    provider = _RecordingProvider(
+        scripts=[
+            ([], [_chunk((1, 2))]),  # batch 0 ok
+            ([], []),                # batch 1 hard fail
+            ([], []),                # batch 1 retry hard fail
+        ]
+    )
+
+    with pytest.raises(BatchError) as excinfo:
+        detect_redactions_chunked(provider, pages, ("x",), pages_per_batch=2)
+
+    assert excinfo.value.batch_idx == 1
+    assert excinfo.value.page_numbers == (3, 4)
+    assert "pages 3" in str(excinfo.value) and "4" in str(excinfo.value)
+
+
+def test_chunked_call_does_not_retry_on_soft_empty_findings() -> None:
+    """A chunk record with empty findings is a legitimate 'no redactions' answer."""
+    from kuroi.core.chunking import detect_redactions_chunked
+
+    pages = (_page(1), _page(2))
+    provider = _RecordingProvider(
+        scripts=[([], [_chunk((1, 2))])]  # one call, soft-empty
+    )
+
+    findings, chunks = detect_redactions_chunked(
+        provider, pages, ("x",), pages_per_batch=2
+    )
+
+    assert len(provider.calls) == 1
+    assert findings == []
+    assert len(chunks) == 1
