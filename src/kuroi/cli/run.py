@@ -8,12 +8,12 @@ import shutil
 import uuid
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
 
 import typer
 from rich.console import Console
 
 from kuroi.core.audit import AuditLog
+from kuroi.core.audit_records import ChunkRecord
 from kuroi.core.backup import create_backup, session_timestamp, sweep_backups
 from kuroi.core.chunking import BatchError, detect_redactions_chunked
 from kuroi.core.config import (
@@ -210,7 +210,7 @@ def run(
                     batch_idx: int, total: int, page_numbers: tuple[int, ...]
                 ) -> None:
                     if len(page_numbers) > 1:
-                        rng = f"{page_numbers[0]}-{page_numbers[-1]}"
+                        rng = f"{page_numbers[0]}–{page_numbers[-1]}"  # noqa: RUF001
                     else:
                         rng = f"{page_numbers[0]}"
                     console.print(f"  Batch {batch_idx + 1}/{total} (pages {rng})...", end="")
@@ -219,7 +219,7 @@ def run(
                     batch_idx: int,
                     total: int,
                     page_numbers: tuple[int, ...],
-                    chunk: Any,
+                    chunk: ChunkRecord,
                 ) -> None:
                     console.print(
                         f" done in {chunk.duration_ms} ms, "
