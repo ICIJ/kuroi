@@ -33,6 +33,7 @@ from kuroi.core.pricing import count_tokens, estimate_cost, load_pricing
 from kuroi.core.redaction import apply_redactions
 from kuroi.core.rules import apply_regex_rules, llm_categories, load_rule_set
 from kuroi.core.verification import verify_pdf
+from kuroi.core.chunking import BatchError, detect_redactions_chunked
 from kuroi.providers.factory import make_provider
 
 console = Console()
@@ -84,6 +85,15 @@ def run(
         None,
         "--seed",
         help="Reproducibility seed. Best-effort per provider; recorded in audit.",
+    ),
+    pages_per_batch: int = typer.Option(
+        0,
+        "--pages-per-batch",
+        help=(
+            "Split LLM analysis into batches of N pages. "
+            "0 (default) keeps the current single-call behavior."
+        ),
+        min=0,
     ),
 ) -> None:
     """Redact a PDF using rules and/or instructions, with verification gating."""
@@ -189,9 +199,27 @@ def run(
                     "is enforced for this provider"
                 )
             instruction_tuple: tuple[str, ...] = (instruct,) if instruct else ()
-            provider_findings, chunks = provider.detect_redactions(
-                pages, tuple(llm_cat_ids), instructions=instruction_tuple, seed=seed
-            )
+            if pages_per_batch == 0:
+                provider_findings, chunks = provider.detect_redactions(
+                    pages, tuple(llm_cat_ids), instructions=instruction_tuple, seed=seed
+                )
+            else:
+                try:
+                    provider_findings, chunks = detect_redactions_chunked(
+                        provider,
+                        pages,
+                        tuple(llm_cat_ids),
+                        instructions=instruction_tuple,
+                        seed=seed,
+                        pages_per_batch=pages_per_batch,
+                    )
+                except BatchError as exc:
+                    console.print(
+                        f"  [red]{exc}[/]\n"
+                        f"  Re-run with a smaller --pages-per-batch, "
+                        f"or check the WARNING(s) above for the cause."
+                    )
+                    raise typer.Exit(code=1) from exc
             findings.extend(provider_findings)
             actual_cost = 0.0
 

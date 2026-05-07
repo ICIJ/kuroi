@@ -793,3 +793,80 @@ def test_default_backup_dir_uses_xdg_data_home(
     expected = fake_xdg / "kuroi" / "backups"
     assert expected.is_dir()
     assert any(p.is_dir() for p in expected.iterdir())
+
+
+def test_run_with_pages_per_batch_invokes_orchestrator(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    stub_anthropic_client: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """--pages-per-batch 2 on a 4-page document produces 2 LLM calls
+    and 2 chunk_request audit events."""
+    pdf = make_pdf(
+        [
+            "Page one alice@example.com",
+            "Page two bob@example.com",
+            "Page three carol@example.com",
+            "Page four dave@example.com",
+        ]
+    )
+    out = tmp_path / "redacted.pdf"
+    backup_dir = tmp_path / "backups"
+    audit_dir = tmp_path / "audit"
+
+    call_page_groups: list[tuple[int, ...]] = []
+
+    def _stub_detect(
+        self: Any,
+        pages: tuple[Any, ...],
+        llm_category_ids: tuple[str, ...],
+        *,
+        instructions: tuple[str, ...] = (),
+        seed: int | None = None,
+    ) -> tuple[list[Any], list[Any]]:
+        from kuroi.core.audit_records import ChunkRecord
+
+        call_page_groups.append(tuple(p.number for p in pages))
+        return [], [
+            ChunkRecord(
+                chunk_idx=0,
+                pages=tuple(p.number for p in pages),
+                temperature=0.0,
+                seed_requested=seed,
+                seed_honored=False,
+                system_fingerprint=None,
+                prompt_sha256="a" * 64,
+                response_sha256="b" * 64,
+                tokens_in=10,
+                tokens_out=2,
+                duration_ms=50,
+            )
+        ]
+
+    monkeypatch.setattr(
+        "kuroi.providers.anthropic.AnthropicProvider.detect_redactions",
+        _stub_detect,
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "--instruct",
+            "redact emails",
+            "-o",
+            str(out),
+            "-y",
+            "--pages-per-batch",
+            "2",
+            "--backup-dir",
+            str(backup_dir),
+            "--audit-dir",
+            str(audit_dir),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert call_page_groups == [(1, 2), (3, 4)]
