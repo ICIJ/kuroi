@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from kuroi.core.findings import Confidence, Finding
 from kuroi.core.pdf import Page, serialize_for_llm
+
+logger = logging.getLogger("kuroi.providers")
 
 SYSTEM_PROMPT = (
     "You are a redaction-assistant for kuroi, a CLI for stripping sensitive data "
@@ -62,6 +65,7 @@ def parse_findings_payload(
     page_lookup = {p.number: p for p in pages}
     valid_confidences: tuple[Confidence, ...] = ("high", "medium", "low")
     out: list[Finding] = []
+    dropped = 0
     for item in payload.get("findings", []):
         try:
             pg = int(item["page"])
@@ -70,12 +74,26 @@ def parse_findings_payload(
             kind = str(item["kind"])
             conf_raw: Any = item.get("confidence", "medium")
         except (KeyError, TypeError, ValueError):
+            logger.debug("dropping malformed finding (missing/bad fields): %r", item)
+            dropped += 1
             continue
         conf = "medium" if conf_raw not in valid_confidences else conf_raw
         page = page_lookup.get(pg)
         if page is None:
+            logger.debug("dropping finding for unknown page %d: %r", pg, item)
+            dropped += 1
             continue
         if not (0 <= start <= end < len(page.words)):
+            logger.debug(
+                "dropping finding with out-of-range indices "
+                "(page=%d has %d words, got start=%d end=%d): %r",
+                pg,
+                len(page.words),
+                start,
+                end,
+                item,
+            )
+            dropped += 1
             continue
         out.append(
             Finding(
@@ -87,4 +105,6 @@ def parse_findings_payload(
                 source=source,
             )
         )
+    if dropped:
+        logger.info("dropped %d malformed/out-of-range finding(s); kept %d", dropped, len(out))
     return out

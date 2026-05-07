@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import json as _json_module
+import logging
 from typing import Any
 
 import httpx
+import pytest
 
 from kuroi.core.findings import Finding
 from kuroi.core.pdf import Page, Word
@@ -282,3 +284,108 @@ def test_ollama_mixed_source_is_llm() -> None:
     )
 
     assert findings[0].source == "llm"
+
+
+def test_ollama_logs_full_prompt_and_response_at_debug(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """-vv must surface the full prompt and response so users can diagnose
+    bad/empty findings without re-running with extra instrumentation."""
+    body = '{"findings": []}'
+    client = _StubClient(response=_ok_response(body))
+    provider = OllamaProvider(
+        model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
+    )
+    pages = (_page(1, ["Hello", "Sarah", "Chen"]),)
+
+    with caplog.at_level(logging.DEBUG, logger="kuroi.providers.ollama"):
+        provider.detect_redactions(pages, llm_category_ids=("person_name",))
+
+    debug_msgs = [r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG]
+    assert any("<document>" in m for m in debug_msgs), "full prompt should appear at DEBUG"
+    assert any(body in m for m in debug_msgs), "full response should appear at DEBUG"
+
+
+def test_ollama_logs_token_and_duration_at_info(caplog: pytest.LogCaptureFixture) -> None:
+    """-v must surface prompt_eval_count so users can compare against the
+    local token estimate and detect server-side context truncation."""
+    client = _StubClient2({"findings": []}, prompt_eval=8192, eval_count=20)
+    provider = OllamaProvider(model="llama3.1:8b", url="http://x", client=client)
+
+    with caplog.at_level(logging.INFO, logger="kuroi.providers.ollama"):
+        provider.detect_redactions(_one_page(), ("person_name",))
+
+    info_msgs = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
+    assert any("tokens_in=8192" in m and "tokens_out=20" in m for m in info_msgs)
+
+
+def test_ollama_warns_on_timeout_instead_of_silent_fail(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = _StubClient(raise_exc=httpx.TimeoutException("read timeout"))
+    provider = OllamaProvider(
+        model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
+    )
+
+    with caplog.at_level(logging.WARNING, logger="kuroi.providers.ollama"):
+        findings, _ = provider.detect_redactions(_one_page(), ("person_name",))
+
+    assert findings == []
+    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("timeout" in m.lower() or "timed out" in m.lower() for m in warnings)
+
+
+def test_ollama_warns_on_http_status_instead_of_silent_fail(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = _StubClient(response=_StubResponse(status_code=500, body="upstream is sad"))
+    provider = OllamaProvider(
+        model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
+    )
+
+    with caplog.at_level(logging.WARNING, logger="kuroi.providers.ollama"):
+        findings, _ = provider.detect_redactions(_one_page(), ("person_name",))
+
+    assert findings == []
+    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("500" in m for m in warnings)
+
+
+def test_ollama_warns_on_non_json_message_content(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = _StubClient(response=_ok_response("not actually json"))
+    provider = OllamaProvider(
+        model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
+    )
+
+    with caplog.at_level(logging.WARNING, logger="kuroi.providers.ollama"):
+        findings, _ = provider.detect_redactions(_one_page(), ("person_name",))
+
+    assert findings == []
+    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("json" in m.lower() for m in warnings)
+
+
+def test_shared_logs_dropped_findings_at_debug(caplog: pytest.LogCaptureFixture) -> None:
+    """Out-of-range and unknown-page drops are silent today — they must be
+    visible at DEBUG so a user can see when the model hallucinated indices."""
+    from kuroi.providers._shared import parse_findings_payload
+
+    payload = {
+        "findings": [
+            {"page": 1, "start": 99, "end": 100, "kind": "person_name", "confidence": "high"},
+            {"page": 7, "start": 0, "end": 0, "kind": "person_name", "confidence": "high"},
+            {"page": 1, "start": 0, "end": 0, "kind": "email", "confidence": "high"},
+        ]
+    }
+    pages = (_page(1, ["alice", "bob"]),)
+
+    with caplog.at_level(logging.DEBUG, logger="kuroi.providers"):
+        kept = parse_findings_payload(payload, pages, source="llm")
+
+    assert len(kept) == 1
+    debug_msgs = [r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG]
+    info_msgs = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
+    assert sum(1 for m in debug_msgs if "drop" in m.lower()) >= 2
+    assert any("dropped 2" in m for m in info_msgs)

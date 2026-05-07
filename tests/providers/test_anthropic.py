@@ -1,6 +1,9 @@
+import logging
 from dataclasses import dataclass
 from typing import Any
 from unittest.mock import MagicMock
+
+import pytest
 
 from kuroi.core.findings import Finding
 from kuroi.core.pdf import Page, Word
@@ -237,3 +240,72 @@ def test_detect_redactions_mixed_source_is_llm() -> None:
     )
 
     assert findings[0].source == "llm"
+
+
+def test_anthropic_logs_full_prompt_and_response_at_debug(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """-vv must surface the full prompt and response so users can diagnose
+    bad/empty findings without re-running with extra instrumentation."""
+    response_text = '{"findings": []}'
+    client = _StubClient(response_text)
+    provider = AnthropicProvider(model="claude-opus-4-7", client=client)
+    pages = (_page(1, ["Hello", "Sarah", "Chen"]),)
+
+    with caplog.at_level(logging.DEBUG, logger="kuroi.providers.anthropic"):
+        provider.detect_redactions(pages, llm_category_ids=("person_name",))
+
+    debug_msgs = [r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG]
+    assert any("<document>" in m for m in debug_msgs), "full prompt should appear at DEBUG"
+    assert any(response_text in m for m in debug_msgs), "full response should appear at DEBUG"
+
+
+def test_anthropic_logs_token_and_duration_at_info(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """-v must surface tokens_in/tokens_out so the user can compare against
+    the local estimate and spot context-window truncation."""
+    client = MagicMock()
+    client.messages.create.return_value = _stub_response(
+        '{"findings": []}', in_t=164411, out_t=12
+    )
+    provider = AnthropicProvider(model="claude-opus-4-7", client=client)
+
+    with caplog.at_level(logging.INFO, logger="kuroi.providers.anthropic"):
+        provider.detect_redactions(_one_page(), ("person_name",))
+
+    info_msgs = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
+    assert any("tokens_in=164411" in m and "tokens_out=12" in m for m in info_msgs)
+
+
+def test_anthropic_warns_when_response_likely_truncated(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """When tokens_out approaches max_tokens, the response was almost certainly
+    cut mid-JSON — the user must see this even at default verbosity."""
+    client = MagicMock()
+    client.messages.create.return_value = _stub_response(
+        '{"findings": [', in_t=1000, out_t=4096  # truncated payload, hit max_tokens
+    )
+    provider = AnthropicProvider(model="claude-opus-4-7", client=client, max_tokens=4096)
+
+    with caplog.at_level(logging.WARNING, logger="kuroi.providers.anthropic"):
+        findings, _ = provider.detect_redactions(_one_page(), ("person_name",))
+
+    assert findings == []
+    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("truncat" in m.lower() and "max_tokens" in m for m in warnings)
+
+
+def test_anthropic_warns_on_non_json_response(caplog: pytest.LogCaptureFixture) -> None:
+    """When the model returns a markdown fence or preamble instead of pure JSON,
+    the user must see a WARNING — not silently get zero findings."""
+    client = _StubClient("Sure, here are the redactions:\n```json\n{}\n```")
+    provider = AnthropicProvider(model="claude-opus-4-7", client=client)
+
+    with caplog.at_level(logging.WARNING, logger="kuroi.providers.anthropic"):
+        findings, _ = provider.detect_redactions(_one_page(), ("person_name",))
+
+    assert findings == []
+    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("non-json" in m.lower() or "json" in m.lower() for m in warnings)
