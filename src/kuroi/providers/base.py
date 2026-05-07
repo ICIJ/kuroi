@@ -22,6 +22,7 @@ class Provider(Protocol):
         *,
         instructions: tuple[str, ...] = (),
         seed: int | None = None,
+        attempt: int = 0,
     ) -> tuple[list[Finding], list[ChunkRecord]]:
         """Identify spans to redact across the supplied pages.
 
@@ -30,6 +31,9 @@ class Provider(Protocol):
             llm_category_ids: Category ids the provider is responsible for.
             instructions: Free-text redaction instructions from the user.
             seed: Optional sampling seed for reproducible runs.
+            attempt: Zero-based retry index from the chunker. Providers may use
+                it to scale per-call timeouts (e.g. Ollama gives slow models
+                more time on each retry).
 
         Returns:
             A tuple of `(findings, chunk_records)` — findings are the proposed

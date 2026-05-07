@@ -21,7 +21,10 @@ from kuroi.providers.base import Provider
 
 logger = logging.getLogger("kuroi.core.chunking")
 
-RETRY_BACKOFF_SECONDS = 2.0
+# One entry per retry. Length determines the retry count; the initial attempt
+# is implicit, so total attempts = len(RETRY_BACKOFFS_SECONDS) + 1.
+RETRY_BACKOFFS_SECONDS: tuple[float, ...] = (2.0, 4.0)
+MAX_ATTEMPTS = len(RETRY_BACKOFFS_SECONDS) + 1
 
 
 def _format_page_range(page_numbers: tuple[int, ...]) -> str:
@@ -31,13 +34,20 @@ def _format_page_range(page_numbers: tuple[int, ...]) -> str:
 
 
 class BatchError(Exception):
-    """Raised when a batch fails twice (initial call + retry)."""
+    """Raised when a batch fails every attempt (initial call + retries)."""
 
-    def __init__(self, batch_idx: int, page_numbers: tuple[int, ...]) -> None:
+    def __init__(
+        self,
+        batch_idx: int,
+        page_numbers: tuple[int, ...],
+        attempts: int = MAX_ATTEMPTS,
+    ) -> None:
         self.batch_idx = batch_idx
         self.page_numbers = page_numbers
+        self.attempts = attempts
         super().__init__(
-            f"Batch {batch_idx + 1} (pages {_format_page_range(page_numbers)}) failed twice and was aborted."
+            f"Batch {batch_idx + 1} (pages {_format_page_range(page_numbers)}) "
+            f"failed {attempts} times and was aborted."
         )
 
 
@@ -67,30 +77,31 @@ def detect_redactions_chunked(
         if on_batch_start is not None:
             on_batch_start(batch_idx, total_batches, page_numbers)
 
-        findings, chunks = provider.detect_redactions(
-            batch,
-            llm_category_ids,
-            instructions=instructions,
-            seed=seed,
-        )
-
-        if not chunks:
-            logger.info(
-                "retrying batch %d/%d (pages %s) after %.0fs",
-                batch_idx + 1,
-                total_batches,
-                _format_page_range(page_numbers),
-                RETRY_BACKOFF_SECONDS,
-            )
-            time.sleep(RETRY_BACKOFF_SECONDS)
+        findings: list[Finding] = []
+        chunks: list[ChunkRecord] = []
+        for attempt in range(MAX_ATTEMPTS):
             findings, chunks = provider.detect_redactions(
                 batch,
                 llm_category_ids,
                 instructions=instructions,
                 seed=seed,
+                attempt=attempt,
             )
-            if not chunks:
-                raise BatchError(batch_idx, page_numbers)
+            if chunks:
+                break
+            if attempt + 1 >= MAX_ATTEMPTS:
+                raise BatchError(batch_idx, page_numbers, attempts=MAX_ATTEMPTS)
+            backoff = RETRY_BACKOFFS_SECONDS[attempt]
+            logger.info(
+                "retrying batch %d/%d (pages %s) in %.0fs (attempt %d/%d)",
+                batch_idx + 1,
+                total_batches,
+                _format_page_range(page_numbers),
+                backoff,
+                attempt + 2,
+                MAX_ATTEMPTS,
+            )
+            time.sleep(backoff)
 
         renumbered = [replace(c, chunk_idx=batch_idx) for c in chunks]
         aggregate_findings.extend(findings)

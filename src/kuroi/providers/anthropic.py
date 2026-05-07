@@ -68,7 +68,9 @@ class AnthropicProvider:
         *,
         instructions: tuple[str, ...] = (),
         seed: int | None = None,
+        attempt: int = 0,
     ) -> tuple[list[Finding], list[ChunkRecord]]:
+        del attempt  # accepted for Provider protocol compliance; Anthropic SDK has its own retry/timeout
         if not llm_category_ids and not instructions:
             return [], []
         user_prompt = build_user_prompt(pages, llm_category_ids, instructions)

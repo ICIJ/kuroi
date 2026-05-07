@@ -47,6 +47,7 @@ class _RecordingProvider:
     def __init__(self, scripts: list[tuple[list[Finding], list[ChunkRecord]]]) -> None:
         self.scripts = list(scripts)
         self.calls: list[tuple[Page, ...]] = []
+        self.attempts: list[int] = []
 
     def detect_redactions(
         self,
@@ -55,8 +56,10 @@ class _RecordingProvider:
         *,
         instructions: tuple[str, ...] = (),
         seed: int | None = None,
+        attempt: int = 0,
     ) -> tuple[list[Finding], list[ChunkRecord]]:
         self.calls.append(pages)
+        self.attempts.append(attempt)
         return self.scripts.pop(0)
 
 
@@ -146,11 +149,13 @@ def test_chunked_call_forwards_categories_instructions_and_seed() -> None:
             *,
             instructions: tuple[str, ...] = (),
             seed: int | None = None,
+            attempt: int = 0,
         ) -> tuple[list[Finding], list[ChunkRecord]]:
             self.last_kwargs = {
                 "llm_category_ids": llm_category_ids,
                 "instructions": instructions,
                 "seed": seed,
+                "attempt": attempt,
             }
             return [], [_chunk(tuple(p.number for p in pages))]
 
@@ -168,6 +173,7 @@ def test_chunked_call_forwards_categories_instructions_and_seed() -> None:
         "llm_category_ids": ("email", "person_name"),
         "instructions": ("redact all names",),
         "seed": 42,
+        "attempt": 0,
     }
 
 
@@ -190,10 +196,11 @@ def test_chunked_call_renumbers_chunk_idx_to_batch_position() -> None:
     assert [c.pages for c in chunks] == [(1, 2), (3, 4), (5, 6)]
 
 
-def test_chunked_call_retries_once_on_hard_failure(
+def test_chunked_call_retries_on_hard_failure_until_success(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """chunks == [] is the hard-failure signal; orchestrator retries once."""
+    """chunks == [] is the hard-failure signal; orchestrator keeps retrying
+    up to MAX_ATTEMPTS - 1 retries with exponential backoff."""
     import kuroi.core.chunking as chunking_mod
     from kuroi.core.chunking import detect_redactions_chunked
 
@@ -203,24 +210,31 @@ def test_chunked_call_retries_once_on_hard_failure(
     pages = (_page(1), _page(2))
     provider = _RecordingProvider(
         scripts=[
-            ([], []),  # hard fail
-            ([_finding(1)], [_chunk((1, 2))]),  # retry succeeds
+            ([], []),  # attempt 0: hard fail
+            ([], []),  # attempt 1: hard fail
+            ([_finding(1)], [_chunk((1, 2))]),  # attempt 2: succeeds
         ]
     )
 
     findings, chunks = detect_redactions_chunked(provider, pages, ("x",), pages_per_batch=2)
 
-    assert len(provider.calls) == 2
+    assert len(provider.calls) == 3
     assert [f.page for f in findings] == [1]
     assert [c.chunk_idx for c in chunks] == [0]
-    assert sleeps == [chunking_mod.RETRY_BACKOFF_SECONDS]
+    # backoffs are sliced from the front of RETRY_BACKOFFS_SECONDS
+    assert sleeps == list(chunking_mod.RETRY_BACKOFFS_SECONDS[: len(sleeps)])
+    assert provider.attempts == [0, 1, 2]
 
 
-def test_chunked_call_aborts_after_two_hard_failures(
+def test_chunked_call_aborts_after_max_attempts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Two consecutive chunks == [] from the same batch raises BatchError."""
-    from kuroi.core.chunking import BatchError, detect_redactions_chunked
+    """MAX_ATTEMPTS consecutive hard failures raise BatchError."""
+    from kuroi.core.chunking import (
+        MAX_ATTEMPTS,
+        BatchError,
+        detect_redactions_chunked,
+    )
 
     monkeypatch.setattr("kuroi.core.chunking.time.sleep", lambda _: None)
 
@@ -228,8 +242,7 @@ def test_chunked_call_aborts_after_two_hard_failures(
     provider = _RecordingProvider(
         scripts=[
             ([], [_chunk((1, 2))]),  # batch 0 ok
-            ([], []),  # batch 1 hard fail
-            ([], []),  # batch 1 retry hard fail
+            *[([], []) for _ in range(MAX_ATTEMPTS)],  # batch 1: every attempt hard-fails
         ]
     )
 
@@ -238,7 +251,34 @@ def test_chunked_call_aborts_after_two_hard_failures(
 
     assert excinfo.value.batch_idx == 1
     assert excinfo.value.page_numbers == (3, 4)
+    assert excinfo.value.attempts == MAX_ATTEMPTS
+    assert f"failed {MAX_ATTEMPTS} times" in str(excinfo.value)
     assert "pages 3" in str(excinfo.value) and "4" in str(excinfo.value)
+
+
+def test_chunked_call_uses_exponential_backoff_between_retries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Each retry sleeps for the matching entry in RETRY_BACKOFFS_SECONDS."""
+    import kuroi.core.chunking as chunking_mod
+    from kuroi.core.chunking import (
+        MAX_ATTEMPTS,
+        BatchError,
+        detect_redactions_chunked,
+    )
+
+    sleeps: list[float] = []
+    monkeypatch.setattr("kuroi.core.chunking.time.sleep", sleeps.append)
+
+    pages = (_page(1),)
+    provider = _RecordingProvider(scripts=[([], []) for _ in range(MAX_ATTEMPTS)])
+
+    with pytest.raises(BatchError):
+        detect_redactions_chunked(provider, pages, ("x",), pages_per_batch=1)
+
+    # one sleep per retry; no sleep after the final attempt before raising
+    assert sleeps == list(chunking_mod.RETRY_BACKOFFS_SECONDS)
+    assert provider.attempts == list(range(MAX_ATTEMPTS))
 
 
 def test_chunked_call_does_not_retry_on_soft_empty_findings() -> None:
@@ -314,12 +354,12 @@ def test_on_batch_complete_receives_renumbered_chunk() -> None:
 def test_on_batch_complete_does_not_fire_on_hard_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from kuroi.core.chunking import BatchError, detect_redactions_chunked
+    from kuroi.core.chunking import MAX_ATTEMPTS, BatchError, detect_redactions_chunked
 
     monkeypatch.setattr("kuroi.core.chunking.time.sleep", lambda _: None)
 
     pages = (_page(1), _page(2))
-    provider = _RecordingProvider(scripts=[([], []), ([], [])])
+    provider = _RecordingProvider(scripts=[([], []) for _ in range(MAX_ATTEMPTS)])
     completes: list[Any] = []
 
     with pytest.raises(BatchError):

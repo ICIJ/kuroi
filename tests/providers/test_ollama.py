@@ -189,8 +189,8 @@ class _StubClient2:
         self.eval_count = eval_count
         self.last_call_kwargs: dict[str, Any] | None = None
 
-    def post(self, url: str, *, json: dict[str, Any]) -> Any:
-        self.last_call_kwargs = {"url": url, "json": json}
+    def post(self, url: str, *, json: dict[str, Any], timeout: Any = None) -> Any:
+        self.last_call_kwargs = {"url": url, "json": json, "timeout": timeout}
         envelope = {
             "message": {"content": _json_module.dumps(self.response_body)},
             "prompt_eval_count": self.prompt_eval,
@@ -349,6 +349,62 @@ def test_ollama_warns_on_http_status_instead_of_silent_fail(
     assert findings == []
     warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
     assert any("500" in m for m in warnings)
+
+
+def test_ollama_read_timeout_scales_with_attempt() -> None:
+    """attempt=N gives the model (N+1)x the base read timeout to respond.
+
+    Slow CPUs / large models can blow past 120s; same-timeout retries are
+    pointless, so each chunker retry must extend the per-call window.
+    """
+    from kuroi.providers.ollama import READ_TIMEOUT_SECONDS
+
+    client = _StubClient(response=_ok_response('{"findings": []}'))
+    provider = OllamaProvider(
+        model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
+    )
+    pages = (_page(1, ["Hello"]),)
+
+    captured_timeouts: list[float] = []
+
+    real_post = client.post
+
+    def _capturing_post(url: str, *, json: dict[str, Any], timeout: Any = None) -> Any:
+        captured_timeouts.append(timeout.read if isinstance(timeout, httpx.Timeout) else timeout)
+        return real_post(url, json=json, timeout=timeout)
+
+    client.post = _capturing_post  # type: ignore[method-assign,assignment]
+
+    for attempt in (0, 1, 2):
+        provider.detect_redactions(pages, ("person_name",), attempt=attempt)
+
+    assert captured_timeouts == [
+        READ_TIMEOUT_SECONDS * 1,
+        READ_TIMEOUT_SECONDS * 2,
+        READ_TIMEOUT_SECONDS * 3,
+    ]
+
+
+def test_ollama_timeout_warning_reports_actual_attempt_timeout(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The warning should report the timeout that *this* attempt was given,
+    not the base default — otherwise users can't tell that retries actually
+    extended the window."""
+    from kuroi.providers.ollama import READ_TIMEOUT_SECONDS
+
+    client = _StubClient(raise_exc=httpx.TimeoutException("slow"))
+    provider = OllamaProvider(
+        model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
+    )
+    pages = (_page(1, ["Hello"]),)
+
+    with caplog.at_level(logging.WARNING, logger="kuroi.providers.ollama"):
+        provider.detect_redactions(pages, ("person_name",), attempt=2)
+
+    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    expected_seconds = f"{READ_TIMEOUT_SECONDS * 3:.0f}s"
+    assert any(expected_seconds in m for m in warnings), warnings
 
 
 def test_ollama_warns_on_non_json_message_content(

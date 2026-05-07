@@ -25,6 +25,16 @@ CONNECT_TIMEOUT_SECONDS = 5.0
 READ_TIMEOUT_SECONDS = 120.0
 
 
+def _read_timeout_for_attempt(attempt: int) -> float:
+    """Linear-grow timeout per chunker retry: 120s, 240s, 360s, ...
+
+    Slow CPUs and large models routinely overshoot 120s, so each retry gives
+    the model proportionally more time to respond rather than retrying
+    with the same too-tight bound.
+    """
+    return READ_TIMEOUT_SECONDS * (attempt + 1)
+
+
 class OllamaProvider:
     """Provider that calls Ollama's `/api/chat` endpoint with `format: "json"`."""
 
@@ -55,6 +65,7 @@ class OllamaProvider:
         *,
         instructions: tuple[str, ...] = (),
         seed: int | None = None,
+        attempt: int = 0,
     ) -> tuple[list[Finding], list[ChunkRecord]]:
         if not llm_category_ids and not instructions:
             return [], []
@@ -75,26 +86,40 @@ class OllamaProvider:
             ],
         }
 
+        read_timeout = _read_timeout_for_attempt(attempt)
+        request_timeout = httpx.Timeout(
+            connect=CONNECT_TIMEOUT_SECONDS,
+            read=read_timeout,
+            write=read_timeout,
+            pool=read_timeout,
+        )
+
         logger.debug(
-            "ollama request model=%s url=%s prompt_chars=%d prompt_sha=%s\nFULL PROMPT:\n%s",
+            "ollama request model=%s url=%s prompt_chars=%d prompt_sha=%s "
+            "attempt=%d read_timeout=%.0fs\nFULL PROMPT:\n%s",
             self.model,
             self._url,
             len(user_prompt),
             prompt_sha[:8],
+            attempt,
+            read_timeout,
             user_prompt,
         )
 
         started = time.monotonic()
         try:
-            response = self._client.post(f"{self._url}/api/chat", json=body)
+            response = self._client.post(
+                f"{self._url}/api/chat", json=body, timeout=request_timeout
+            )
             response.raise_for_status()
             envelope = response.json()
         except httpx.TimeoutException as exc:
             logger.warning(
-                "ollama request timed out after %.0fs (read timeout). The model is "
-                "either not loaded yet or the prompt is too large to process in time. "
-                "Detail: %s",
-                READ_TIMEOUT_SECONDS,
+                "ollama request timed out after %.0fs (read timeout, attempt %d). "
+                "The model is either not loaded yet or the prompt is too large to "
+                "process in time. Detail: %s",
+                read_timeout,
+                attempt,
                 exc,
             )
             return [], []
