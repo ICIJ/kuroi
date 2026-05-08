@@ -254,9 +254,16 @@ def run(
                 page_numbers: tuple[int, ...],
                 chunk: ChunkRecord,
             ) -> None:
+                extra = ""
+                if config.layout_aware:
+                    block_total = sum(
+                        len({w.block_id for w in pages[pn - 1].words})
+                        for pn in page_numbers
+                    )
+                    extra = f" blocks={block_total}"
                 console.print(
                     f" done in {chunk.duration_ms} ms, "
-                    f"tokens_in={chunk.tokens_in} tokens_out={chunk.tokens_out}"
+                    f"tokens_in={chunk.tokens_in} tokens_out={chunk.tokens_out}{extra}"
                 )
 
             try:
