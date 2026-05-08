@@ -423,6 +423,66 @@ def test_ollama_warns_on_non_json_message_content(
     assert any("json" in m.lower() for m in warnings)
 
 
+def test_ollama_layout_aware_off_uses_plain_system_prompt() -> None:
+    from unittest.mock import MagicMock
+
+    from kuroi.providers._shared import LAYOUT_AWARE_INSTRUCTIONS, SYSTEM_PROMPT
+
+    pages = (_page(1, ["Hello", "world"]),)
+    fake_client = MagicMock()
+    fake_response = MagicMock()
+    fake_response.json.return_value = {
+        "message": {"content": '{"findings": []}'},
+        "prompt_eval_count": 10,
+        "eval_count": 2,
+    }
+    fake_client.post.return_value = fake_response
+    provider = OllamaProvider(model="qwen3", url="http://x", client=fake_client)
+
+    provider.detect_redactions(pages, llm_category_ids=("k",))
+
+    body = fake_client.post.call_args.kwargs["json"]
+    sys_msg = next(m for m in body["messages"] if m["role"] == "system")
+    user_msg = next(m for m in body["messages"] if m["role"] == "user")
+    assert sys_msg["content"] == SYSTEM_PROMPT
+    assert LAYOUT_AWARE_INSTRUCTIONS not in sys_msg["content"]
+    assert "<block" not in user_msg["content"]
+
+
+def test_ollama_layout_aware_on_appends_paragraph_and_wraps_user_prompt() -> None:
+    from unittest.mock import MagicMock
+
+    from kuroi.providers._shared import LAYOUT_AWARE_INSTRUCTIONS
+
+    pages = (
+        Page(
+            number=1,
+            words=(
+                Word(idx=0, text="Hello", bbox=(0, 0, 1, 1), block_id=1),
+                Word(idx=1, text="world", bbox=(1, 0, 2, 1), block_id=2),
+            ),
+        ),
+    )
+    fake_client = MagicMock()
+    fake_response = MagicMock()
+    fake_response.json.return_value = {
+        "message": {"content": '{"findings": []}'},
+        "prompt_eval_count": 10,
+        "eval_count": 2,
+    }
+    fake_client.post.return_value = fake_response
+    provider = OllamaProvider(model="qwen3", url="http://x", client=fake_client)
+
+    provider.detect_redactions(pages, llm_category_ids=("k",), layout_aware=True)
+
+    body = fake_client.post.call_args.kwargs["json"]
+    sys_msg = next(m for m in body["messages"] if m["role"] == "system")
+    user_msg = next(m for m in body["messages"] if m["role"] == "user")
+    assert LAYOUT_AWARE_INSTRUCTIONS in sys_msg["content"]
+    assert '<block id="1">[0]Hello</block>' in user_msg["content"]
+    assert '<block id="2">[1]world</block>' in user_msg["content"]
+
+
 def test_shared_logs_dropped_findings_at_debug(caplog: pytest.LogCaptureFixture) -> None:
     """Out-of-range and unknown-page drops are silent today — they must be
     visible at DEBUG so a user can see when the model hallucinated indices."""
