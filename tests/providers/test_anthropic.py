@@ -387,3 +387,53 @@ def test_anthropic_other_bad_request_errors_still_raise() -> None:
 
     with pytest.raises(anthropic.BadRequestError):
         provider.detect_redactions(_one_page(), ("person_name",))
+
+
+def test_anthropic_layout_aware_off_uses_plain_system_prompt() -> None:
+    from kuroi.providers._shared import SYSTEM_PROMPT, LAYOUT_AWARE_INSTRUCTIONS
+
+    pages = (_page(1, ["Hello", "world"]),)
+    fake_client = MagicMock()
+    fake_client.messages.create.return_value = MagicMock(
+        content=[MagicMock(text='{"findings": []}')],
+        usage=MagicMock(input_tokens=10, output_tokens=2),
+        system_fingerprint=None,
+    )
+    provider = AnthropicProvider(model="claude-opus-4-7", client=fake_client)
+
+    provider.detect_redactions(pages, llm_category_ids=("k",))
+
+    kwargs = fake_client.messages.create.call_args.kwargs
+    assert kwargs["system"] == SYSTEM_PROMPT
+    assert LAYOUT_AWARE_INSTRUCTIONS not in kwargs["system"]
+    assert "<block" not in kwargs["messages"][0]["content"]
+
+
+def test_anthropic_layout_aware_on_appends_paragraph_and_wraps_user_prompt() -> None:
+    from kuroi.providers._shared import LAYOUT_AWARE_INSTRUCTIONS
+
+    # Give both words distinct block_ids so layout-aware emits two block tags.
+    pages = (
+        Page(
+            number=1,
+            words=(
+                Word(idx=0, text="Hello", bbox=(0, 0, 1, 1), block_id=1),
+                Word(idx=1, text="world", bbox=(1, 0, 2, 1), block_id=2),
+            ),
+        ),
+    )
+    fake_client = MagicMock()
+    fake_client.messages.create.return_value = MagicMock(
+        content=[MagicMock(text='{"findings": []}')],
+        usage=MagicMock(input_tokens=10, output_tokens=2),
+        system_fingerprint=None,
+    )
+    provider = AnthropicProvider(model="claude-opus-4-7", client=fake_client)
+
+    provider.detect_redactions(pages, llm_category_ids=("k",), layout_aware=True)
+
+    kwargs = fake_client.messages.create.call_args.kwargs
+    assert LAYOUT_AWARE_INSTRUCTIONS in kwargs["system"]
+    user_content = kwargs["messages"][0]["content"]
+    assert '<block id="1">[0]Hello</block>' in user_content
+    assert '<block id="2">[1]world</block>' in user_content

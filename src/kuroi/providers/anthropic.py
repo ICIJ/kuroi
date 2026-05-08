@@ -17,7 +17,7 @@ from kuroi.core.audit_records import ChunkRecord
 from kuroi.core.findings import Finding
 from kuroi.core.pdf import Page
 from kuroi.providers._shared import (
-    SYSTEM_PROMPT,
+    build_system_prompt,
     build_user_prompt,
     parse_findings_payload,
 )
@@ -91,11 +91,14 @@ class AnthropicProvider:
         instructions: tuple[str, ...] = (),
         seed: int | None = None,
         attempt: int = 0,
+        layout_aware: bool = False,
     ) -> tuple[list[Finding], list[ChunkRecord]]:
         del attempt  # accepted for Provider protocol compliance; Anthropic SDK has its own retry/timeout
         if not llm_category_ids and not instructions:
             return [], []
-        user_prompt = build_user_prompt(pages, llm_category_ids, instructions)
+        user_prompt = build_user_prompt(
+            pages, llm_category_ids, instructions, layout_aware=layout_aware
+        )
         prompt_sha = hashlib.sha256(user_prompt.encode("utf-8")).hexdigest()
 
         extra: dict[str, Any] = {} if self.model in _NO_TEMPERATURE_MODELS else {"temperature": 0}
@@ -117,7 +120,7 @@ class AnthropicProvider:
             response = self._client.messages.create(
                 model=self.model,
                 max_tokens=self._max_tokens,
-                system=SYSTEM_PROMPT,
+                system=build_system_prompt(layout_aware),
                 messages=[{"role": "user", "content": user_prompt}],
                 **extra,
             )
