@@ -99,6 +99,36 @@ def extract_word_index(pdf_path: Path) -> ExtractionResult:
         doc.close()  # type: ignore[no-untyped-call]
 
 
+def slice_page(page: Page, word_start: int, word_end: int) -> Page:
+    """Return a synthetic page containing words[word_start:word_end], with
+    `Word.idx` re-indexed to 0..(word_end - word_start - 1).
+
+    Re-indexing is what lets the synthetic page round-trip through the
+    existing `serialize_for_llm` / `parse_findings_payload` pair without
+    any other change: `parse_findings_payload` validates indices as
+    positions in `page.words`, so resetting `idx` to 0..N-1 inside the
+    slice keeps that invariant. The chunker translates the model's
+    returned indices back to original-page coordinates by adding
+    `word_start`.
+
+    `page.number` is preserved, so findings naturally reference the
+    original page in the document.
+
+    Raises ValueError if the requested range is invalid (empty, negative,
+    or past the end of the source page's word list).
+    """
+    if not (0 <= word_start < word_end <= len(page.words)):
+        raise ValueError(
+            f"slice {word_start}..{word_end} out of range for page "
+            f"{page.number} ({len(page.words)} words)"
+        )
+    sliced = tuple(
+        Word(idx=i, text=w.text, bbox=w.bbox)
+        for i, w in enumerate(page.words[word_start:word_end])
+    )
+    return Page(number=page.number, words=sliced)
+
+
 def serialize_for_llm(pages: tuple[Page, ...]) -> str:
     """Render the word index as the prompt-side representation.
 
