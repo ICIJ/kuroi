@@ -444,3 +444,49 @@ def test_chunked_call_attempts_in_batch_error_match_policy(
 
     assert excinfo.value.attempts == total_attempts
     assert provider.attempts == list(range(total_attempts))
+
+
+# ---------------------------------------------------------------------------
+# _WorkItem and _IndexCounter foundation tests
+# ---------------------------------------------------------------------------
+
+
+def test_workitem_from_pages_has_no_word_range() -> None:
+    """Default constructor for full-page batches: word_range is None."""
+    from kuroi.core.chunking import _WorkItem
+
+    pages = (_page(1), _page(2), _page(3))
+    item = _WorkItem.from_pages(pages)
+
+    assert item.pages == pages
+    assert item.word_range is None
+
+
+def test_workitem_with_word_range_records_slice() -> None:
+    """Sub-page work items carry the original-page coordinates."""
+    from kuroi.core.chunking import _WorkItem
+
+    page = _page(1)
+    item = _WorkItem(pages=(page,), word_range=(10, 50))
+
+    assert item.word_range == (10, 50)
+
+
+def test_index_counter_starts_at_zero() -> None:
+    from kuroi.core.chunking import _IndexCounter
+
+    counter = _IndexCounter()
+    assert counter.next() == 0
+    assert counter.next() == 1
+    assert counter.next() == 2
+
+
+def test_index_counter_independent_instances() -> None:
+    """Each run gets its own counter; they don't share state."""
+    from kuroi.core.chunking import _IndexCounter
+
+    a = _IndexCounter()
+    b = _IndexCounter()
+    a.next()
+    a.next()
+    assert b.next() == 0  # b is unaffected by a

@@ -12,7 +12,7 @@ import logging
 import math
 import time
 from collections.abc import Callable
-from dataclasses import replace
+from dataclasses import dataclass, replace
 
 from kuroi.core.audit_records import ChunkRecord
 from kuroi.core.config import RetryPolicy
@@ -45,6 +45,46 @@ class BatchError(Exception):
             f"Batch {batch_idx + 1} (pages {_format_page_range(page_numbers)}) "
             f"failed {attempts} times and was aborted."
         )
+
+
+@dataclass(frozen=True)
+class _WorkItem:
+    """One unit dispatched as a single Provider.detect_redactions call.
+
+    For multi-page batches: pages is the full-page tuple, word_range is
+    None. For sub-page slices: pages is a single synthetic (re-indexed)
+    page produced by `slice_page`, and word_range is the
+    (original_start, original_end) coordinates so the chunker can
+    translate findings back and the audit log can record the slice.
+    """
+
+    pages: tuple[Page, ...]
+    word_range: tuple[int, int] | None
+
+    @classmethod
+    def from_pages(cls, pages: tuple[Page, ...]) -> _WorkItem:
+        return cls(pages=pages, word_range=None)
+
+
+class _IndexCounter:
+    """Globally-unique, monotonically-increasing chunk_idx generator.
+
+    Threaded through recursion in _try_or_subdivide so that every
+    successful sub-call (whether full-page or sliced) gets a unique
+    chunk_idx in arrival order. Replaces the prior
+    `chunk_idx = batch_idx` assignment, which loses uniqueness once a
+    batch produces multiple sub-records.
+    """
+
+    __slots__ = ("_value",)
+
+    def __init__(self) -> None:
+        self._value = 0
+
+    def next(self) -> int:
+        n = self._value
+        self._value += 1
+        return n
 
 
 def detect_redactions_chunked(
