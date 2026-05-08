@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pymupdf
 import pytest
@@ -257,3 +258,50 @@ def test_extract_word_index_populates_block_id(make_pdf: Callable[..., Path]) ->
     # Words sharing a paragraph share a block_id.
     first_three = page.words[:3]
     assert len({w.block_id for w in first_three}) == 1
+
+
+def test_ocr_path_populates_block_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    """OCR'd words inherit whatever block_id PyMuPDF assigns; the test
+    asserts that the *field is populated* from the tuple, not that the
+    value is any specific number."""
+    from kuroi.core import pdf as pdf_module
+
+    captured: dict[str, list[tuple[float, float, float, float, str, int, int, int]]] = {}
+
+    class FakePage:
+        def __init__(self) -> None:
+            self.number = 1
+
+        def get_text(self, mode: str, **kwargs: object) -> list[tuple[Any, ...]]:
+            # Native pass returns words with block_id=0; OCR pass overrides with block_id=42.
+            if "textpage" in kwargs:
+                tup = (0.0, 0.0, 1.0, 1.0, "ocr", 42, 0, 0)
+                captured["ocr_words"] = [tup]
+                return [tup]
+            return [(0.0, 0.0, 1.0, 1.0, "native", 0, 0, 0)]
+
+        def get_images(self) -> list[object]:
+            return [object()]  # trigger the OCR branch
+
+        def get_textpage_ocr(self, **kwargs: object) -> object:
+            return object()
+
+    class FakeDoc:
+        page_count = 1
+
+        def __getitem__(self, _: int) -> FakePage:
+            return FakePage()
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setattr(pdf_module.pymupdf, "open", lambda _: FakeDoc())
+    monkeypatch.setattr(pdf_module.shutil, "which", lambda _: "/usr/bin/tesseract")
+
+    result = pdf_module.extract_word_index(Path("ignored.pdf"))
+
+    assert result.ocr_page_count == 1
+    page = result.pages[0]
+    assert len(page.words) == 1
+    assert page.words[0].block_id == 42
+    assert page.words[0].text == "ocr"
