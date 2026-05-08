@@ -695,7 +695,7 @@ def test_halve_single_page_produces_overlapping_halves() -> None:
     right = words[450..1000] (sliced page has 550 words, idx 0..549)
     Both word_ranges record the original-page coordinates.
     """
-    from kuroi.core.chunking import _halve, OVERLAP_WORDS, _WorkItem
+    from kuroi.core.chunking import OVERLAP_WORDS, _halve, _WorkItem
 
     page = _page_with_words(num=3, n_words=1000)
     item = _WorkItem.from_pages((page,))
@@ -718,7 +718,7 @@ def test_halve_single_page_produces_overlapping_halves() -> None:
 def test_halve_single_page_overlap_includes_original_text_at_boundary() -> None:
     """The overlap zone (M-O .. M+O) must appear in the sliced text of both
     halves, so a boundary-straddling entity survives in at least one."""
-    from kuroi.core.chunking import _halve, OVERLAP_WORDS, _WorkItem
+    from kuroi.core.chunking import OVERLAP_WORDS, _halve, _WorkItem
 
     page = _page_with_words(num=1, n_words=200)
     item = _WorkItem.from_pages((page,))
@@ -756,7 +756,7 @@ def test_halve_raises_at_floor_for_too_small_single_page() -> None:
     """N <= 2 * OVERLAP_WORDS → no useful subdivision possible."""
     import pytest
 
-    from kuroi.core.chunking import _halve, BatchError, _WorkItem
+    from kuroi.core.chunking import BatchError, _halve, _WorkItem
 
     page = _page_with_words(num=1, n_words=80)  # 80 <= 2*50
     item = _WorkItem.from_pages((page,))
@@ -773,7 +773,7 @@ def test_halve_raises_at_floor_when_halves_would_be_too_small() -> None:
     99 words — neither is strictly smaller than the parent, so floor."""
     import pytest
 
-    from kuroi.core.chunking import _halve, BatchError, _WorkItem
+    from kuroi.core.chunking import BatchError, _halve, _WorkItem
 
     page = _page_with_words(num=1, n_words=99)
     item = _WorkItem.from_pages((page,))
