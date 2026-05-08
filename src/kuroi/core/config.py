@@ -195,6 +195,18 @@ def _read_retry_policy(
                 f"Expected non-negative integer for `retry.max_retries`, got {raw!r}"
             )
         max_retries = raw
+    if "KUROI_MAX_RETRIES" in env:
+        try:
+            parsed_int = int(env["KUROI_MAX_RETRIES"])
+        except ValueError as exc:
+            raise ConfigError(
+                f"Expected integer for `KUROI_MAX_RETRIES`, got {env['KUROI_MAX_RETRIES']!r}"
+            ) from exc
+        if parsed_int < 0:
+            raise ConfigError(
+                f"Expected non-negative integer for `KUROI_MAX_RETRIES`, got {parsed_int}"
+            )
+        max_retries = parsed_int
     if overrides.retry_max is not None:
         if overrides.retry_max < 0:
             raise ConfigError(
@@ -211,6 +223,18 @@ def _read_retry_policy(
                 f"Expected non-negative number for `retry.backoff`, got {raw!r}"
             )
         backoff = float(raw)
+    if "KUROI_RETRY_BACKOFF" in env:
+        try:
+            parsed_float = float(env["KUROI_RETRY_BACKOFF"])
+        except ValueError as exc:
+            raise ConfigError(
+                f"Expected number for `KUROI_RETRY_BACKOFF`, got {env['KUROI_RETRY_BACKOFF']!r}"
+            ) from exc
+        if parsed_float < 0:
+            raise ConfigError(
+                f"Expected non-negative number for `KUROI_RETRY_BACKOFF`, got {parsed_float}"
+            )
+        backoff = parsed_float
     if overrides.retry_backoff is not None:
         if overrides.retry_backoff < 0:
             raise ConfigError(
@@ -227,6 +251,19 @@ def _read_retry_policy(
                 f"Expected number >= 1.0 for `retry.backoff_multiplier`, got {raw!r}"
             )
         multiplier = float(raw)
+    if "KUROI_RETRY_BACKOFF_MULTIPLIER" in env:
+        try:
+            parsed_multiplier = float(env["KUROI_RETRY_BACKOFF_MULTIPLIER"])
+        except ValueError as exc:
+            raise ConfigError(
+                f"Expected number for `KUROI_RETRY_BACKOFF_MULTIPLIER`, "
+                f"got {env['KUROI_RETRY_BACKOFF_MULTIPLIER']!r}"
+            ) from exc
+        if parsed_multiplier < 1.0:
+            raise ConfigError(
+                f"Expected number >= 1.0 for `KUROI_RETRY_BACKOFF_MULTIPLIER`, got {parsed_multiplier}"
+            )
+        multiplier = parsed_multiplier
     if overrides.retry_backoff_multiplier is not None:
         if overrides.retry_backoff_multiplier < 1.0:
             raise ConfigError(

@@ -407,3 +407,60 @@ def test_resolve_retry_rejects_non_table(tmp_path: Path) -> None:
     path = _file(tmp_path, 'provider = "anthropic"\nmodel = "m"\nretry = "fast"\n')
     with pytest.raises(ConfigError, match="retry"):
         resolve_config(ConfigOverrides(), env={}, file_path=path)
+
+
+def test_resolve_retry_from_env(tmp_path: Path) -> None:
+    cfg = resolve_config(
+        ConfigOverrides(),
+        env={
+            "KUROI_MAX_RETRIES": "5",
+            "KUROI_RETRY_BACKOFF": "1.5",
+            "KUROI_RETRY_BACKOFF_MULTIPLIER": "3.0",
+        },
+        file_path=tmp_path / "missing.toml",
+    )
+    assert cfg.retry.max_retries == 5
+    assert cfg.retry.backoff == 1.5
+    assert cfg.retry.backoff_multiplier == 3.0
+
+
+def test_resolve_retry_env_beats_file(tmp_path: Path) -> None:
+    path = _file(
+        tmp_path,
+        'provider = "anthropic"\nmodel = "m"\n\n[retry]\nmax_retries = 1\nbackoff = 9.0\n',
+    )
+    cfg = resolve_config(
+        ConfigOverrides(),
+        env={"KUROI_MAX_RETRIES": "7", "KUROI_RETRY_BACKOFF": "0.5"},
+        file_path=path,
+    )
+    assert cfg.retry.max_retries == 7
+    assert cfg.retry.backoff == 0.5
+    assert cfg.retry.backoff_multiplier == 2.0  # untouched, falls back to default
+
+
+def test_resolve_retry_env_rejects_non_numeric(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError, match="KUROI_MAX_RETRIES"):
+        resolve_config(
+            ConfigOverrides(),
+            env={"KUROI_MAX_RETRIES": "lots"},
+            file_path=tmp_path / "missing.toml",
+        )
+
+
+def test_resolve_retry_env_rejects_negative(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError, match="KUROI_RETRY_BACKOFF"):
+        resolve_config(
+            ConfigOverrides(),
+            env={"KUROI_RETRY_BACKOFF": "-2.0"},
+            file_path=tmp_path / "missing.toml",
+        )
+
+
+def test_resolve_retry_env_rejects_multiplier_below_one(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError, match="KUROI_RETRY_BACKOFF_MULTIPLIER"):
+        resolve_config(
+            ConfigOverrides(),
+            env={"KUROI_RETRY_BACKOFF_MULTIPLIER": "0.5"},
+            file_path=tmp_path / "missing.toml",
+        )
