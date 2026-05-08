@@ -1023,6 +1023,59 @@ def test_run_with_pages_per_batch_aborts_on_batch_error(
     assert "smaller --pages-per-batch" in result.stdout
 
 
+def test_run_max_retries_zero_disables_retry(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    stub_anthropic_client: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`--max-retries 0` causes a single hard failure to abort with exit 1."""
+    pdf = make_pdf(["one"])
+
+    call_count = {"n": 0}
+
+    def _stub_detect(
+        self: Any,
+        pages: tuple[Any, ...],
+        llm_category_ids: tuple[str, ...],
+        *,
+        instructions: tuple[str, ...] = (),
+        seed: int | None = None,
+        attempt: int = 0,
+    ) -> tuple[list[Any], list[Any]]:
+        call_count["n"] += 1
+        return [], []  # hard failure
+
+    monkeypatch.setattr(
+        "kuroi.providers.anthropic.AnthropicProvider.detect_redactions",
+        _stub_detect,
+    )
+    monkeypatch.setattr("kuroi.core.chunking.time.sleep", lambda _: None)
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "--instruct",
+            "redact",
+            "-o",
+            str(tmp_path / "out.pdf"),
+            "-y",
+            "--max-retries",
+            "0",
+            "--backup-dir",
+            str(tmp_path / "backups"),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert call_count["n"] == 1  # exactly one provider call, no retry
+    assert "failed 1 times" in result.stdout
+
+
 def test_run_default_path_uses_orchestrator_with_default_policy(
     make_pdf: Callable[..., Path],
     tmp_path: Path,
