@@ -101,6 +101,39 @@ def _translate_indices(findings: list[Finding], item: _WorkItem) -> list[Finding
     return [replace(f, start=f.start + offset, end=f.end + offset) for f in findings]
 
 
+_CONFIDENCE_RANK: dict[str, int] = {"high": 3, "medium": 2, "low": 1}
+
+
+def _dedupe(findings: list[Finding]) -> list[Finding]:
+    """Collapse exact duplicates by (page, start, end, kind).
+
+    On collision keep the higher-confidence record; ties go to the
+    earliest-arriving record. Findings whose ranges *overlap* but are
+    not identical are preserved on purpose — the redaction step then
+    redacts the union, which is the safer outcome for a security tool.
+    Findings of different kinds at the same range are likewise preserved
+    (genuine disagreement worth surfacing in diff/verify).
+
+    Order of returned findings is the order each unique key was first
+    seen — keeps the output deterministic.
+    """
+    by_key: dict[tuple[int, int, int, str], int] = {}
+    out: list[Finding] = []
+    for f in findings:
+        key = (f.page, f.start, f.end, f.kind)
+        existing_idx = by_key.get(key)
+        if existing_idx is None:
+            by_key[key] = len(out)
+            out.append(f)
+            continue
+        existing = out[existing_idx]
+        if _CONFIDENCE_RANK.get(f.confidence, 0) > _CONFIDENCE_RANK.get(
+            existing.confidence, 0
+        ):
+            out[existing_idx] = f
+    return out
+
+
 def detect_redactions_chunked(
     provider: Provider,
     pages: tuple[Page, ...],

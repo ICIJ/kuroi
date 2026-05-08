@@ -544,3 +544,74 @@ def test_translate_indices_preserves_page_number() -> None:
     out = _translate_indices(inputs, item)
 
     assert out[0].page == 7
+
+
+# ---------------------------------------------------------------------------
+# _dedupe tests
+# ---------------------------------------------------------------------------
+
+
+def test_dedupe_collapses_identical_findings() -> None:
+    """Same (page, start, end, kind) → keep one."""
+    from kuroi.core.chunking import _dedupe
+
+    a = Finding(page=1, start=10, end=12, kind="X", confidence="high", source="llm")
+    b = Finding(page=1, start=10, end=12, kind="X", confidence="high", source="llm")
+
+    out = _dedupe([a, b])
+
+    assert len(out) == 1
+
+
+def test_dedupe_keeps_highest_confidence_on_collision() -> None:
+    """When dedupe key collides, the higher-confidence finding wins."""
+    from kuroi.core.chunking import _dedupe
+
+    high = Finding(page=1, start=0, end=0, kind="X", confidence="high", source="llm")
+    low = Finding(page=1, start=0, end=0, kind="X", confidence="low", source="llm")
+
+    out_a = _dedupe([low, high])
+    out_b = _dedupe([high, low])
+
+    assert len(out_a) == 1 and out_a[0].confidence == "high"
+    assert len(out_b) == 1 and out_b[0].confidence == "high"
+
+
+def test_dedupe_preserves_overlapping_non_identical_findings() -> None:
+    """Overlapping ranges of the same kind are different findings; keep both
+    so the redaction step naturally redacts the union."""
+    from kuroi.core.chunking import _dedupe
+
+    a = Finding(page=1, start=10, end=12, kind="X", confidence="high", source="llm")
+    b = Finding(page=1, start=11, end=13, kind="X", confidence="high", source="llm")
+
+    out = _dedupe([a, b])
+
+    assert len(out) == 2
+
+
+def test_dedupe_does_not_merge_across_kinds() -> None:
+    """Same range, different kind → keep both (genuine disagreement)."""
+    from kuroi.core.chunking import _dedupe
+
+    person = Finding(page=1, start=0, end=1, kind="person_name", confidence="high", source="llm")
+    email = Finding(page=1, start=0, end=1, kind="email", confidence="high", source="llm")
+
+    out = _dedupe([person, email])
+
+    assert len(out) == 2
+
+
+def test_dedupe_preserves_order_of_first_seen() -> None:
+    """Dedupe should be deterministic. Within a colliding key group, the
+    earliest-arriving finding (after applying the highest-confidence rule)
+    is kept; first-seen ordering across groups is preserved."""
+    from kuroi.core.chunking import _dedupe
+
+    f1 = Finding(page=1, start=0, end=0, kind="a", confidence="high", source="llm")
+    f2 = Finding(page=1, start=1, end=1, kind="b", confidence="high", source="llm")
+    f3 = Finding(page=1, start=0, end=0, kind="a", confidence="low", source="llm")
+
+    out = _dedupe([f1, f2, f3])
+
+    assert [(f.start, f.kind) for f in out] == [(0, "a"), (1, "b")]
