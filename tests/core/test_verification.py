@@ -3,7 +3,12 @@ from pathlib import Path
 
 import pymupdf
 
-from kuroi.core.verification import scan_metadata, scan_text_under_overlays, verify_pdf
+from kuroi.core.verification import (
+    _filled_rectangles,
+    scan_metadata,
+    scan_text_under_overlays,
+    verify_pdf,
+)
 
 
 def test_scan_text_under_overlays_finds_leak(
@@ -44,6 +49,44 @@ def test_scan_text_under_overlays_ignores_white_page_background(tmp_path: Path) 
     out = tmp_path / "white_bg.pdf"
     doc.save(str(out))  # type: ignore[no-untyped-call]
     doc.close()  # type: ignore[no-untyped-call]
+
+    leaks = scan_text_under_overlays(out)
+
+    assert leaks == []
+
+
+def test_filled_rectangles_excludes_thin_decorative_rects(tmp_path: Path) -> None:
+    # PACER-style PDFs scatter sub-5pt dark rects (table separators, list
+    # bullets) across every page. They are not redaction overlays and must not
+    # be candidates: a body-text glyph's cap-height alone is ~6pt, so anything
+    # shorter physically cannot obscure characters.
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.draw_rect(pymupdf.Rect(72, 72, 200, 92), color=(0, 0, 0), fill=(0, 0, 0))
+    page.draw_rect(pymupdf.Rect(72, 200, 200, 203), color=(0, 0, 0), fill=(0, 0, 0))
+    out = tmp_path / "mixed.pdf"
+    doc.save(str(out))
+    doc.close()
+
+    doc = pymupdf.open(str(out))
+    rects = _filled_rectangles(doc[0])
+    doc.close()
+
+    assert len(rects) == 1
+    assert rects[0] == (72.0, 72.0, 200.0, 92.0)
+
+
+def test_scan_text_under_overlays_ignores_pure_punctuation_leak(tmp_path: Path) -> None:
+    # A redaction overlay that only happens to enclose a stray period (or any
+    # non-alphanumeric glyph) is not a meaningful information leak. This is the
+    # PACER false positive that caused real-world verify failures.
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), ".", fontsize=11)
+    page.draw_rect(pymupdf.Rect(70, 60, 90, 78), color=(0, 0, 0), fill=(0, 0, 0))
+    out = tmp_path / "punct_only.pdf"
+    doc.save(str(out))
+    doc.close()
 
     leaks = scan_text_under_overlays(out)
 

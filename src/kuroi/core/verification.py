@@ -45,7 +45,7 @@ def scan_text_under_overlays(pdf_path: Path) -> list[Leak]:
                     wx0, wy0, wx1, wy1 = float(w[0]), float(w[1]), float(w[2]), float(w[3])
                     if _box_contains(rect, (wx0, wy0, wx1, wy1)):
                         covered.append(str(w[4]))
-                if covered:
+                if covered and _has_substantive_content(covered):
                     leaks.append(
                         Leak(
                             page=page_idx + 1,
@@ -60,7 +60,26 @@ def scan_text_under_overlays(pdf_path: Path) -> list[Leak]:
     return leaks
 
 
+def _has_substantive_content(covered: list[str]) -> bool:
+    """True if any character in `covered` is alphanumeric.
+
+    Filters the PACER-style false positive where a decorative dark rect
+    coincidentally encloses the bbox of a stray punctuation glyph (period,
+    comma, hyphen). A rect that contains only punctuation and whitespace
+    cannot leak meaningful information regardless of whether kuroi or the
+    source document drew it.
+    """
+    return any(ch.isalnum() for ch in "".join(covered))
+
+
 _DARK_FILL_THRESHOLD = 0.5  # all RGB components below this count as redaction-dark
+
+# Below this height, a filled rect cannot physically obscure body-text glyphs
+# (cap-height ~6pt at 8pt body). Anything thinner is decoration: PACER-style
+# table separators, list bullets, hairline rules. kuroi's own apply_redactions
+# always produces rects >= word-bbox-height + 3pt descender padding, so its
+# real overlays clear this filter by a wide margin.
+_MIN_OVERLAY_HEIGHT_PT = 5.0
 
 
 def _is_redaction_fill(fill: object) -> bool:
@@ -95,6 +114,8 @@ def _filled_rectangles(
             continue
         rect = drawing.get("rect")
         if rect is None:
+            continue
+        if float(rect.y1) - float(rect.y0) < _MIN_OVERLAY_HEIGHT_PT:
             continue
         out.append((float(rect.x0), float(rect.y0), float(rect.x1), float(rect.y1)))
     return out
