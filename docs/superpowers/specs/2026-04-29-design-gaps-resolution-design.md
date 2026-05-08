@@ -133,6 +133,16 @@ Every line carries a discriminator field `event` so each line is self-identifyin
 }
 ```
 
+Fields added after v0.1:
+
+- `page_word_range` (optional, `[int, int]` or `null`, added in 0.2 with
+  the subdivide-on-failure feature). When the chunker had to split a
+  single page into sub-page slices because the page was too dense for
+  the active model, this records the original-page
+  `(word_start, word_end)` covered by this call. `null` (or absent) for
+  full-page calls. `pages` still names the originating page (single-
+  element list for a sub-page call).
+
 **`event: "finding"` — per-redaction records.**
 
 ```json
