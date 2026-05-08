@@ -341,6 +341,31 @@ def test_anthropic_prompt_too_long_returns_empty_to_signal_subdivide(
     assert any("prompt" in m.lower() and "too long" in m.lower() for m in warnings)
 
 
+def test_anthropic_truncated_response_returns_empty_to_signal_subdivide(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """When the model hits ~95% of max_tokens, the JSON is almost certainly
+    cut off. Today this is a silent data-loss path (returns [chunk] with
+    zero findings); now it must return ([], []) so the chunker subdivides
+    and recovers the lost findings on a smaller prompt."""
+    client = MagicMock()
+    # max_tokens defaults to 4096; tokens_out=4000 is ~97.7%.
+    client.messages.create.return_value = _stub_response(
+        '{"findings": [{"page": 1, "start": 0, "end":',  # truncated mid-array
+        in_t=100,
+        out_t=4000,
+    )
+    provider = AnthropicProvider(model="claude-opus-4-7", client=client, max_tokens=4096)
+
+    with caplog.at_level(logging.WARNING, logger="kuroi.providers.anthropic"):
+        findings, chunks = provider.detect_redactions(_one_page(), ("person_name",))
+
+    assert findings == []
+    assert chunks == []
+    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("truncat" in m.lower() for m in warnings)
+
+
 def test_anthropic_other_bad_request_errors_still_raise() -> None:
     """Non-size BadRequestErrors (malformed schema, unknown model, etc.)
     are real bugs; subdivision won't help, so they keep propagating."""
