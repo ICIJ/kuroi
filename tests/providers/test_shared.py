@@ -70,3 +70,34 @@ def test_build_system_prompt_on_is_strictly_longer_than_off() -> None:
     on = build_system_prompt(layout_aware=True)
     off = build_system_prompt(layout_aware=False)
     assert len(on) > len(off)
+
+
+def _page_with_blocks() -> Page:
+    return Page(
+        number=1,
+        words=(
+            Word(idx=0, text="A", bbox=(0, 0, 1, 1), block_id=3),
+            Word(idx=1, text="B", bbox=(1, 0, 2, 1), block_id=4),
+        ),
+    )
+
+
+def test_build_user_prompt_default_no_block_tags() -> None:
+    prompt = build_user_prompt(
+        (_page_with_blocks(),),
+        llm_category_ids=("kind",),
+    )
+
+    assert "<block" not in prompt
+    assert "[0]A [1]B" in prompt
+
+
+def test_build_user_prompt_layout_aware_includes_block_tags() -> None:
+    prompt = build_user_prompt(
+        (_page_with_blocks(),),
+        llm_category_ids=("kind",),
+        layout_aware=True,
+    )
+
+    assert '<block id="3">[0]A</block>' in prompt
+    assert '<block id="4">[1]B</block>' in prompt

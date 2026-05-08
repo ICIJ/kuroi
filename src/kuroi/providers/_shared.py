@@ -55,9 +55,11 @@ def build_user_prompt(
     pages: tuple[Page, ...],
     llm_category_ids: tuple[str, ...],
     instructions: tuple[str, ...] = (),
+    *,
+    layout_aware: bool = False,
 ) -> str:
     """Construct the user-message body sent to the model."""
-    doc = serialize_for_llm(pages)
+    doc = serialize_for_llm(pages, layout_aware=layout_aware)
     parts: list[str] = []
     if llm_category_ids:
         cats = ", ".join(llm_category_ids)
