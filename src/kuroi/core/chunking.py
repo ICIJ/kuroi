@@ -17,7 +17,7 @@ from dataclasses import dataclass, replace
 from kuroi.core.audit_records import ChunkRecord
 from kuroi.core.config import RetryPolicy
 from kuroi.core.findings import Finding
-from kuroi.core.pdf import Page
+from kuroi.core.pdf import Page, slice_page
 from kuroi.providers.base import Provider
 
 logger = logging.getLogger("kuroi.core.chunking")
@@ -141,18 +141,49 @@ def _halve(item: _WorkItem) -> tuple[_WorkItem, _WorkItem]:
     """Split a work item into two children for subdivision retry.
 
     Multi-page batches split by pages: `[p1, p2, p3, p4]` →
-    `([p1, p2], [p3, p4])`. No overlap between halves — page boundaries
-    are already meaningful boundaries in the document, so no entity can
-    straddle them.
+    `([p1, p2], [p3, p4])`. No overlap — page boundaries are already
+    meaningful boundaries in the document.
 
-    Single-page and floor cases will be added in subsequent tasks.
+    Single-page work items (or sub-page slices that have grown long
+    enough to warrant another split) split by word range with a
+    symmetric OVERLAP_WORDS overlap so entities straddling the cut
+    survive in at least one half.
+
+    Floor handling (raising BatchError when no further halving makes
+    sense) lands in Task 11.
     """
     if len(item.pages) >= 2:
         mid = len(item.pages) // 2
         left = _WorkItem.from_pages(item.pages[:mid])
         right = _WorkItem.from_pages(item.pages[mid:])
         return left, right
-    raise NotImplementedError("single-page and floor cases come in Tasks 10–11")
+
+    # Single page (full or already-sliced).
+    page = item.pages[0]
+    base_start = item.word_range[0] if item.word_range is not None else 0
+    base_end = item.word_range[1] if item.word_range is not None else len(page.words)
+    n = base_end - base_start
+    mid = n // 2
+
+    # Boundaries inside the *current* page-slice (0..n).
+    left_local_end = mid + OVERLAP_WORDS
+    right_local_start = mid - OVERLAP_WORDS
+
+    # The page object inside `item` is already (full or) sliced; we slice
+    # *it again* to produce children. For full-page items, that's the
+    # original page. For already-sliced items, that's the synthetic page.
+    left_page = slice_page(page, 0, left_local_end)
+    right_page = slice_page(page, right_local_start, n)
+
+    left = _WorkItem(
+        pages=(left_page,),
+        word_range=(base_start, base_start + left_local_end),
+    )
+    right = _WorkItem(
+        pages=(right_page,),
+        word_range=(base_start + right_local_start, base_end),
+    )
+    return left, right
 
 
 def detect_redactions_chunked(
