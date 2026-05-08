@@ -31,8 +31,7 @@ def diff(
     """Show what changed between an original and a redacted PDF."""
     if format is Format.html and output is None:
         console.print(
-            "[red]html format requires -o <path> "
-            "(refusing to write binary or html to a TTY)[/]"
+            "[red]html format requires -o <path> (refusing to write binary or html to a TTY)[/]"
         )
         raise typer.Exit(code=2)
 
