@@ -8,9 +8,11 @@ from pathlib import Path
 import pytest
 
 from kuroi.core.config import (
+    DEFAULT_RETRY_POLICY,
     Config,
     ConfigError,
     ConfigOverrides,
+    RetryPolicy,
     load_config_file,
     resolve_config,
     write_config_file,
@@ -296,3 +298,36 @@ def test_config_backup_retention_negative_rejected(tmp_path: Path) -> None:
     cfg.write_text('provider = "anthropic"\nmodel = "m"\n[backup]\nretention_hours = -1\n')
     with pytest.raises(ConfigError, match="positive integer or 0"):
         resolve_config(ConfigOverrides(), env={}, file_path=cfg)
+
+
+# ---------------------------------------------------------------------------
+# RetryPolicy tests
+# ---------------------------------------------------------------------------
+
+
+def test_retry_policy_default_schedule_matches_legacy_constants() -> None:
+    """The default policy reproduces the historical (2.0, 4.0) schedule."""
+    assert DEFAULT_RETRY_POLICY.max_retries == 2
+    assert DEFAULT_RETRY_POLICY.backoff == 2.0
+    assert DEFAULT_RETRY_POLICY.backoff_multiplier == 2.0
+    assert DEFAULT_RETRY_POLICY.schedule() == (2.0, 4.0)
+
+
+def test_retry_policy_zero_retries_yields_empty_schedule() -> None:
+    assert RetryPolicy(max_retries=0, backoff=2.0, backoff_multiplier=2.0).schedule() == ()
+
+
+def test_retry_policy_multiplier_one_yields_fixed_delay() -> None:
+    schedule = RetryPolicy(max_retries=3, backoff=5.0, backoff_multiplier=1.0).schedule()
+    assert schedule == (5.0, 5.0, 5.0)
+
+
+def test_retry_policy_exponential_growth() -> None:
+    schedule = RetryPolicy(max_retries=4, backoff=1.0, backoff_multiplier=3.0).schedule()
+    assert schedule == (1.0, 3.0, 9.0, 27.0)
+
+
+def test_retry_policy_is_frozen() -> None:
+    policy = RetryPolicy(max_retries=2, backoff=2.0, backoff_multiplier=2.0)
+    with pytest.raises(FrozenInstanceError):
+        policy.max_retries = 5  # type: ignore[misc]

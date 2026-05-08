@@ -24,6 +24,33 @@ DEFAULT_OLLAMA_URL = "http://localhost:11434"
 DEFAULT_ANTHROPIC_MODEL = "claude-opus-4-7"
 
 
+@dataclass(frozen=True)
+class RetryPolicy:
+    """Retry attempts and backoff schedule for a chunked LLM call.
+
+    `max_retries` is the count of retries *after* the initial attempt;
+    total attempts = `max_retries + 1`. Setting `max_retries=0` disables retry.
+
+    The schedule grows geometrically: the k-th retry delay (0-indexed) is
+    `backoff * backoff_multiplier ** k`. A multiplier of 1.0 gives
+    a fixed delay; the default `(2, 2.0, 2.0)` produces `(2.0, 4.0)` —
+    the historical hardcoded schedule.
+    """
+
+    max_retries: int
+    backoff: float
+    backoff_multiplier: float
+
+    def schedule(self) -> tuple[float, ...]:
+        return tuple(
+            self.backoff * (self.backoff_multiplier ** k)
+            for k in range(self.max_retries)
+        )
+
+
+DEFAULT_RETRY_POLICY = RetryPolicy(max_retries=2, backoff=2.0, backoff_multiplier=2.0)
+
+
 class ConfigError(Exception):
     """Raised when configuration cannot be resolved or is invalid."""
 
