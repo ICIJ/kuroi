@@ -14,7 +14,7 @@ from kuroi.core.audit_records import ChunkRecord
 from kuroi.core.findings import Finding
 from kuroi.core.pdf import Page
 from kuroi.providers._shared import (
-    SYSTEM_PROMPT,
+    build_system_prompt,
     build_user_prompt,
     parse_findings_payload,
 )
@@ -66,10 +66,13 @@ class OllamaProvider:
         instructions: tuple[str, ...] = (),
         seed: int | None = None,
         attempt: int = 0,
+        layout_aware: bool = False,
     ) -> tuple[list[Finding], list[ChunkRecord]]:
         if not llm_category_ids and not instructions:
             return [], []
-        user_prompt = build_user_prompt(pages, llm_category_ids, instructions)
+        user_prompt = build_user_prompt(
+            pages, llm_category_ids, instructions, layout_aware=layout_aware
+        )
         prompt_sha = hashlib.sha256(user_prompt.encode("utf-8")).hexdigest()
 
         options: dict[str, Any] = {"temperature": 0}
@@ -81,7 +84,7 @@ class OllamaProvider:
             "format": "json",
             "options": options,
             "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": build_system_prompt(layout_aware)},
                 {"role": "user", "content": user_prompt},
             ],
         }
