@@ -241,3 +241,56 @@ def test_run_layout_aware_flag_reaches_provider(
     )
     assert result.exit_code == 0, result.stdout
     assert captured["layout_aware"] is True
+
+
+def test_run_logs_block_count_when_layout_aware(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """--layout-aware adds `blocks=N` to the per-batch progress line.
+    The batched-UI path requires `total_batches > 1`, so we use a
+    multi-page PDF with --pages-per-batch 1."""
+
+    def _fake_make(cfg: Config) -> _StubProvider:
+        return _StubProvider(model=cfg.model)
+
+    monkeypatch.setattr("kuroi.cli.run.make_provider", _fake_make)
+
+    pdf = make_pdf(["First page", "Second page"])
+    out = tmp_path / "out.pdf"
+
+    result = CliRunner().invoke(
+        app,
+        [
+            *_common_args(pdf, out, tmp_path),
+            "--layout-aware",
+            "--pages-per-batch", "1",
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert "blocks=" in result.stdout
+
+
+def test_run_does_not_log_block_count_without_layout_aware(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _fake_make(cfg: Config) -> _StubProvider:
+        return _StubProvider(model=cfg.model)
+
+    monkeypatch.setattr("kuroi.cli.run.make_provider", _fake_make)
+
+    pdf = make_pdf(["First page", "Second page"])
+    out = tmp_path / "out.pdf"
+
+    result = CliRunner().invoke(
+        app,
+        [
+            *_common_args(pdf, out, tmp_path),
+            "--pages-per-batch", "1",  # no --layout-aware
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert "blocks=" not in result.stdout
