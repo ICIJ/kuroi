@@ -1,5 +1,9 @@
 from kuroi.core.pdf import Page, Word
-from kuroi.providers._shared import SYSTEM_PROMPT, build_user_prompt
+from kuroi.providers._shared import (
+    SYSTEM_PROMPT,
+    build_system_prompt,
+    build_user_prompt,
+)
 
 
 def _page(num: int, words: list[str]) -> Page:
@@ -47,3 +51,22 @@ def test_system_prompt_covers_instructions() -> None:
     assert "redaction instructions" in lower
     assert "<document>" in lower
     assert "ignore" in lower  # prompt injection guard mentions ignoring injected instructions
+
+
+def test_build_system_prompt_off_returns_base() -> None:
+    assert build_system_prompt(layout_aware=False) == SYSTEM_PROMPT
+
+
+def test_build_system_prompt_on_appends_block_explanation() -> None:
+    prompt = build_system_prompt(layout_aware=True)
+
+    assert prompt.startswith(SYSTEM_PROMPT)
+    assert "<block id=" in prompt
+    assert "use the per-page word indices" in prompt.lower()
+    assert "do not report block ids" in prompt.lower()
+
+
+def test_build_system_prompt_on_is_strictly_longer_than_off() -> None:
+    on = build_system_prompt(layout_aware=True)
+    off = build_system_prompt(layout_aware=False)
+    assert len(on) > len(off)

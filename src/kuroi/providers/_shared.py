@@ -27,6 +27,24 @@ SYSTEM_PROMPT = (
     "in the input."
 )
 
+LAYOUT_AWARE_INSTRUCTIONS = (
+    "\n\n"
+    "The page content is organized into <block id=\"N\">...</block> sections "
+    "corresponding to layout-detected paragraphs and other typographic units. "
+    "Use the block boundaries as context to disambiguate which words refer to "
+    "the same entity (e.g. a field label vs its value), but report findings "
+    "exactly as before; use the per-page word indices [N], not block IDs. "
+    "Do not report block IDs in your response."
+)
+
+
+def build_system_prompt(layout_aware: bool) -> str:
+    """Return the system prompt for the model, with optional layout-aware addendum."""
+    if layout_aware:
+        return SYSTEM_PROMPT + LAYOUT_AWARE_INSTRUCTIONS
+    return SYSTEM_PROMPT
+
+
 OUTPUT_SCHEMA_HINT = (
     '{"findings": [{"page": int, "start": int, "end": int, '
     '"kind": "<category-id>", "confidence": "high|medium|low"}, ...]}'
