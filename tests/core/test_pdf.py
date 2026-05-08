@@ -305,3 +305,24 @@ def test_ocr_path_populates_block_id(monkeypatch: pytest.MonkeyPatch) -> None:
     assert len(page.words) == 1
     assert page.words[0].block_id == 42
     assert page.words[0].text == "ocr"
+
+
+def test_serialize_for_llm_default_no_block_tags() -> None:
+    from kuroi.core.pdf import Page, Word, serialize_for_llm
+
+    pages = (
+        Page(
+            number=1,
+            words=(
+                Word(idx=0, text="Hello", bbox=(0, 0, 1, 1), block_id=3),
+                Word(idx=1, text="world", bbox=(1, 0, 2, 1), block_id=3),
+                Word(idx=2, text="Other", bbox=(0, 1, 1, 2), block_id=4),
+            ),
+        ),
+    )
+
+    text = serialize_for_llm(pages)
+
+    # Default path: no <block> markers anywhere.
+    assert "<block" not in text
+    assert text == '<page n="1">\n[0]Hello [1]world [2]Other\n</page>'
