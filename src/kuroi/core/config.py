@@ -64,6 +64,7 @@ class Config:
     ollama_url: str
     audit_include_text: bool = False
     backup_retention_hours: int = 24
+    retry: RetryPolicy = DEFAULT_RETRY_POLICY
 
 
 @dataclass(frozen=True)
@@ -76,6 +77,9 @@ class ConfigOverrides:
     provider: str | None = None
     model: str | None = None
     ollama_url: str | None = None
+    retry_max: int | None = None
+    retry_backoff: float | None = None
+    retry_backoff_multiplier: float | None = None
 
 
 def xdg_config_home() -> Path:
