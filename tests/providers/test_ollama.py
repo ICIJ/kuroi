@@ -445,3 +445,51 @@ def test_shared_logs_dropped_findings_at_debug(caplog: pytest.LogCaptureFixture)
     info_msgs = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]
     assert sum(1 for m in debug_msgs if "drop" in m.lower()) >= 2
     assert any("dropped 2" in m for m in info_msgs)
+
+
+def test_ollama_missing_message_content_returns_empty_chunks() -> None:
+    """When the envelope is missing message.content, the call counts as a
+    subdivide signal — empty findings AND empty chunks."""
+    body = json.dumps({"done": True})
+    client = _StubClient(response=_StubResponse(status_code=200, body=body))
+    provider = OllamaProvider(
+        model="llama3.1:8b",
+        url="http://localhost:11434",
+        client=client,  # type: ignore[arg-type]
+    )
+
+    findings, chunks = provider.detect_redactions(_one_page(), ("person_name",))
+
+    assert findings == []
+    assert chunks == []
+
+
+def test_ollama_non_json_content_returns_empty_chunks() -> None:
+    """`format=json` is honored at the HTTP level but the content body is
+    not valid JSON. Same subdivide signal."""
+    client = _StubClient(response=_ok_response("not actually json"))
+    provider = OllamaProvider(
+        model="llama3.1:8b",
+        url="http://localhost:11434",
+        client=client,  # type: ignore[arg-type]
+    )
+
+    findings, chunks = provider.detect_redactions(_one_page(), ("person_name",))
+
+    assert findings == []
+    assert chunks == []
+
+
+def test_ollama_non_object_payload_returns_empty_chunks() -> None:
+    """Content parses to a JSON array or scalar (not an object). Same."""
+    client = _StubClient(response=_ok_response("[1, 2, 3]"))
+    provider = OllamaProvider(
+        model="llama3.1:8b",
+        url="http://localhost:11434",
+        client=client,  # type: ignore[arg-type]
+    )
+
+    findings, chunks = provider.detect_redactions(_one_page(), ("person_name",))
+
+    assert findings == []
+    assert chunks == []
