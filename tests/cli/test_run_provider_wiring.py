@@ -129,3 +129,57 @@ def test_run_reports_config_error_with_exit_code_2(
     )
     assert result.exit_code == 2
     assert "Ollama" in result.stdout or "model" in result.stdout.lower()
+
+
+def test_run_cli_flag_layout_aware_propagates_to_config(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Config] = {}
+
+    def _fake_make(cfg: Config) -> _StubProvider:
+        captured["config"] = cfg
+        return _StubProvider(model=cfg.model)
+
+    monkeypatch.setattr("kuroi.cli.run.make_provider", _fake_make)
+
+    pdf = make_pdf(["alice@example.com"])
+    out = tmp_path / "out.pdf"
+
+    result = CliRunner().invoke(
+        app, [*_common_args(pdf, out, tmp_path), "--layout-aware"]
+    )
+    assert result.exit_code == 0, result.stdout
+    assert captured["config"].layout_aware is True
+
+
+def test_run_no_layout_aware_flag_overrides_config_true(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cfg_dir = tmp_path / "cfg"
+    cfg_dir.mkdir()
+    (cfg_dir / "kuroi").mkdir()
+    (cfg_dir / "kuroi" / "config.toml").write_text(
+        "[prompt]\nlayout_aware = true\n"
+    )
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(cfg_dir))
+
+    captured: dict[str, Config] = {}
+
+    def _fake_make(cfg: Config) -> _StubProvider:
+        captured["config"] = cfg
+        return _StubProvider(model=cfg.model)
+
+    monkeypatch.setattr("kuroi.cli.run.make_provider", _fake_make)
+
+    pdf = make_pdf(["alice@example.com"])
+    out = tmp_path / "out.pdf"
+
+    result = CliRunner().invoke(
+        app, [*_common_args(pdf, out, tmp_path), "--no-layout-aware"]
+    )
+    assert result.exit_code == 0, result.stdout
+    assert captured["config"].layout_aware is False

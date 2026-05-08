@@ -115,6 +115,15 @@ def run(
         ),
         min=0,
     ),
+    layout_aware: bool | None = typer.Option(
+        None,
+        "--layout-aware/--no-layout-aware",
+        help=(
+            "Wrap the LLM prompt with PyMuPDF block tags so the model can "
+            "see paragraph and other layout boundaries. Default: off "
+            "(or set [prompt] layout_aware in config)."
+        ),
+    ),
 ) -> None:
     """Redact a PDF using rules and/or instructions, with verification gating."""
     if backup_dir is None:
@@ -167,6 +176,7 @@ def run(
                         retry_max=max_retries,
                         retry_backoff=retry_backoff,
                         retry_backoff_multiplier=retry_backoff_multiplier,
+                        layout_aware=layout_aware,
                     ),
                     env=os.environ,
                     file_path=xdg_config_home() / "kuroi" / "config.toml",
