@@ -87,6 +87,20 @@ class _IndexCounter:
         return n
 
 
+def _translate_indices(findings: list[Finding], item: _WorkItem) -> list[Finding]:
+    """Shift each finding's (start, end) into original-page coordinates.
+
+    For full-page items (word_range is None) findings are returned
+    unchanged. For sub-page items, add the slice's word_range[0] offset
+    to start and end. The page number is already correct because
+    `slice_page` preserves `Page.number`.
+    """
+    if item.word_range is None:
+        return findings
+    offset = item.word_range[0]
+    return [replace(f, start=f.start + offset, end=f.end + offset) for f in findings]
+
+
 def detect_redactions_chunked(
     provider: Provider,
     pages: tuple[Page, ...],
