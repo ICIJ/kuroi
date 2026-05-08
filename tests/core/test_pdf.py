@@ -328,7 +328,7 @@ def test_serialize_for_llm_default_no_block_tags() -> None:
     assert text == '<page n="1">\n[0]Hello [1]world [2]Other\n</page>'
 
 
-def _layout_pages() -> tuple[object, ...]:
+def _layout_pages() -> tuple["Page", ...]:
     from kuroi.core.pdf import Page, Word
 
     return (
