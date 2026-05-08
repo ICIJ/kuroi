@@ -183,3 +183,61 @@ def test_run_no_layout_aware_flag_overrides_config_true(
     )
     assert result.exit_code == 0, result.stdout
     assert captured["config"].layout_aware is False
+
+
+def test_run_layout_aware_flag_reaches_provider(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """End-to-end: --layout-aware on CLI causes the provider's detect_redactions
+    to be called with layout_aware=True."""
+    captured: dict[str, bool] = {}
+
+    class _SpyProvider:
+        name = "stub"
+
+        def __init__(self, model: str) -> None:
+            self.model = model
+
+        def detect_redactions(
+            self,
+            pages: Any,
+            llm_category_ids: Any,
+            *,
+            instructions: tuple[str, ...] = (),
+            seed: int | None = None,
+            attempt: int = 0,
+            layout_aware: bool = False,
+        ) -> tuple[list[Finding], list[Any]]:
+            from kuroi.core.audit_records import ChunkRecord
+
+            captured["layout_aware"] = layout_aware
+            return [], [
+                ChunkRecord(
+                    chunk_idx=0,
+                    pages=tuple(p.number for p in pages),
+                    temperature=0.0,
+                    seed_requested=None,
+                    seed_honored=False,
+                    system_fingerprint=None,
+                    prompt_sha256="a" * 64,
+                    response_sha256="b" * 64,
+                    tokens_in=1,
+                    tokens_out=1,
+                    duration_ms=1,
+                )
+            ]
+
+    monkeypatch.setattr(
+        "kuroi.cli.run.make_provider", lambda cfg: _SpyProvider(model=cfg.model)
+    )
+
+    pdf = make_pdf(["alice@example.com"])
+    out = tmp_path / "out.pdf"
+
+    result = CliRunner().invoke(
+        app, [*_common_args(pdf, out, tmp_path), "--layout-aware"]
+    )
+    assert result.exit_code == 0, result.stdout
+    assert captured["layout_aware"] is True

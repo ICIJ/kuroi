@@ -268,6 +268,7 @@ def run(
                     seed=seed,
                     pages_per_batch=effective_batch_size,
                     retry_policy=config.retry,
+                    layout_aware=config.layout_aware,
                     on_batch_start=_on_batch_start if batched_ui else None,
                     on_batch_complete=_on_batch_complete if batched_ui else None,
                 )
