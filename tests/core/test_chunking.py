@@ -660,3 +660,71 @@ def test_halve_two_page_item_yields_two_single_page_children() -> None:
 
     assert tuple(p.number for p in left.pages) == (1,)
     assert tuple(p.number for p in right.pages) == (2,)
+
+
+def _page_with_words(num: int, n_words: int) -> Page:
+    return Page(
+        number=num,
+        words=tuple(
+            Word(idx=i, text=f"w{i}", bbox=(float(i), 0.0, float(i + 1), 1.0))
+            for i in range(n_words)
+        ),
+    )
+
+
+def test_halve_single_page_produces_overlapping_halves() -> None:
+    """1000-word page with M=500, OVERLAP=50:
+    left  = words[0..550]   (sliced page has 550 words, idx 0..549)
+    right = words[450..1000] (sliced page has 550 words, idx 0..549)
+    Both word_ranges record the original-page coordinates.
+    """
+    from kuroi.core.chunking import _halve, OVERLAP_WORDS, _WorkItem
+
+    page = _page_with_words(num=3, n_words=1000)
+    item = _WorkItem.from_pages((page,))
+
+    left, right = _halve(item)
+
+    expected_mid = 500
+    assert left.word_range == (0, expected_mid + OVERLAP_WORDS)
+    assert right.word_range == (expected_mid - OVERLAP_WORDS, 1000)
+    # Both halves carry exactly one page (the sliced page).
+    assert len(left.pages) == 1 and len(right.pages) == 1
+    # Sliced pages preserve page.number
+    assert left.pages[0].number == 3
+    assert right.pages[0].number == 3
+    # Sliced word counts match the ranges
+    assert len(left.pages[0].words) == expected_mid + OVERLAP_WORDS
+    assert len(right.pages[0].words) == 1000 - (expected_mid - OVERLAP_WORDS)
+
+
+def test_halve_single_page_overlap_includes_original_text_at_boundary() -> None:
+    """The overlap zone (M-O .. M+O) must appear in the sliced text of both
+    halves, so a boundary-straddling entity survives in at least one."""
+    from kuroi.core.chunking import _halve, OVERLAP_WORDS, _WorkItem
+
+    page = _page_with_words(num=1, n_words=200)
+    item = _WorkItem.from_pages((page,))
+
+    left, right = _halve(item)
+
+    # Original M=100, OVERLAP=50, overlap zone is original words[50..150]
+    boundary_texts = {f"w{i}" for i in range(100 - OVERLAP_WORDS, 100 + OVERLAP_WORDS)}
+    left_texts = {w.text for w in left.pages[0].words}
+    right_texts = {w.text for w in right.pages[0].words}
+
+    assert boundary_texts.issubset(left_texts)
+    assert boundary_texts.issubset(right_texts)
+
+
+def test_halve_single_page_re_indexes_words_to_zero_base() -> None:
+    """The sliced page's Word.idx values restart at 0 in each child."""
+    from kuroi.core.chunking import _halve, _WorkItem
+
+    page = _page_with_words(num=1, n_words=300)
+    item = _WorkItem.from_pages((page,))
+
+    left, right = _halve(item)
+
+    assert left.pages[0].words[0].idx == 0
+    assert right.pages[0].words[0].idx == 0
