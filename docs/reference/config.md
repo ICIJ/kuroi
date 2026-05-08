@@ -23,6 +23,7 @@ The merged result is an immutable `Config` object defined in
 | `retry.max_retries`           | int      | `2`                           | `[retry]` table, `max_retries`         | `--max-retries`                | `KUROI_MAX_RETRIES`                |
 | `retry.backoff`               | float    | `2.0`                         | `[retry]` table, `backoff`             | `--retry-backoff`              | `KUROI_RETRY_BACKOFF`              |
 | `retry.backoff_multiplier`    | float    | `2.0`                         | `[retry]` table, `backoff_multiplier`  | `--retry-backoff-multiplier`   | `KUROI_RETRY_BACKOFF_MULTIPLIER`   |
+| `prompt.layout_aware`         | bool     | `false`                       | `[prompt]` table, `layout_aware`       | `--layout-aware` / `--no-layout-aware` | (none)                   |
 | `ANTHROPIC_API_KEY`           | string   | (unset)                       | (not in TOML)                          | (env only)                     | `ANTHROPIC_API_KEY`                |
 
 When the provider is `ollama`, there is no built-in default model — you
@@ -51,6 +52,9 @@ retention_hours = 24
 max_retries = 2
 backoff = 2.0
 backoff_multiplier = 2.0
+
+[prompt]
+layout_aware = false
 ```
 
 `kuroi setup` writes the top-level `provider`/`model` keys and the
@@ -77,6 +81,16 @@ Examples:
 
 Validation rules: `max_retries >= 0`, `backoff >= 0`,
 `backoff_multiplier >= 1.0`.
+
+## `[prompt]`
+
+Prompt-shaping options.
+
+| Key            | Type    | Default | Description                                                                 |
+|----------------|---------|---------|-----------------------------------------------------------------------------|
+| `layout_aware` | boolean | `false` | Wrap the LLM prompt with PyMuPDF block boundaries. See [Prompt tuning](../user-guide/prompt-tuning.md). |
+
+CLI flag override: `--layout-aware` / `--no-layout-aware`.
 
 ## Refreshing pricing
 
