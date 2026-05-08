@@ -88,6 +88,24 @@ def run(
         "--seed",
         help="Reproducibility seed. Best-effort per provider; recorded in audit.",
     ),
+    max_retries: int | None = typer.Option(
+        None,
+        "--max-retries",
+        help="Number of retries after the initial attempt. 0 disables retry. Overrides env and config.",
+        min=0,
+    ),
+    retry_backoff: float | None = typer.Option(
+        None,
+        "--retry-backoff",
+        help="Seconds before the first retry. Overrides env and config.",
+        min=0.0,
+    ),
+    retry_backoff_multiplier: float | None = typer.Option(
+        None,
+        "--retry-backoff-multiplier",
+        help="Each retry waits M x the previous delay. Must be >= 1.0. Overrides env and config.",
+        min=1.0,
+    ),
     pages_per_batch: int = typer.Option(
         0,
         "--pages-per-batch",
@@ -142,7 +160,14 @@ def run(
         with output_lock(final_output):
             try:
                 config = resolve_config(
-                    ConfigOverrides(provider=provider_name, model=model, ollama_url=ollama_url),
+                    ConfigOverrides(
+                        provider=provider_name,
+                        model=model,
+                        ollama_url=ollama_url,
+                        retry_max=max_retries,
+                        retry_backoff=retry_backoff,
+                        retry_backoff_multiplier=retry_backoff_multiplier,
+                    ),
                     env=os.environ,
                     file_path=xdg_config_home() / "kuroi" / "config.toml",
                 )
