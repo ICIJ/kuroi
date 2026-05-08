@@ -15,16 +15,12 @@ from collections.abc import Callable
 from dataclasses import replace
 
 from kuroi.core.audit_records import ChunkRecord
+from kuroi.core.config import RetryPolicy
 from kuroi.core.findings import Finding
 from kuroi.core.pdf import Page
 from kuroi.providers.base import Provider
 
 logger = logging.getLogger("kuroi.core.chunking")
-
-# One entry per retry. Length determines the retry count; the initial attempt
-# is implicit, so total attempts = len(RETRY_BACKOFFS_SECONDS) + 1.
-RETRY_BACKOFFS_SECONDS: tuple[float, ...] = (2.0, 4.0)
-MAX_ATTEMPTS = len(RETRY_BACKOFFS_SECONDS) + 1
 
 
 def _format_page_range(page_numbers: tuple[int, ...]) -> str:
@@ -40,7 +36,7 @@ class BatchError(Exception):
         self,
         batch_idx: int,
         page_numbers: tuple[int, ...],
-        attempts: int = MAX_ATTEMPTS,
+        attempts: int,
     ) -> None:
         self.batch_idx = batch_idx
         self.page_numbers = page_numbers
@@ -59,11 +55,15 @@ def detect_redactions_chunked(
     instructions: tuple[str, ...] = (),
     seed: int | None = None,
     pages_per_batch: int,
+    retry_policy: RetryPolicy,
     on_batch_start: Callable[[int, int, tuple[int, ...]], None] | None = None,
     on_batch_complete: Callable[[int, int, tuple[int, ...], ChunkRecord], None] | None = None,
 ) -> tuple[list[Finding], list[ChunkRecord]]:
     if pages_per_batch < 1:
         raise ValueError(f"pages_per_batch must be >= 1, got {pages_per_batch}")
+
+    schedule = retry_policy.schedule()
+    total_attempts = len(schedule) + 1
 
     total_batches = math.ceil(len(pages) / pages_per_batch)
     aggregate_findings: list[Finding] = []
@@ -79,7 +79,7 @@ def detect_redactions_chunked(
 
         findings: list[Finding] = []
         chunks: list[ChunkRecord] = []
-        for attempt in range(MAX_ATTEMPTS):
+        for attempt in range(total_attempts):
             findings, chunks = provider.detect_redactions(
                 batch,
                 llm_category_ids,
@@ -89,9 +89,9 @@ def detect_redactions_chunked(
             )
             if chunks:
                 break
-            if attempt + 1 >= MAX_ATTEMPTS:
-                raise BatchError(batch_idx, page_numbers, attempts=MAX_ATTEMPTS)
-            backoff = RETRY_BACKOFFS_SECONDS[attempt]
+            if attempt + 1 >= total_attempts:
+                raise BatchError(batch_idx, page_numbers, attempts=total_attempts)
+            backoff = schedule[attempt]
             logger.info(
                 "retrying batch %d/%d (pages %s) in %.0fs (attempt %d/%d)",
                 batch_idx + 1,
@@ -99,7 +99,7 @@ def detect_redactions_chunked(
                 _format_page_range(page_numbers),
                 backoff,
                 attempt + 2,
-                MAX_ATTEMPTS,
+                total_attempts,
             )
             time.sleep(backoff)
 
