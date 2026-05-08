@@ -28,6 +28,7 @@ class _StubProvider:
         instructions: tuple[str, ...] = (),
         seed: int | None = None,
         attempt: int = 0,
+        layout_aware: bool = False,
     ) -> tuple[list[Finding], list[Any]]:
         from kuroi.core.audit_records import ChunkRecord
 

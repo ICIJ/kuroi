@@ -249,6 +249,7 @@ def detect_redactions_chunked(
     seed: int | None = None,
     pages_per_batch: int,
     retry_policy: RetryPolicy,
+    layout_aware: bool = False,
     on_batch_start: Callable[[int, int, tuple[int, ...]], None] | None = None,
     on_batch_complete: Callable[[int, int, tuple[int, ...], ChunkRecord], None] | None = None,
 ) -> tuple[list[Finding], list[ChunkRecord]]:
@@ -280,6 +281,7 @@ def detect_redactions_chunked(
                 counter=counter,
                 batch_idx=batch_idx,
                 subdivision_level=0,
+                layout_aware=layout_aware,
             )
         except BatchError as exc:
             # _halve raised at floor with batch_idx=0/attempts=0; replace
@@ -311,6 +313,7 @@ def _try_with_retries(
     seed: int | None,
     retry_policy: RetryPolicy,
     batch_idx: int,
+    layout_aware: bool,
 ) -> tuple[list[Finding], list[ChunkRecord]]:
     """Run the configured retry loop for a single work item.
 
@@ -330,6 +333,7 @@ def _try_with_retries(
             instructions=instructions,
             seed=seed,
             attempt=attempt,
+            layout_aware=layout_aware,
         )
         if chunks:
             assert len(chunks) == 1, (
@@ -363,6 +367,7 @@ def _try_or_subdivide(
     counter: _IndexCounter,
     batch_idx: int,
     subdivision_level: int,
+    layout_aware: bool,
 ) -> tuple[list[Finding], list[ChunkRecord]]:
     """Try a work item; on full-retry failure, subdivide and recurse.
 
@@ -381,6 +386,7 @@ def _try_or_subdivide(
         seed=seed,
         retry_policy=retry_policy,
         batch_idx=batch_idx,
+        layout_aware=layout_aware,
     )
     if chunks:
         translated = _translate_indices(findings, item)
@@ -419,6 +425,7 @@ def _try_or_subdivide(
             counter=counter,
             batch_idx=batch_idx,
             subdivision_level=subdivision_level + 1,
+            layout_aware=layout_aware,
         )
         out_f.extend(f)
         out_c.extend(c)

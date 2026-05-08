@@ -485,6 +485,7 @@ def test_run_instruct_flag_passes_instruction_to_provider(
         instructions: Any = (),
         seed: Any = None,
         attempt: int = 0,
+        layout_aware: bool = False,
     ) -> Any:
         from kuroi.core.audit_records import ChunkRecord
 
@@ -572,6 +573,7 @@ def test_run_both_rules_and_instruct_run_together(
         instructions: Any = (),
         seed: Any = None,
         attempt: int = 0,
+        layout_aware: bool = False,
     ) -> Any:
         from kuroi.core.audit_records import ChunkRecord
 
@@ -858,6 +860,7 @@ def test_run_with_pages_per_batch_invokes_orchestrator(
         instructions: tuple[str, ...] = (),
         seed: int | None = None,
         attempt: int = 0,
+        layout_aware: bool = False,
     ) -> tuple[list[Any], list[Any]]:
         from kuroi.core.audit_records import ChunkRecord
 
@@ -922,6 +925,7 @@ def test_run_with_pages_per_batch_prints_progress_per_batch(
         instructions: tuple[str, ...] = (),
         seed: int | None = None,
         attempt: int = 0,
+        layout_aware: bool = False,
     ) -> tuple[list[Any], list[Any]]:
         from kuroi.core.audit_records import ChunkRecord
 
@@ -987,6 +991,7 @@ def test_run_with_pages_per_batch_aborts_on_batch_error(
         instructions: tuple[str, ...] = (),
         seed: int | None = None,
         attempt: int = 0,
+        layout_aware: bool = False,
     ) -> tuple[list[Any], list[Any]]:
         return [], []  # hard failure on every call
 
@@ -1102,6 +1107,7 @@ def test_run_max_retries_zero_disables_retry(
         instructions: tuple[str, ...] = (),
         seed: int | None = None,
         attempt: int = 0,
+        layout_aware: bool = False,
     ) -> tuple[list[Any], list[Any]]:
         call_count["n"] += 1
         return [], []  # hard failure
