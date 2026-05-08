@@ -277,9 +277,7 @@ def _read_layout_aware(
     """
     prompt_table = file_data.get("prompt", {})
     if not isinstance(prompt_table, dict):
-        raise ConfigError(
-            f"Expected table for `prompt`, got {type(prompt_table).__name__}"
-        )
+        raise ConfigError(f"Expected table for `prompt`, got {type(prompt_table).__name__}")
 
     layout_aware: bool = False
     if "layout_aware" in prompt_table:

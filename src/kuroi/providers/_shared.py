@@ -29,7 +29,7 @@ SYSTEM_PROMPT = (
 
 LAYOUT_AWARE_INSTRUCTIONS = (
     "\n\n"
-    "The page content is organized into <block id=\"N\">...</block> sections "
+    'The page content is organized into <block id="N">...</block> sections '
     "corresponding to layout-detected paragraphs and other typographic units. "
     "Use the block boundaries as context to disambiguate which words refer to "
     "the same entity (e.g. a field label vs its value), but report findings "

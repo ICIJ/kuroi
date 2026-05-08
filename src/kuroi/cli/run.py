@@ -257,8 +257,7 @@ def run(
                 extra = ""
                 if config.layout_aware:
                     block_total = sum(
-                        len({w.block_id for w in pages[pn - 1].words})
-                        for pn in page_numbers
+                        len({w.block_id for w in pages[pn - 1].words}) for pn in page_numbers
                     )
                     extra = f" blocks={block_total}"
                 console.print(

@@ -169,8 +169,7 @@ class OllamaProvider:
 
         if not isinstance(content, str):
             logger.warning(
-                "ollama envelope missing message.content (will subdivide); got "
-                "envelope keys: %r",
+                "ollama envelope missing message.content (will subdivide); got envelope keys: %r",
                 list(envelope.keys()) if isinstance(envelope, dict) else type(envelope),
             )
             return [], []

@@ -93,7 +93,9 @@ class AnthropicProvider:
         attempt: int = 0,
         layout_aware: bool = False,
     ) -> tuple[list[Finding], list[ChunkRecord]]:
-        del attempt  # accepted for Provider protocol compliance; Anthropic SDK has its own retry/timeout
+        del (
+            attempt
+        )  # accepted for Provider protocol compliance; Anthropic SDK has its own retry/timeout
         if not llm_category_ids and not instructions:
             return [], []
         user_prompt = build_user_prompt(

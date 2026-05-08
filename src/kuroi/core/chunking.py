@@ -60,8 +60,8 @@ class BatchError(Exception):
         self.last_failed_word_range = last_failed_word_range
         self.last_prompt_chars = last_prompt_chars
         if subdivision_levels > 0 and last_failed_word_range is not None:
-            page_label = page_numbers[0] if len(page_numbers) == 1 else _format_page_range(
-                page_numbers
+            page_label = (
+                page_numbers[0] if len(page_numbers) == 1 else _format_page_range(page_numbers)
             )
             start, end = last_failed_word_range
             n_words = end - start
@@ -170,9 +170,7 @@ def _dedupe(findings: list[Finding]) -> list[Finding]:
             out.append(f)
             continue
         existing = out[existing_idx]
-        if _CONFIDENCE_RANK.get(f.confidence, 0) > _CONFIDENCE_RANK.get(
-            existing.confidence, 0
-        ):
+        if _CONFIDENCE_RANK.get(f.confidence, 0) > _CONFIDENCE_RANK.get(existing.confidence, 0):
             out[existing_idx] = f
     return out
 
@@ -337,8 +335,7 @@ def _try_with_retries(
         )
         if chunks:
             assert len(chunks) == 1, (
-                f"providers must return exactly one ChunkRecord per call, "
-                f"got {len(chunks)}"
+                f"providers must return exactly one ChunkRecord per call, got {len(chunks)}"
             )
             return findings, chunks
         if attempt + 1 >= total_attempts:
@@ -391,8 +388,7 @@ def _try_or_subdivide(
     if chunks:
         translated = _translate_indices(findings, item)
         renumbered = [
-            replace(c, chunk_idx=counter.next(), page_word_range=item.word_range)
-            for c in chunks
+            replace(c, chunk_idx=counter.next(), page_word_range=item.word_range) for c in chunks
         ]
         return translated, renumbered
 
