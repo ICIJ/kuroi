@@ -255,12 +255,10 @@ def detect_redactions_chunked(
     if pages_per_batch < 1:
         raise ValueError(f"pages_per_batch must be >= 1, got {pages_per_batch}")
 
-    schedule = retry_policy.schedule()
-    total_attempts = len(schedule) + 1
-
     total_batches = math.ceil(len(pages) / pages_per_batch)
     aggregate_findings: list[Finding] = []
     aggregate_chunks: list[ChunkRecord] = []
+    counter = _IndexCounter()
 
     for batch_idx in range(total_batches):
         offset = batch_idx * pages_per_batch
@@ -270,41 +268,159 @@ def detect_redactions_chunked(
         if on_batch_start is not None:
             on_batch_start(batch_idx, total_batches, page_numbers)
 
-        findings: list[Finding] = []
-        chunks: list[ChunkRecord] = []
-        for attempt in range(total_attempts):
-            findings, chunks = provider.detect_redactions(
-                batch,
+        item = _WorkItem.from_pages(batch)
+        try:
+            findings, chunks = _try_or_subdivide(
+                item,
+                provider,
                 llm_category_ids,
                 instructions=instructions,
                 seed=seed,
-                attempt=attempt,
+                retry_policy=retry_policy,
+                counter=counter,
+                batch_idx=batch_idx,
+                subdivision_level=0,
             )
-            if chunks:
-                break
-            if attempt + 1 >= total_attempts:
-                raise BatchError(batch_idx, page_numbers, attempts=total_attempts)
-            backoff = schedule[attempt]
-            logger.info(
-                "retrying batch %d/%d (pages %s) in %.0fs (attempt %d/%d)",
-                batch_idx + 1,
-                total_batches,
-                _format_page_range(page_numbers),
-                backoff,
-                attempt + 2,
-                total_attempts,
-            )
-            time.sleep(backoff)
+        except BatchError as exc:
+            # _halve raised at floor with batch_idx=0/attempts=0; replace
+            # those with the real values from this top-level batch.
+            raise BatchError(
+                batch_idx=batch_idx,
+                page_numbers=exc.page_numbers,
+                attempts=len(retry_policy.schedule()) + 1,
+                subdivision_levels=exc.subdivision_levels,
+                last_failed_word_range=exc.last_failed_word_range,
+                last_prompt_chars=exc.last_prompt_chars,
+            ) from exc
 
-        renumbered = [replace(c, chunk_idx=batch_idx) for c in chunks]
         aggregate_findings.extend(findings)
-        aggregate_chunks.extend(renumbered)
+        aggregate_chunks.extend(chunks)
 
-        if renumbered:
-            assert len(renumbered) == 1, (
-                f"providers must return exactly one ChunkRecord per call, got {len(renumbered)}"
-            )
-        if on_batch_complete is not None and renumbered:
-            on_batch_complete(batch_idx, total_batches, page_numbers, renumbered[0])
+        if on_batch_complete is not None and chunks:
+            on_batch_complete(batch_idx, total_batches, page_numbers, chunks[-1])
 
     return aggregate_findings, aggregate_chunks
+
+
+def _try_with_retries(
+    item: _WorkItem,
+    provider: Provider,
+    llm_category_ids: tuple[str, ...],
+    *,
+    instructions: tuple[str, ...],
+    seed: int | None,
+    retry_policy: RetryPolicy,
+    batch_idx: int,
+) -> tuple[list[Finding], list[ChunkRecord]]:
+    """Run the configured retry loop for a single work item.
+
+    Returns whatever the provider returns on the last successful call
+    (chunks non-empty), or `[], []` if every attempt produced empty
+    chunks. The caller (`_try_or_subdivide`) decides what to do with
+    `[], []` — that's the "subdivide" signal.
+    """
+    schedule = retry_policy.schedule()
+    total_attempts = len(schedule) + 1
+    page_numbers = tuple(p.number for p in item.pages)
+
+    for attempt in range(total_attempts):
+        findings, chunks = provider.detect_redactions(
+            item.pages,
+            llm_category_ids,
+            instructions=instructions,
+            seed=seed,
+            attempt=attempt,
+        )
+        if chunks:
+            assert len(chunks) == 1, (
+                f"providers must return exactly one ChunkRecord per call, "
+                f"got {len(chunks)}"
+            )
+            return findings, chunks
+        if attempt + 1 >= total_attempts:
+            return [], []
+        backoff = schedule[attempt]
+        logger.info(
+            "retrying batch %d (pages %s) in %.0fs (attempt %d/%d)",
+            batch_idx + 1,
+            _format_page_range(page_numbers),
+            backoff,
+            attempt + 2,
+            total_attempts,
+        )
+        time.sleep(backoff)
+    return [], []
+
+
+def _try_or_subdivide(
+    item: _WorkItem,
+    provider: Provider,
+    llm_category_ids: tuple[str, ...],
+    *,
+    instructions: tuple[str, ...],
+    seed: int | None,
+    retry_policy: RetryPolicy,
+    counter: _IndexCounter,
+    batch_idx: int,
+    subdivision_level: int,
+) -> tuple[list[Finding], list[ChunkRecord]]:
+    """Try a work item; on full-retry failure, subdivide and recurse.
+
+    Subdivision is *post-retry*: transient flakes get the full retry
+    budget at every recursion level. Only after retries are exhausted
+    do we conclude "this batch is too big" and split.
+
+    Each recursive call increments subdivision_level so a floor-failed
+    BatchError can report the depth at which it bottomed out.
+    """
+    findings, chunks = _try_with_retries(
+        item,
+        provider,
+        llm_category_ids,
+        instructions=instructions,
+        seed=seed,
+        retry_policy=retry_policy,
+        batch_idx=batch_idx,
+    )
+    if chunks:
+        translated = _translate_indices(findings, item)
+        renumbered = [
+            replace(c, chunk_idx=counter.next(), page_word_range=item.word_range)
+            for c in chunks
+        ]
+        return translated, renumbered
+
+    # Empty chunks → subdivide. _halve raises BatchError at the floor.
+    try:
+        left, right = _halve(item)
+    except BatchError as exc:
+        # Annotate the floor-raised error with the recursion depth that
+        # got us here. last_failed_word_range and last_prompt_chars are
+        # already set by _halve; we add the level count.
+        raise BatchError(
+            batch_idx=exc.batch_idx,
+            page_numbers=exc.page_numbers,
+            attempts=exc.attempts,
+            subdivision_levels=subdivision_level + 1,
+            last_failed_word_range=exc.last_failed_word_range,
+            last_prompt_chars=exc.last_prompt_chars,
+        ) from exc
+
+    out_f: list[Finding] = []
+    out_c: list[ChunkRecord] = []
+    for child in (left, right):
+        f, c = _try_or_subdivide(
+            child,
+            provider,
+            llm_category_ids,
+            instructions=instructions,
+            seed=seed,
+            retry_policy=retry_policy,
+            counter=counter,
+            batch_idx=batch_idx,
+            subdivision_level=subdivision_level + 1,
+        )
+        out_f.extend(f)
+        out_c.extend(c)
+
+    return _dedupe(out_f), out_c
