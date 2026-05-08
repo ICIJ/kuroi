@@ -615,3 +615,48 @@ def test_dedupe_preserves_order_of_first_seen() -> None:
     out = _dedupe([f1, f2, f3])
 
     assert [(f.start, f.kind) for f in out] == [(0, "a"), (1, "b")]
+
+
+# ---------------------------------------------------------------------------
+# _halve tests
+# ---------------------------------------------------------------------------
+
+
+def test_halve_splits_multi_page_item_evenly() -> None:
+    """4 pages → [[p1,p2], [p3,p4]]. Both children have word_range=None."""
+    from kuroi.core.chunking import _halve, _WorkItem
+
+    pages = tuple(_page(i) for i in range(1, 5))
+    item = _WorkItem.from_pages(pages)
+
+    left, right = _halve(item)
+
+    assert tuple(p.number for p in left.pages) == (1, 2)
+    assert tuple(p.number for p in right.pages) == (3, 4)
+    assert left.word_range is None
+    assert right.word_range is None
+
+
+def test_halve_splits_multi_page_item_with_odd_count() -> None:
+    """3 pages → [[p1], [p2,p3]]. Left half is the smaller half."""
+    from kuroi.core.chunking import _halve, _WorkItem
+
+    pages = (_page(1), _page(2), _page(3))
+    item = _WorkItem.from_pages(pages)
+
+    left, right = _halve(item)
+
+    assert tuple(p.number for p in left.pages) == (1,)
+    assert tuple(p.number for p in right.pages) == (2, 3)
+
+
+def test_halve_two_page_item_yields_two_single_page_children() -> None:
+    """2 pages is the smallest multi-page case: → [[p1], [p2]]."""
+    from kuroi.core.chunking import _halve, _WorkItem
+
+    item = _WorkItem.from_pages((_page(1), _page(2)))
+
+    left, right = _halve(item)
+
+    assert tuple(p.number for p in left.pages) == (1,)
+    assert tuple(p.number for p in right.pages) == (2,)

@@ -22,6 +22,9 @@ from kuroi.providers.base import Provider
 
 logger = logging.getLogger("kuroi.core.chunking")
 
+MIN_CHUNK_WORDS = 50
+OVERLAP_WORDS = 50
+
 
 def _format_page_range(page_numbers: tuple[int, ...]) -> str:
     if len(page_numbers) > 1:
@@ -132,6 +135,24 @@ def _dedupe(findings: list[Finding]) -> list[Finding]:
         ):
             out[existing_idx] = f
     return out
+
+
+def _halve(item: _WorkItem) -> tuple[_WorkItem, _WorkItem]:
+    """Split a work item into two children for subdivision retry.
+
+    Multi-page batches split by pages: `[p1, p2, p3, p4]` →
+    `([p1, p2], [p3, p4])`. No overlap between halves — page boundaries
+    are already meaningful boundaries in the document, so no entity can
+    straddle them.
+
+    Single-page and floor cases will be added in subsequent tasks.
+    """
+    if len(item.pages) >= 2:
+        mid = len(item.pages) // 2
+        left = _WorkItem.from_pages(item.pages[:mid])
+        right = _WorkItem.from_pages(item.pages[mid:])
+        return left, right
+    raise NotImplementedError("single-page and floor cases come in Tasks 10–11")
 
 
 def detect_redactions_chunked(
