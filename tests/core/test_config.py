@@ -331,3 +331,15 @@ def test_retry_policy_is_frozen() -> None:
     policy = RetryPolicy(max_retries=2, backoff=2.0, backoff_multiplier=2.0)
     with pytest.raises(FrozenInstanceError):
         policy.max_retries = 5  # type: ignore[misc]
+
+
+def test_config_retry_defaults_to_default_policy(tmp_path: Path) -> None:
+    cfg = resolve_config(ConfigOverrides(), env={}, file_path=tmp_path / "missing.toml")
+    assert cfg.retry == DEFAULT_RETRY_POLICY
+
+
+def test_config_overrides_retry_fields_default_to_none() -> None:
+    overrides = ConfigOverrides()
+    assert overrides.retry_max is None
+    assert overrides.retry_backoff is None
+    assert overrides.retry_backoff_multiplier is None
