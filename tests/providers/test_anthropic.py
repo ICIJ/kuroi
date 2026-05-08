@@ -309,3 +309,56 @@ def test_anthropic_warns_on_non_json_response(caplog: pytest.LogCaptureFixture) 
     assert findings == []
     warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
     assert any("non-json" in m.lower() or "json" in m.lower() for m in warnings)
+
+
+def test_anthropic_prompt_too_long_returns_empty_to_signal_subdivide(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A 'prompt is too long' BadRequestError is caught and translated to
+    the chunker's subdivide signal: empty findings AND empty chunks."""
+    import anthropic
+
+    client = MagicMock()
+    err = anthropic.BadRequestError(
+        message="prompt is too long: 250000 tokens > 200000 maximum",
+        response=MagicMock(),
+        body={
+            "error": {
+                "type": "invalid_request_error",
+                "message": "prompt is too long: 250000 tokens > 200000 maximum",
+            }
+        },
+    )
+    client.messages.create.side_effect = err
+    provider = AnthropicProvider(model="claude-opus-4-7", client=client)
+
+    with caplog.at_level(logging.WARNING, logger="kuroi.providers.anthropic"):
+        findings, chunks = provider.detect_redactions(_one_page(), ("person_name",))
+
+    assert findings == []
+    assert chunks == []
+    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("prompt" in m.lower() and "too long" in m.lower() for m in warnings)
+
+
+def test_anthropic_other_bad_request_errors_still_raise() -> None:
+    """Non-size BadRequestErrors (malformed schema, unknown model, etc.)
+    are real bugs; subdivision won't help, so they keep propagating."""
+    import anthropic
+
+    client = MagicMock()
+    err = anthropic.BadRequestError(
+        message="model: unknown-model is not a recognized model",
+        response=MagicMock(),
+        body={
+            "error": {
+                "type": "invalid_request_error",
+                "message": "model: unknown-model is not a recognized model",
+            }
+        },
+    )
+    client.messages.create.side_effect = err
+    provider = AnthropicProvider(model="unknown-model", client=client)
+
+    with pytest.raises(anthropic.BadRequestError):
+        provider.detect_redactions(_one_page(), ("person_name",))

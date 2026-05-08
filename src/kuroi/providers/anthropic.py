@@ -24,6 +24,28 @@ from kuroi.providers._shared import (
 
 __all__ = ["AnthropicProvider", "build_user_prompt", "parse_findings_payload"]
 
+
+def _is_prompt_too_long(exc: object) -> bool:
+    """True iff an Anthropic BadRequestError signals an oversized prompt.
+
+    The SDK exposes the structured body on `exc.body`. We match on
+    error.type == "invalid_request_error" *and* the substring
+    "prompt is too long" anywhere in the message — narrower than catching
+    every 400, which would swallow real misconfiguration (unknown model,
+    malformed schema, etc.).
+    """
+    body = getattr(exc, "body", None)
+    if not isinstance(body, dict):
+        return False
+    error = body.get("error")
+    if not isinstance(error, dict):
+        return False
+    if error.get("type") != "invalid_request_error":
+        return False
+    message = error.get("message", "")
+    return isinstance(message, str) and "prompt is too long" in message.lower()
+
+
 logger = logging.getLogger("kuroi.providers.anthropic")
 
 # claude-opus-4-x and newer extended-thinking models reject temperature
@@ -88,14 +110,25 @@ class AnthropicProvider:
             user_prompt,
         )
 
+        import anthropic  # local import to keep optional at module load
+
         started = time.monotonic()
-        response = self._client.messages.create(
-            model=self.model,
-            max_tokens=self._max_tokens,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_prompt}],
-            **extra,
-        )
+        try:
+            response = self._client.messages.create(
+                model=self.model,
+                max_tokens=self._max_tokens,
+                system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_prompt}],
+                **extra,
+            )
+        except anthropic.BadRequestError as exc:
+            if _is_prompt_too_long(exc):
+                logger.warning(
+                    "anthropic rejected prompt as too long (will subdivide): %s",
+                    exc,
+                )
+                return [], []
+            raise
         duration_ms = int((time.monotonic() - started) * 1000)
 
         text = "".join(block.text for block in response.content if hasattr(block, "text"))
