@@ -58,6 +58,7 @@ class _RecordingProvider:
         instructions: tuple[str, ...] = (),
         seed: int | None = None,
         attempt: int = 0,
+        layout_aware: bool = False,
     ) -> tuple[list[Finding], list[ChunkRecord]]:
         self.calls.append(pages)
         self.attempts.append(attempt)
@@ -163,6 +164,7 @@ def test_chunked_call_forwards_categories_instructions_and_seed() -> None:
             instructions: tuple[str, ...] = (),
             seed: int | None = None,
             attempt: int = 0,
+            layout_aware: bool = False,
         ) -> tuple[list[Finding], list[ChunkRecord]]:
             self.last_kwargs = {
                 "llm_category_ids": llm_category_ids,
@@ -829,3 +831,56 @@ def test_batch_error_legacy_message_for_multi_page_failure() -> None:
 
     msg = str(err)
     assert msg == "Batch 4 (pages 13–15) failed 3 times and was aborted."  # noqa: RUF001
+
+
+def test_chunked_call_forwards_layout_aware_to_provider() -> None:
+    from kuroi.core.chunking import detect_redactions_chunked
+
+    received: list[bool] = []
+
+    class _LayoutRecordingProvider:
+        name = "recording"
+        model = "test"
+
+        def detect_redactions(
+            self,
+            pages: tuple[Page, ...],
+            llm_category_ids: tuple[str, ...],
+            *,
+            instructions: tuple[str, ...] = (),
+            seed: int | None = None,
+            attempt: int = 0,
+            layout_aware: bool = False,
+        ) -> tuple[list[Finding], list[ChunkRecord]]:
+            received.append(layout_aware)
+            return [], [
+                ChunkRecord(
+                    chunk_idx=0,
+                    pages=tuple(p.number for p in pages),
+                    temperature=0.0,
+                    seed_requested=None,
+                    seed_honored=False,
+                    system_fingerprint=None,
+                    prompt_sha256="x",
+                    response_sha256="y",
+                    tokens_in=1,
+                    tokens_out=1,
+                    duration_ms=1,
+                )
+            ]
+
+    pages = (
+        Page(number=1, words=(Word(idx=0, text="a", bbox=(0, 0, 1, 1)),)),
+        Page(number=2, words=(Word(idx=0, text="b", bbox=(0, 0, 1, 1)),)),
+    )
+
+    detect_redactions_chunked(
+        _LayoutRecordingProvider(),
+        pages,
+        ("k",),
+        pages_per_batch=1,
+        retry_policy=RetryPolicy(max_retries=0, backoff=0.0, backoff_multiplier=2.0),
+        layout_aware=True,
+    )
+
+    assert received == [True, True]
