@@ -133,3 +133,16 @@ attempt. Two knobs help:
 Run with `-v` to see per-attempt logs (`retrying batch 3/12 (pages 9–12)
 in 4s (attempt 2/3)`) and the upstream WARNINGs that triggered the
 retry.
+
+## "Could not be processed even after subdividing"
+
+Hitting a `BatchError: page N (M words) could not be processed even
+after subdividing to the minimum chunk size`? The active model can't
+handle even a small slice of that page.
+
+- Try a model with a larger context window (Anthropic Sonnet/Opus,
+  larger Ollama models).
+- For Ollama, raise `--max-retries` to give a slow deployment more
+  per-attempt wall clock — the timeout grows linearly with attempt
+  number (120s × (attempt + 1)), so `--max-retries 5` extends the
+  per-attempt budget to 720s.
