@@ -166,22 +166,27 @@ class OllamaProvider:
 
         if not isinstance(content, str):
             logger.warning(
-                "ollama envelope missing message.content; got envelope keys: %r",
+                "ollama envelope missing message.content (will subdivide); got "
+                "envelope keys: %r",
                 list(envelope.keys()) if isinstance(envelope, dict) else type(envelope),
             )
-            return [], [chunk]
+            return [], []
         try:
             payload = json.loads(content)
         except json.JSONDecodeError as exc:
             logger.warning(
-                "ollama returned non-JSON content despite format=json (%s). First 500 chars: %r",
+                "ollama returned non-JSON content despite format=json (will "
+                "subdivide; %s). First 500 chars: %r",
                 exc,
                 content[:500],
             )
-            return [], [chunk]
+            return [], []
         if not isinstance(payload, dict):
-            logger.warning("ollama JSON payload is not an object (got %s)", type(payload).__name__)
-            return [], [chunk]
+            logger.warning(
+                "ollama JSON payload is not an object (will subdivide; got %s)",
+                type(payload).__name__,
+            )
+            return [], []
 
         source = "instruction" if not llm_category_ids else "llm"
         return parse_findings_payload(payload, pages, source=source), [chunk]
