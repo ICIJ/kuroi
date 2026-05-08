@@ -72,6 +72,7 @@ def extract_word_index(pdf_path: Path) -> ExtractionResult:
                     idx=i,
                     text=str(w[4]),
                     bbox=(float(w[0]), float(w[1]), float(w[2]), float(w[3])),
+                    block_id=int(w[5]),
                 )
                 for i, w in enumerate(raw)
             )
