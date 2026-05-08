@@ -490,3 +490,57 @@ def test_index_counter_independent_instances() -> None:
     a.next()
     a.next()
     assert b.next() == 0  # b is unaffected by a
+
+
+# ---------------------------------------------------------------------------
+# _translate_indices tests
+# ---------------------------------------------------------------------------
+
+
+def test_translate_indices_passthrough_for_full_page_item() -> None:
+    """word_range=None: findings are returned unchanged."""
+    from kuroi.core.chunking import _translate_indices, _WorkItem
+
+    item = _WorkItem.from_pages((_page(5),))
+    inputs = [
+        Finding(page=5, start=3, end=4, kind="x", confidence="high", source="llm"),
+    ]
+
+    out = _translate_indices(inputs, item)
+
+    assert out == inputs
+
+
+def test_translate_indices_shifts_start_and_end_by_word_range_offset() -> None:
+    """Sub-page slice with offset 200: the model returned (start=3, end=5);
+    the original-page position is (start=203, end=205)."""
+    from kuroi.core.chunking import _translate_indices, _WorkItem
+
+    item = _WorkItem(pages=(_page(5),), word_range=(200, 400))
+    inputs = [
+        Finding(page=5, start=3, end=5, kind="x", confidence="high", source="llm"),
+        Finding(page=5, start=10, end=10, kind="y", confidence="medium", source="llm"),
+    ]
+
+    out = _translate_indices(inputs, item)
+
+    assert [(f.start, f.end) for f in out] == [(203, 205), (210, 210)]
+    # Other fields unchanged
+    assert out[0].kind == "x"
+    assert out[0].confidence == "high"
+    assert out[1].source == "llm"
+
+
+def test_translate_indices_preserves_page_number() -> None:
+    """The page field is already correct because slice_page preserves
+    page.number; the helper must not touch it."""
+    from kuroi.core.chunking import _translate_indices, _WorkItem
+
+    item = _WorkItem(pages=(_page(7),), word_range=(100, 200))
+    inputs = [
+        Finding(page=7, start=0, end=1, kind="x", confidence="high", source="llm"),
+    ]
+
+    out = _translate_indices(inputs, item)
+
+    assert out[0].page == 7
