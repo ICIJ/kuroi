@@ -1019,7 +1019,10 @@ def test_run_with_pages_per_batch_aborts_on_batch_error(
     from kuroi.core.config import DEFAULT_RETRY_POLICY
 
     expected_attempts = DEFAULT_RETRY_POLICY.max_retries + 1
-    assert f"failed {expected_attempts} times" in result.stdout
+    # Single-word page hits the _halve floor immediately, so the
+    # subdivision-aware message format is used.
+    assert f"attempts={expected_attempts}" in result.stdout
+    assert "could not be processed" in result.stdout
     assert "smaller --pages-per-batch" in result.stdout
 
 
@@ -1073,7 +1076,10 @@ def test_run_max_retries_zero_disables_retry(
 
     assert result.exit_code == 1
     assert call_count["n"] == 1  # exactly one provider call, no retry
-    assert "failed 1 times" in result.stdout
+    # Single-word page hits the _halve floor immediately, so the
+    # subdivision-aware message format is used (attempts=1).
+    assert "attempts=1" in result.stdout
+    assert "could not be processed" in result.stdout
 
 
 def test_run_default_path_uses_orchestrator_with_default_policy(

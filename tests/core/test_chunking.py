@@ -212,6 +212,21 @@ def test_chunked_call_renumbers_chunk_idx_to_batch_position() -> None:
     assert [c.pages for c in chunks] == [(1, 2), (3, 4), (5, 6)]
 
 
+def test_chunked_call_emits_page_word_range_none_for_full_page_batches() -> None:
+    """Full-page calls record page_word_range=None — no false 'subdivided'
+    signals in the audit log when the run was healthy."""
+    from kuroi.core.chunking import detect_redactions_chunked
+
+    pages = (_page(1), _page(2))
+    provider = _RecordingProvider(scripts=[([], [_chunk((1,))]), ([], [_chunk((2,))])])
+
+    _, chunks = detect_redactions_chunked(
+        provider, pages, ("x",), pages_per_batch=1, retry_policy=DEFAULT_RETRY_POLICY
+    )
+
+    assert all(c.page_word_range is None for c in chunks)
+
+
 def test_chunked_call_retries_on_hard_failure_until_success(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -247,7 +262,9 @@ def test_chunked_call_retries_on_hard_failure_until_success(
 def test_chunked_call_aborts_after_max_attempts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """`policy.max_retries + 1` consecutive hard failures raise BatchError."""
+    """`policy.max_retries + 1` consecutive hard failures on a batch that
+    cannot be subdivided (single 1-word page hits the _halve floor on the
+    first split) raise BatchError."""
     from kuroi.core.chunking import BatchError, detect_redactions_chunked
 
     monkeypatch.setattr("kuroi.core.chunking.time.sleep", lambda _: None)
@@ -255,24 +272,22 @@ def test_chunked_call_aborts_after_max_attempts(
     policy = RetryPolicy(max_retries=2, backoff=2.0, backoff_multiplier=2.0)
     total_attempts = policy.max_retries + 1
 
-    pages = tuple(_page(i) for i in range(1, 5))  # batch_idx=1 will fail
+    pages = (_page(1), _page(2))  # batch_idx=1 will fail
     provider = _RecordingProvider(
         scripts=[
-            ([], [_chunk((1, 2))]),  # batch 0 ok
+            ([], [_chunk((1,))]),  # batch 0 ok
             *[([], []) for _ in range(total_attempts)],  # batch 1: every attempt hard-fails
         ]
     )
 
     with pytest.raises(BatchError) as excinfo:
         detect_redactions_chunked(
-            provider, pages, ("x",), pages_per_batch=2, retry_policy=policy
+            provider, pages, ("x",), pages_per_batch=1, retry_policy=policy
         )
 
     assert excinfo.value.batch_idx == 1
-    assert excinfo.value.page_numbers == (3, 4)
+    assert excinfo.value.page_numbers == (2,)
     assert excinfo.value.attempts == total_attempts
-    assert f"failed {total_attempts} times" in str(excinfo.value)
-    assert "pages 3" in str(excinfo.value) and "4" in str(excinfo.value)
 
 
 def test_chunked_call_uses_policy_schedule_between_retries(
@@ -384,7 +399,9 @@ def test_on_batch_complete_does_not_fire_on_hard_failure(
     policy = RetryPolicy(max_retries=2, backoff=2.0, backoff_multiplier=2.0)
     total_attempts = policy.max_retries + 1
 
-    pages = (_page(1), _page(2))
+    # Single 1-word page can't be subdivided, so retry exhaustion goes
+    # straight to BatchError without further sub-calls.
+    pages = (_page(1),)
     provider = _RecordingProvider(scripts=[([], []) for _ in range(total_attempts)])
     completes: list[Any] = []
 
@@ -393,7 +410,7 @@ def test_on_batch_complete_does_not_fire_on_hard_failure(
             provider,
             pages,
             ("x",),
-            pages_per_batch=2,
+            pages_per_batch=1,
             retry_policy=policy,
             on_batch_complete=lambda *args: completes.append(args),
         )
