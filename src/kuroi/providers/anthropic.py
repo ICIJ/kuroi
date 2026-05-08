@@ -149,13 +149,14 @@ class AnthropicProvider:
 
         if tokens_out and tokens_out >= int(self._max_tokens * _TRUNCATION_THRESHOLD):
             logger.warning(
-                "anthropic response likely truncated: tokens_out=%d hit %.0f%% of "
-                "max_tokens=%d. Increase max_tokens or split the document; the JSON "
-                "is probably cut mid-array and findings will be lost.",
+                "anthropic response truncated at max_tokens (will subdivide): "
+                "tokens_out=%d hit %.0f%% of max_tokens=%d. The JSON was probably "
+                "cut mid-array; subdividing this batch and retrying.",
                 tokens_out,
                 100 * tokens_out / self._max_tokens,
                 self._max_tokens,
             )
+            return [], []
 
         chunk = ChunkRecord(
             chunk_idx=0,
