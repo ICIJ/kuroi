@@ -12,7 +12,7 @@ import kuroi.cli.verify as _verify_module
 from kuroi import __version__
 from kuroi.cli.backups import backups_app
 from kuroi.cli.config import config_app
-from kuroi.core.log import setup_logging, warn_vv_once
+from kuroi.core.log import configure_mupdf_stderr, setup_logging, warn_vv_once
 
 app = typer.Typer(
     name="kuroi",
@@ -53,6 +53,7 @@ def main(
 ) -> None:
     """kuroi — strip sensitive data from PDFs with LLM assistance."""
     setup_logging(verbosity=verbose, quiet=quiet)
+    configure_mupdf_stderr(verbose)
     if verbose >= 2:
         warn_vv_once()
 
