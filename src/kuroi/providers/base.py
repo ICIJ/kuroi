@@ -23,6 +23,7 @@ class Provider(Protocol):
         instructions: tuple[str, ...] = (),
         seed: int | None = None,
         attempt: int = 0,
+        layout_aware: bool = False,
     ) -> tuple[list[Finding], list[ChunkRecord]]:
         """Identify spans to redact across the supplied pages.
 
@@ -34,6 +35,9 @@ class Provider(Protocol):
             attempt: Zero-based retry index from the chunker. Providers may use
                 it to scale per-call timeouts (e.g. Ollama gives slow models
                 more time on each retry).
+            layout_aware: When True, wrap the prompt with PyMuPDF block
+                boundaries (<block id="N">…</block>) so the model sees
+                paragraph and other layout-detected structure. Default False.
 
         Returns:
             A tuple of `(findings, chunk_records)` — findings are the proposed
