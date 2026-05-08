@@ -526,3 +526,57 @@ def test_resolve_retry_cli_validates_multiplier_below_one(tmp_path: Path) -> Non
             env={},
             file_path=tmp_path / "missing.toml",
         )
+
+
+# ---------------------------------------------------------------------------
+# layout_aware tests
+# ---------------------------------------------------------------------------
+
+
+def test_config_layout_aware_default_false(tmp_path: Path) -> None:
+    config = resolve_config(
+        ConfigOverrides(),
+        env={},
+        file_path=tmp_path / "missing.toml",
+    )
+    assert config.layout_aware is False
+
+
+def test_config_layout_aware_from_file(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text("[prompt]\nlayout_aware = true\n")
+
+    config = resolve_config(
+        ConfigOverrides(),
+        env={},
+        file_path=cfg_path,
+    )
+    assert config.layout_aware is True
+
+
+def test_config_layout_aware_override_wins_over_file(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text("[prompt]\nlayout_aware = true\n")
+
+    config = resolve_config(
+        ConfigOverrides(layout_aware=False),
+        env={},
+        file_path=cfg_path,
+    )
+    assert config.layout_aware is False
+
+
+def test_config_layout_aware_rejects_non_bool(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text('[prompt]\nlayout_aware = "yes"\n')
+
+    with pytest.raises(ConfigError, match="layout_aware"):
+        resolve_config(ConfigOverrides(), env={}, file_path=cfg_path)
+
+
+def test_config_prompt_table_must_be_table(tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text("prompt = 42\n")
+
+    with pytest.raises(ConfigError, match="prompt"):
+        resolve_config(ConfigOverrides(), env={}, file_path=cfg_path)

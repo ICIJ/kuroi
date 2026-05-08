@@ -62,6 +62,7 @@ class Config:
     audit_include_text: bool = False
     backup_retention_hours: int = 24
     retry: RetryPolicy = DEFAULT_RETRY_POLICY
+    layout_aware: bool = False
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,7 @@ class ConfigOverrides:
     retry_max: int | None = None
     retry_backoff: float | None = None
     retry_backoff_multiplier: float | None = None
+    layout_aware: bool | None = None
 
 
 def xdg_config_home() -> Path:
@@ -265,6 +267,35 @@ def _read_retry_policy(
     return RetryPolicy(max_retries=max_retries, backoff=backoff, backoff_multiplier=multiplier)
 
 
+def _read_layout_aware(
+    file_data: dict[str, Any],
+    overrides: ConfigOverrides,
+) -> bool:
+    """Resolve layout_aware as CLI override > file > default.
+
+    Raises `ConfigError` if the file value is the wrong type.
+    """
+    prompt_table = file_data.get("prompt", {})
+    if not isinstance(prompt_table, dict):
+        raise ConfigError(
+            f"Expected table for `prompt`, got {type(prompt_table).__name__}"
+        )
+
+    layout_aware: bool = False
+    if "layout_aware" in prompt_table:
+        raw = prompt_table["layout_aware"]
+        if not isinstance(raw, bool):
+            raise ConfigError(
+                f"Expected boolean for `prompt.layout_aware`, got {type(raw).__name__}"
+            )
+        layout_aware = raw
+
+    if overrides.layout_aware is not None:
+        layout_aware = overrides.layout_aware
+
+    return layout_aware
+
+
 def resolve_config(
     overrides: ConfigOverrides,
     *,
@@ -334,4 +365,5 @@ def resolve_config(
         audit_include_text=audit_include_text_raw,
         backup_retention_hours=backup_retention_raw,
         retry=_read_retry_policy(file_data, env, overrides),
+        layout_aware=_read_layout_aware(file_data, overrides),
     )
