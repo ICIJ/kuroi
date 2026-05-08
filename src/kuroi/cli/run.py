@@ -231,9 +231,7 @@ def run(
             total_batches = math.ceil(len(pages) / effective_batch_size)
             batched_ui = total_batches > 1
 
-            def _on_batch_start(
-                batch_idx: int, total: int, page_numbers: tuple[int, ...]
-            ) -> None:
+            def _on_batch_start(batch_idx: int, total: int, page_numbers: tuple[int, ...]) -> None:
                 if len(page_numbers) > 1:
                     rng = f"{page_numbers[0]}–{page_numbers[-1]}"  # noqa: RUF001
                 else:
