@@ -131,3 +131,107 @@ def test_extract_word_index_ocrs_pages_with_text_and_image(
     assert result.ocr_page_count == 1
     assert len(result.pages) == 1
     assert result.pages[0].words[0].text == "ocred"
+
+
+# ---------------------------------------------------------------------------
+# slice_page tests
+# ---------------------------------------------------------------------------
+
+
+def test_slice_page_reindexes_words_to_zero_base() -> None:
+    from kuroi.core.pdf import Page, Word, slice_page
+
+    words = tuple(
+        Word(idx=i, text=f"w{i}", bbox=(float(i), 0.0, float(i + 1), 1.0))
+        for i in range(10)
+    )
+    page = Page(number=7, words=words)
+
+    sliced = slice_page(page, 3, 7)
+
+    assert tuple(w.idx for w in sliced.words) == (0, 1, 2, 3)
+    assert tuple(w.text for w in sliced.words) == ("w3", "w4", "w5", "w6")
+
+
+def test_slice_page_preserves_page_number() -> None:
+    from kuroi.core.pdf import Page, Word, slice_page
+
+    words = tuple(
+        Word(idx=i, text=f"w{i}", bbox=(0.0, 0.0, 1.0, 1.0)) for i in range(5)
+    )
+    page = Page(number=42, words=words)
+
+    sliced = slice_page(page, 1, 4)
+
+    assert sliced.number == 42
+
+
+def test_slice_page_preserves_word_text_and_bbox() -> None:
+    from kuroi.core.pdf import Page, Word, slice_page
+
+    words = (
+        Word(idx=0, text="alpha", bbox=(0.0, 0.0, 5.0, 1.0)),
+        Word(idx=1, text="beta", bbox=(5.0, 0.0, 10.0, 1.0)),
+        Word(idx=2, text="gamma", bbox=(10.0, 0.0, 15.0, 1.0)),
+    )
+    page = Page(number=1, words=words)
+
+    sliced = slice_page(page, 1, 3)
+
+    assert sliced.words[0].text == "beta"
+    assert sliced.words[0].bbox == (5.0, 0.0, 10.0, 1.0)
+    assert sliced.words[1].text == "gamma"
+    assert sliced.words[1].bbox == (10.0, 0.0, 15.0, 1.0)
+
+
+def test_slice_page_full_range_round_trips_text() -> None:
+    from kuroi.core.pdf import Page, Word, slice_page
+
+    words = tuple(
+        Word(idx=i, text=f"w{i}", bbox=(0.0, 0.0, 1.0, 1.0)) for i in range(3)
+    )
+    page = Page(number=1, words=words)
+
+    sliced = slice_page(page, 0, 3)
+
+    assert tuple(w.text for w in sliced.words) == ("w0", "w1", "w2")
+    assert tuple(w.idx for w in sliced.words) == (0, 1, 2)
+
+
+def test_slice_page_rejects_empty_range() -> None:
+    import pytest
+
+    from kuroi.core.pdf import Page, Word, slice_page
+
+    page = Page(number=1, words=(Word(idx=0, text="x", bbox=(0.0, 0.0, 1.0, 1.0)),))
+
+    with pytest.raises(ValueError, match="out of range"):
+        slice_page(page, 0, 0)
+
+
+def test_slice_page_rejects_negative_start() -> None:
+    import pytest
+
+    from kuroi.core.pdf import Page, Word, slice_page
+
+    page = Page(number=1, words=(Word(idx=0, text="x", bbox=(0.0, 0.0, 1.0, 1.0)),))
+
+    with pytest.raises(ValueError, match="out of range"):
+        slice_page(page, -1, 1)
+
+
+def test_slice_page_rejects_end_past_word_count() -> None:
+    import pytest
+
+    from kuroi.core.pdf import Page, Word, slice_page
+
+    page = Page(
+        number=1,
+        words=(
+            Word(idx=0, text="a", bbox=(0.0, 0.0, 1.0, 1.0)),
+            Word(idx=1, text="b", bbox=(0.0, 0.0, 1.0, 1.0)),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="out of range"):
+        slice_page(page, 0, 3)
