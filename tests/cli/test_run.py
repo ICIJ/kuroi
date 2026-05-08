@@ -484,10 +484,27 @@ def test_run_instruct_flag_passes_instruction_to_provider(
         *,
         instructions: Any = (),
         seed: Any = None,
+        attempt: int = 0,
     ) -> Any:
+        from kuroi.core.audit_records import ChunkRecord
+
         captured["instructions"] = instructions
         captured["llm_category_ids"] = llm_category_ids
-        return [], []
+        return [], [
+            ChunkRecord(
+                chunk_idx=0,
+                pages=tuple(p.number for p in pages),
+                temperature=0.0,
+                seed_requested=None,
+                seed_honored=False,
+                system_fingerprint=None,
+                prompt_sha256="a" * 64,
+                response_sha256="b" * 64,
+                tokens_in=1,
+                tokens_out=1,
+                duration_ms=1,
+            )
+        ]
 
     monkeypatch.setattr(ap.AnthropicProvider, "detect_redactions", _spy_detect)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
@@ -554,10 +571,27 @@ def test_run_both_rules_and_instruct_run_together(
         *,
         instructions: Any = (),
         seed: Any = None,
+        attempt: int = 0,
     ) -> Any:
+        from kuroi.core.audit_records import ChunkRecord
+
         captured["instructions"] = instructions
         captured["llm_category_ids"] = llm_category_ids
-        return [], []
+        return [], [
+            ChunkRecord(
+                chunk_idx=0,
+                pages=tuple(p.number for p in pages),
+                temperature=0.0,
+                seed_requested=None,
+                seed_honored=False,
+                system_fingerprint=None,
+                prompt_sha256="a" * 64,
+                response_sha256="b" * 64,
+                tokens_in=1,
+                tokens_out=1,
+                duration_ms=1,
+            )
+        ]
 
     monkeypatch.setattr(ap.AnthropicProvider, "detect_redactions", _spy_detect)
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
@@ -987,3 +1021,67 @@ def test_run_with_pages_per_batch_aborts_on_batch_error(
     expected_attempts = DEFAULT_RETRY_POLICY.max_retries + 1
     assert f"failed {expected_attempts} times" in result.stdout
     assert "smaller --pages-per-batch" in result.stdout
+
+
+def test_run_default_path_uses_orchestrator_with_default_policy(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    stub_anthropic_client: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without --pages-per-batch, the run still routes through the orchestrator
+    as a single batch covering the whole document, with the default retry policy."""
+    pdf = make_pdf(["Page one", "Page two"])
+
+    captured: dict[str, Any] = {}
+
+    def _capture(*args: Any, **kwargs: Any) -> tuple[list[Any], list[Any]]:
+        from kuroi.core.audit_records import ChunkRecord
+
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        pages = args[1]
+        return [], [
+            ChunkRecord(
+                chunk_idx=0,
+                pages=tuple(p.number for p in pages),
+                temperature=0.0,
+                seed_requested=None,
+                seed_honored=False,
+                system_fingerprint=None,
+                prompt_sha256="a" * 64,
+                response_sha256="b" * 64,
+                tokens_in=10,
+                tokens_out=2,
+                duration_ms=50,
+            )
+        ]
+
+    monkeypatch.setattr("kuroi.cli.run.detect_redactions_chunked", _capture)
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "--instruct",
+            "redact",
+            "-o",
+            str(tmp_path / "out.pdf"),
+            "-y",
+            "--backup-dir",
+            str(tmp_path / "backups"),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    from kuroi.core.config import DEFAULT_RETRY_POLICY
+
+    assert captured["kwargs"]["retry_policy"] == DEFAULT_RETRY_POLICY
+    # Default path: one batch covering all pages — no per-batch progress UI
+    assert captured["kwargs"]["on_batch_start"] is None
+    assert captured["kwargs"]["on_batch_complete"] is None
+    assert captured["kwargs"]["pages_per_batch"] == 2  # len(pages)
+    assert "Batch 1/" not in result.stdout

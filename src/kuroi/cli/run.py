@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import math
 import os
 import shutil
 import uuid
@@ -17,7 +18,6 @@ from kuroi.core.audit_records import ChunkRecord
 from kuroi.core.backup import create_backup, session_timestamp, sweep_backups
 from kuroi.core.chunking import BatchError, detect_redactions_chunked
 from kuroi.core.config import (
-    DEFAULT_RETRY_POLICY,
     ConfigError,
     ConfigOverrides,
     resolve_config,
@@ -201,51 +201,50 @@ def run(
                     "is enforced for this provider"
                 )
             instruction_tuple: tuple[str, ...] = (instruct,) if instruct else ()
-            if pages_per_batch == 0:
-                provider_findings, chunks = provider.detect_redactions(
-                    pages, tuple(llm_cat_ids), instructions=instruction_tuple, seed=seed
+
+            effective_batch_size = pages_per_batch if pages_per_batch > 0 else len(pages)
+            total_batches = math.ceil(len(pages) / effective_batch_size)
+            batched_ui = total_batches > 1
+
+            def _on_batch_start(
+                batch_idx: int, total: int, page_numbers: tuple[int, ...]
+            ) -> None:
+                if len(page_numbers) > 1:
+                    rng = f"{page_numbers[0]}–{page_numbers[-1]}"  # noqa: RUF001
+                else:
+                    rng = f"{page_numbers[0]}"
+                console.print(f"  Batch {batch_idx + 1}/{total} (pages {rng})...", end="")
+
+            def _on_batch_complete(
+                batch_idx: int,
+                total: int,
+                page_numbers: tuple[int, ...],
+                chunk: ChunkRecord,
+            ) -> None:
+                console.print(
+                    f" done in {chunk.duration_ms} ms, "
+                    f"tokens_in={chunk.tokens_in} tokens_out={chunk.tokens_out}"
                 )
-            else:
 
-                def _on_batch_start(
-                    batch_idx: int, total: int, page_numbers: tuple[int, ...]
-                ) -> None:
-                    if len(page_numbers) > 1:
-                        rng = f"{page_numbers[0]}–{page_numbers[-1]}"  # noqa: RUF001
-                    else:
-                        rng = f"{page_numbers[0]}"
-                    console.print(f"  Batch {batch_idx + 1}/{total} (pages {rng})...", end="")
-
-                def _on_batch_complete(
-                    batch_idx: int,
-                    total: int,
-                    page_numbers: tuple[int, ...],
-                    chunk: ChunkRecord,
-                ) -> None:
-                    console.print(
-                        f" done in {chunk.duration_ms} ms, "
-                        f"tokens_in={chunk.tokens_in} tokens_out={chunk.tokens_out}"
-                    )
-
-                try:
-                    provider_findings, chunks = detect_redactions_chunked(
-                        provider,
-                        pages,
-                        tuple(llm_cat_ids),
-                        instructions=instruction_tuple,
-                        seed=seed,
-                        pages_per_batch=pages_per_batch,
-                        retry_policy=DEFAULT_RETRY_POLICY,
-                        on_batch_start=_on_batch_start,
-                        on_batch_complete=_on_batch_complete,
-                    )
-                except BatchError as exc:
-                    console.print(
-                        f"  [red]{exc}[/]\n"
-                        f"  Re-run with a smaller --pages-per-batch, "
-                        f"or check the WARNING(s) above for the cause."
-                    )
-                    raise typer.Exit(code=1) from exc
+            try:
+                provider_findings, chunks = detect_redactions_chunked(
+                    provider,
+                    pages,
+                    tuple(llm_cat_ids),
+                    instructions=instruction_tuple,
+                    seed=seed,
+                    pages_per_batch=effective_batch_size,
+                    retry_policy=config.retry,
+                    on_batch_start=_on_batch_start if batched_ui else None,
+                    on_batch_complete=_on_batch_complete if batched_ui else None,
+                )
+            except BatchError as exc:
+                console.print(
+                    f"  [red]{exc}[/]\n"
+                    f"  Re-run with a smaller --pages-per-batch, "
+                    f"or check the WARNING(s) above for the cause."
+                )
+                raise typer.Exit(code=1) from exc
             findings.extend(provider_findings)
             actual_cost = 0.0
 

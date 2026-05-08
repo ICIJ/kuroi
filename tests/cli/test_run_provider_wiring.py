@@ -27,8 +27,25 @@ class _StubProvider:
         *,
         instructions: tuple[str, ...] = (),
         seed: int | None = None,
+        attempt: int = 0,
     ) -> tuple[list[Finding], list[Any]]:
-        return [], []
+        from kuroi.core.audit_records import ChunkRecord
+
+        return [], [
+            ChunkRecord(
+                chunk_idx=0,
+                pages=tuple(p.number for p in pages),
+                temperature=0.0,
+                seed_requested=None,
+                seed_honored=False,
+                system_fingerprint=None,
+                prompt_sha256="a" * 64,
+                response_sha256="b" * 64,
+                tokens_in=1,
+                tokens_out=1,
+                duration_ms=1,
+            )
+        ]
 
 
 def _common_args(pdf: Path, out: Path, tmp_path: Path) -> list[str]:
