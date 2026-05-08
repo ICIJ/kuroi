@@ -15,6 +15,8 @@ from __future__ import annotations
 import logging
 import sys
 
+import pymupdf
+
 
 def setup_logging(verbosity: int, quiet: bool) -> None:
     if quiet:
@@ -39,6 +41,20 @@ def setup_logging(verbosity: int, quiet: bool) -> None:
     # can observe `kuroi.*` log records. The duplicate-emission risk is bounded
     # because the root logger has no handlers in normal CLI usage.
     root.propagate = True
+
+
+def configure_mupdf_stderr(verbosity: int) -> None:
+    """Suppress MuPDF C-library stderr output unless -vv (debug) is in use.
+
+    MuPDF prints messages like "format error: cannot find object in xref"
+    directly to stderr when the input PDF has malformed xref entries. Most
+    are recoverable — PyMuPDF substitutes nulls and continues, and the
+    `garbage=4, deflate=True, clean=True` save in apply_redactions strips
+    the dangling refs from the output. Surfacing them by default makes
+    users think the redaction failed when it didn't. Keep them visible at
+    -vv so they remain available for diagnosing genuinely broken PDFs.
+    """
+    pymupdf.TOOLS.mupdf_display_errors(verbosity >= 2)  # type: ignore[no-untyped-call]
 
 
 _VV_WARNED = False

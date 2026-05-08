@@ -1,6 +1,9 @@
 import logging
 
-from kuroi.core.log import setup_logging
+import pymupdf
+import pytest
+
+from kuroi.core.log import configure_mupdf_stderr, setup_logging
 
 
 def test_setup_logging_default_is_warning(caplog):
@@ -39,6 +42,28 @@ def test_setup_logging_quiet_silences_info(caplog):
     # quiet wins over -v: INFO suppressed, ERROR still flows.
     assert "should-be-silent" not in caplog.text
     assert "error-flows" in caplog.text
+
+
+@pytest.fixture
+def _restore_mupdf_display_errors():
+    prev = pymupdf.TOOLS.mupdf_display_errors()
+    yield
+    pymupdf.TOOLS.mupdf_display_errors(bool(prev))
+
+
+def test_configure_mupdf_stderr_silences_by_default(_restore_mupdf_display_errors):
+    configure_mupdf_stderr(verbosity=0)
+    assert pymupdf.TOOLS.mupdf_display_errors() is False
+
+
+def test_configure_mupdf_stderr_silences_at_v(_restore_mupdf_display_errors):
+    configure_mupdf_stderr(verbosity=1)
+    assert pymupdf.TOOLS.mupdf_display_errors() is False
+
+
+def test_configure_mupdf_stderr_enables_at_vv(_restore_mupdf_display_errors):
+    configure_mupdf_stderr(verbosity=2)
+    assert pymupdf.TOOLS.mupdf_display_errors() is True
 
 
 def test_warn_vv_once_only_emits_once(capsys):
