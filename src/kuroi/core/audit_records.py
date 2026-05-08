@@ -13,7 +13,8 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class ChunkRecord:
     """A single LLM-API call. There is one ChunkRecord per detect_redactions call;
-    when chunking lands, providers will return a list with one entry per chunk."""
+    the chunking orchestrator emits one ChunkRecord per successful sub-call when
+    a batch is subdivided."""
 
     chunk_idx: int
     pages: tuple[int, ...]
@@ -26,3 +27,4 @@ class ChunkRecord:
     tokens_in: int
     tokens_out: int
     duration_ms: int
+    page_word_range: tuple[int, int] | None = None

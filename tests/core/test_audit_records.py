@@ -36,3 +36,41 @@ def test_chunk_record_seed_metadata() -> None:
     assert rec.seed_requested == 42
     assert rec.seed_honored is True
     assert rec.system_fingerprint == "fp_abc"
+
+
+def test_chunk_record_page_word_range_defaults_to_none() -> None:
+    """Existing call sites that don't pass page_word_range still work."""
+    record = ChunkRecord(
+        chunk_idx=0,
+        pages=(1,),
+        temperature=0.0,
+        seed_requested=None,
+        seed_honored=False,
+        system_fingerprint=None,
+        prompt_sha256="a" * 64,
+        response_sha256="b" * 64,
+        tokens_in=10,
+        tokens_out=5,
+        duration_ms=100,
+    )
+
+    assert record.page_word_range is None
+
+
+def test_chunk_record_page_word_range_explicit_value_round_trips() -> None:
+    record = ChunkRecord(
+        chunk_idx=3,
+        pages=(41,),
+        temperature=0.0,
+        seed_requested=None,
+        seed_honored=False,
+        system_fingerprint=None,
+        prompt_sha256="a" * 64,
+        response_sha256="b" * 64,
+        tokens_in=10,
+        tokens_out=5,
+        duration_ms=100,
+        page_word_range=(3950, 8000),
+    )
+
+    assert record.page_word_range == (3950, 8000)
