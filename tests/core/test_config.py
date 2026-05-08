@@ -464,3 +464,65 @@ def test_resolve_retry_env_rejects_multiplier_below_one(tmp_path: Path) -> None:
             env={"KUROI_RETRY_BACKOFF_MULTIPLIER": "0.5"},
             file_path=tmp_path / "missing.toml",
         )
+
+
+def test_resolve_retry_cli_beats_env_and_file(tmp_path: Path) -> None:
+    path = _file(
+        tmp_path,
+        'provider = "anthropic"\nmodel = "m"\n\n[retry]\nmax_retries = 1\n',
+    )
+    cfg = resolve_config(
+        ConfigOverrides(retry_max=9),
+        env={"KUROI_MAX_RETRIES": "5"},
+        file_path=path,
+    )
+    assert cfg.retry.max_retries == 9
+
+
+def test_resolve_retry_per_key_independent(tmp_path: Path) -> None:
+    """TOML sets max_retries; env sets backoff; CLI sets multiplier — all merge."""
+    path = _file(
+        tmp_path,
+        'provider = "anthropic"\nmodel = "m"\n\n[retry]\nmax_retries = 4\n',
+    )
+    cfg = resolve_config(
+        ConfigOverrides(retry_backoff_multiplier=5.0),
+        env={"KUROI_RETRY_BACKOFF": "0.25"},
+        file_path=path,
+    )
+    assert cfg.retry.max_retries == 4
+    assert cfg.retry.backoff == 0.25
+    assert cfg.retry.backoff_multiplier == 5.0
+
+
+def test_resolve_retry_cli_max_retries_zero_disables_retry(tmp_path: Path) -> None:
+    """`--max-retries 0` is the fail-fast escape hatch and must override file/env."""
+    path = _file(
+        tmp_path,
+        'provider = "anthropic"\nmodel = "m"\n\n[retry]\nmax_retries = 7\n',
+    )
+    cfg = resolve_config(
+        ConfigOverrides(retry_max=0),
+        env={"KUROI_MAX_RETRIES": "5"},
+        file_path=path,
+    )
+    assert cfg.retry.max_retries == 0
+    assert cfg.retry.schedule() == ()
+
+
+def test_resolve_retry_cli_validates_negative_max_retries(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError, match="max_retries"):
+        resolve_config(
+            ConfigOverrides(retry_max=-1),
+            env={},
+            file_path=tmp_path / "missing.toml",
+        )
+
+
+def test_resolve_retry_cli_validates_multiplier_below_one(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError, match="backoff_multiplier"):
+        resolve_config(
+            ConfigOverrides(retry_backoff_multiplier=0.5),
+            env={},
+            file_path=tmp_path / "missing.toml",
+        )
