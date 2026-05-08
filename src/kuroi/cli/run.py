@@ -17,6 +17,7 @@ from kuroi.core.audit_records import ChunkRecord
 from kuroi.core.backup import create_backup, session_timestamp, sweep_backups
 from kuroi.core.chunking import BatchError, detect_redactions_chunked
 from kuroi.core.config import (
+    DEFAULT_RETRY_POLICY,
     ConfigError,
     ConfigOverrides,
     resolve_config,
@@ -234,6 +235,7 @@ def run(
                         instructions=instruction_tuple,
                         seed=seed,
                         pages_per_batch=pages_per_batch,
+                        retry_policy=DEFAULT_RETRY_POLICY,
                         on_batch_start=_on_batch_start,
                         on_batch_complete=_on_batch_complete,
                     )

@@ -982,7 +982,8 @@ def test_run_with_pages_per_batch_aborts_on_batch_error(
     )
 
     assert result.exit_code == 1
-    from kuroi.core.chunking import MAX_ATTEMPTS
+    from kuroi.core.config import DEFAULT_RETRY_POLICY
 
-    assert f"failed {MAX_ATTEMPTS} times" in result.stdout
+    expected_attempts = DEFAULT_RETRY_POLICY.max_retries + 1
+    assert f"failed {expected_attempts} times" in result.stdout
     assert "smaller --pages-per-batch" in result.stdout
