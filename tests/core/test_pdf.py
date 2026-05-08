@@ -326,3 +326,76 @@ def test_serialize_for_llm_default_no_block_tags() -> None:
     # Default path: no <block> markers anywhere.
     assert "<block" not in text
     assert text == '<page n="1">\n[0]Hello [1]world [2]Other\n</page>'
+
+
+def _layout_pages() -> tuple[object, ...]:
+    from kuroi.core.pdf import Page, Word
+
+    return (
+        Page(
+            number=1,
+            words=(
+                Word(idx=0, text="Heading", bbox=(0, 0, 1, 1), block_id=7),
+                Word(idx=1, text="First", bbox=(0, 1, 1, 2), block_id=8),
+                Word(idx=2, text="paragraph", bbox=(1, 1, 2, 2), block_id=8),
+                Word(idx=3, text="Footer", bbox=(0, 9, 1, 10), block_id=12),
+            ),
+        ),
+    )
+
+
+def test_serialize_for_llm_layout_aware_wraps_blocks() -> None:
+    from kuroi.core.pdf import serialize_for_llm
+
+    text = serialize_for_llm(_layout_pages(), layout_aware=True)
+
+    # Three blocks emitted in document order; idx markers preserved inside.
+    assert '<block id="7">[0]Heading</block>' in text
+    assert '<block id="8">[1]First [2]paragraph</block>' in text
+    assert '<block id="12">[3]Footer</block>' in text
+    assert text.startswith('<page n="1">')
+    assert text.endswith("</page>")
+
+
+def test_serialize_for_llm_layout_aware_collapses_consecutive_same_block() -> None:
+    from kuroi.core.pdf import Page, Word, serialize_for_llm
+
+    pages = (
+        Page(
+            number=1,
+            words=(
+                Word(idx=0, text="a", bbox=(0, 0, 1, 1), block_id=5),
+                Word(idx=1, text="b", bbox=(1, 0, 2, 1), block_id=5),
+                Word(idx=2, text="c", bbox=(2, 0, 3, 1), block_id=5),
+            ),
+        ),
+    )
+
+    text = serialize_for_llm(pages, layout_aware=True)
+
+    # One block tag wraps all three words; no spurious second tag.
+    assert text.count('<block id="5">') == 1
+    assert '<block id="5">[0]a [1]b [2]c</block>' in text
+
+
+def test_serialize_for_llm_layout_aware_split_block_across_pages() -> None:
+    """A block_id that appears on two pages emits twice — once per page —
+    because PyMuPDF block numbering is per-page."""
+    from kuroi.core.pdf import Page, Word, serialize_for_llm
+
+    pages = (
+        Page(
+            number=1,
+            words=(Word(idx=0, text="a", bbox=(0, 0, 1, 1), block_id=2),),
+        ),
+        Page(
+            number=2,
+            words=(Word(idx=0, text="b", bbox=(0, 0, 1, 1), block_id=2),),
+        ),
+    )
+
+    text = serialize_for_llm(pages, layout_aware=True)
+
+    assert text.count('<block id="2">') == 2
+    assert '<page n="1">\n<block id="2">[0]a</block>\n</page>' in text
+    assert '<page n="2">\n<block id="2">[0]b</block>\n</page>' in text

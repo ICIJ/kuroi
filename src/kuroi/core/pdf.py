@@ -132,19 +132,48 @@ def slice_page(page: Page, word_start: int, word_end: int) -> Page:
     return Page(number=page.number, words=sliced)
 
 
-def serialize_for_llm(pages: tuple[Page, ...]) -> str:
+def _serialize_blocks(words: tuple[Word, ...]) -> str:
+    out: list[str] = []
+    current_block_id: int | None = None
+    current_words: list[Word] = []
+
+    def flush() -> None:
+        if current_words:
+            inner = " ".join(f"[{w.idx}]{w.text}" for w in current_words)
+            out.append(f'<block id="{current_block_id}">{inner}</block>')
+
+    for w in words:
+        if w.block_id != current_block_id:
+            flush()
+            current_words = [w]
+            current_block_id = w.block_id
+        else:
+            current_words.append(w)
+    flush()
+    return "\n".join(out)
+
+
+def serialize_for_llm(
+    pages: tuple[Page, ...],
+    *,
+    layout_aware: bool = False,
+) -> str:
     """Render the word index as the prompt-side representation.
 
-    Output shape:
+    Default (layout_aware=False) output:
         <page n="1">
         [0]Hello [1]world
         </page>
-        <page n="2">
-        [0]Second [1]page
-        </page>
+
+    With layout_aware=True, each page's content is wrapped in
+    <block id="N">…</block> sections corresponding to the PyMuPDF
+    block_id assignments on each Word.
     """
     chunks: list[str] = []
     for page in pages:
-        body = " ".join(f"[{w.idx}]{w.text}" for w in page.words)
+        if layout_aware:
+            body = _serialize_blocks(page.words)
+        else:
+            body = " ".join(f"[{w.idx}]{w.text}" for w in page.words)
         chunks.append(f'<page n="{page.number}">\n{body}\n</page>')
     return "\n".join(chunks)
