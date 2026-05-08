@@ -1050,6 +1050,7 @@ def test_run_floor_batch_error_renders_multi_line_diagnostic(
         instructions: tuple[str, ...] = (),
         seed: int | None = None,
         attempt: int = 0,
+        layout_aware: bool = False,
     ) -> tuple[list[Any], list[Any]]:
         return [], []  # hard failure on every call
 

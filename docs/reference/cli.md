@@ -101,6 +101,10 @@ Options:
                                   Split LLM analysis into batches of N pages. 0
                                   (default) keeps the current single-call behavior.
                                   [default: 0; x>=0]
+  --layout-aware / --no-layout-aware
+                                  Wrap the LLM prompt with PyMuPDF block tags so the
+                                  model can see paragraph and other layout boundaries.
+                                  Default: off (or set [prompt] layout_aware in config).
   --help                          Show this message and exit.
 ```
 
