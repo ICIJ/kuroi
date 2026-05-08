@@ -13,14 +13,17 @@ The merged result is an immutable `Config` object defined in
 
 ## Configuration keys
 
-| Key                          | Type     | Default                       | TOML location                       | CLI flag         | Env var              |
-| ---------------------------- | -------- | ----------------------------- | ----------------------------------- | ---------------- | -------------------- |
-| `provider`                   | string   | `anthropic`                   | top-level `provider`                | `--provider`     | `KUROI_PROVIDER`     |
-| `model`                      | string   | `claude-opus-4-7` (anthropic) | top-level `model`                   | `--model`        | `KUROI_MODEL`        |
-| `ollama_url`                 | string   | `http://localhost:11434`      | `[ollama]` table, `url`             | `--ollama-url`   | `KUROI_OLLAMA_URL`   |
-| `audit_include_text`         | bool     | `false`                       | `[audit]` table, `include_text`     | (file only)      | (none)               |
-| `backup_retention_hours`     | int      | `24`                          | `[backup]` table, `retention_hours` | (file only)      | (none)               |
-| `ANTHROPIC_API_KEY`          | string   | (unset)                       | (not in TOML)                       | (env only)       | `ANTHROPIC_API_KEY`  |
+| Key                           | Type     | Default                       | TOML location                          | CLI flag                       | Env var                            |
+| ----------------------------- | -------- | ----------------------------- | -------------------------------------- | ------------------------------ | ---------------------------------- |
+| `provider`                    | string   | `anthropic`                   | top-level `provider`                   | `--provider`                   | `KUROI_PROVIDER`                   |
+| `model`                       | string   | `claude-opus-4-7` (anthropic) | top-level `model`                      | `--model`                      | `KUROI_MODEL`                      |
+| `ollama_url`                  | string   | `http://localhost:11434`      | `[ollama]` table, `url`                | `--ollama-url`                 | `KUROI_OLLAMA_URL`                 |
+| `audit_include_text`          | bool     | `false`                       | `[audit]` table, `include_text`        | (file only)                    | (none)                             |
+| `backup_retention_hours`      | int      | `24`                          | `[backup]` table, `retention_hours`    | (file only)                    | (none)                             |
+| `retry.max_retries`           | int      | `2`                           | `[retry]` table, `max_retries`         | `--max-retries`                | `KUROI_MAX_RETRIES`                |
+| `retry.backoff`               | float    | `2.0`                         | `[retry]` table, `backoff`             | `--retry-backoff`              | `KUROI_RETRY_BACKOFF`              |
+| `retry.backoff_multiplier`    | float    | `2.0`                         | `[retry]` table, `backoff_multiplier`  | `--retry-backoff-multiplier`   | `KUROI_RETRY_BACKOFF_MULTIPLIER`   |
+| `ANTHROPIC_API_KEY`           | string   | (unset)                       | (not in TOML)                          | (env only)                     | `ANTHROPIC_API_KEY`                |
 
 When the provider is `ollama`, there is no built-in default model — you
 must set `model` explicitly (via CLI flag, env var, file, or
@@ -29,7 +32,7 @@ must set `model` explicitly (via CLI flag, env var, file, or
 ## Editing the config file
 
 The on-disk format is TOML. A flat top level for `provider`/`model`
-plus optional `[ollama]`, `[audit]`, and `[backup]` tables.
+plus optional `[ollama]`, `[audit]`, `[backup]`, and `[retry]` tables.
 
 ```toml
 provider = "anthropic"
@@ -43,12 +46,37 @@ include_text = false
 
 [backup]
 retention_hours = 24
+
+[retry]
+max_retries = 2
+backoff = 2.0
+backoff_multiplier = 2.0
 ```
 
 `kuroi setup` writes the top-level `provider`/`model` keys and the
-`[ollama]` table interactively. `audit.include_text` and
-`backup.retention_hours` are not exposed by `setup` — edit
-`config.toml` directly to change them.
+`[ollama]` table interactively. `audit.include_text`,
+`backup.retention_hours`, and the `[retry]` table are not exposed by
+`setup` — edit `config.toml` directly to change them.
+
+## Retry policy
+
+The `[retry]` table tunes how the orchestrator handles transient provider
+failures (HTTP errors, timeouts, malformed responses). Defaults reproduce
+the historical schedule of 2s then 4s before giving up.
+
+The schedule formula is:
+
+> delay before retry *k* (1-indexed) = `backoff × backoff_multiplier^(k-1)`
+
+Examples:
+
+- `--max-retries 0` — fail fast; abort on the first hard failure.
+- `--max-retries 5 --retry-backoff 1 --retry-backoff-multiplier 2` —
+  schedule `(1, 2, 4, 8, 16)` for slow Ollama or rate-limited APIs.
+- `--retry-backoff-multiplier 1` — fixed delay between retries.
+
+Validation rules: `max_retries >= 0`, `backoff >= 0`,
+`backoff_multiplier >= 1.0`.
 
 ## Refreshing pricing
 

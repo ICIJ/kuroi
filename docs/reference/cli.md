@@ -72,21 +72,36 @@ Arguments:
 
 Options:
   -o, --output PATH
-  --in-place           Write to the input path; backup is taken.
-  --overwrite          Replace an existing output file.
-  --rules TEXT         Comma-separated rule set names.
-  -i, --instruct TEXT  Natural-language redaction instruction.
-  -y                   Skip the apply confirmation.
-  --backup-dir PATH    Backup directory [default: $XDG_DATA_HOME/kuroi/backups].
-  --no-backup          Skip backup creation. With --in-place the original is
-                       unrecoverable.
-  --audit-dir PATH     Audit log directory [default: $XDG_DATA_HOME/kuroi/audit].
-  --provider TEXT      LLM provider: 'anthropic' or 'ollama'. Overrides env and config.
-  --model TEXT         Model ID. Overrides env and config.
-  --ollama-url TEXT    Base URL of the Ollama daemon. Overrides env and config.
-  --seed INTEGER       Reproducibility seed. Best-effort per provider; recorded in
-                       audit.
-  --help               Show this message and exit.
+  --in-place                      Write to the input path; backup is taken.
+  --overwrite                     Replace an existing output file.
+  --rules TEXT                    Comma-separated rule set names.
+  -i, --instruct TEXT             Natural-language redaction instruction.
+  -y                              Skip the apply confirmation.
+  --backup-dir PATH               Backup directory [default:
+                                  $XDG_DATA_HOME/kuroi/backups].
+  --no-backup                     Skip backup creation. With --in-place the original is
+                                  unrecoverable.
+  --audit-dir PATH                Audit log directory [default:
+                                  $XDG_DATA_HOME/kuroi/audit].
+  --provider TEXT                 LLM provider: 'anthropic' or 'ollama'. Overrides env
+                                  and config.
+  --model TEXT                    Model ID. Overrides env and config.
+  --ollama-url TEXT               Base URL of the Ollama daemon. Overrides env and
+                                  config.
+  --seed INTEGER                  Reproducibility seed. Best-effort per provider;
+                                  recorded in audit.
+  --max-retries INTEGER RANGE     Number of retries after the initial attempt. 0
+                                  disables retry. Overrides env and config.  [x>=0]
+  --retry-backoff FLOAT RANGE     Seconds before the first retry. Overrides env and
+                                  config.  [x>=0.0]
+  --retry-backoff-multiplier FLOAT RANGE
+                                  Each retry waits M x the previous delay. Must be >=
+                                  1.0. Overrides env and config.  [x>=1.0]
+  --pages-per-batch INTEGER RANGE
+                                  Split LLM analysis into batches of N pages. 0
+                                  (default) keeps the current single-call behavior.
+                                  [default: 0; x>=0]
+  --help                          Show this message and exit.
 ```
 
 ## `kuroi undo`
