@@ -19,6 +19,12 @@ project adheres to [Semantic Versioning](https://semver.org/).
   Single pages too dense for the active model continue to surface a
   clear `BatchError` with diagnostics. New optional `page_word_range`
   field on the `chunk_request` audit record records sub-page slices.
+- `--layout-aware` / `--no-layout-aware` flag (and `[prompt] layout_aware`
+  config key) wraps the LLM prompt with PyMuPDF block boundaries
+  (`<block id="N">…</block>`). Helps the model disambiguate field labels
+  from values and reduces context loss across subdivided batches. Off by
+  default. Adds ~5% prompt-token overhead on typical pages; the per-batch
+  progress line shows `blocks=N` when on so users can measure the cost.
 
 ### Changed
 - The default (non-chunked) run path now retries on hard provider

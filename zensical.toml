@@ -20,6 +20,7 @@ nav = [
     { "Quick start" = "user-guide/quickstart.md" },
     { "Batch redaction" = "user-guide/batch.md" },
     { "LLM providers" = "user-guide/providers.md" },
+    { "Prompt tuning" = "user-guide/prompt-tuning.md" },
     { "Audit, diff, undo & backups" = "user-guide/audit-and-undo.md" },
     { Troubleshooting = "user-guide/troubleshooting.md" },
   ]},
