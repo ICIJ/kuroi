@@ -172,6 +172,71 @@ def _read_string(data: dict[str, Any], key: str, *, label: str | None = None) ->
     return value
 
 
+def _read_retry_policy(
+    file_data: dict[str, Any],
+    env: Mapping[str, str],
+    overrides: "ConfigOverrides",
+) -> "RetryPolicy":
+    """Resolve the retry policy by walking CLI → env → file → built-in defaults
+    independently for each of the three keys.
+
+    Raises `ConfigError` on any invalid value (wrong type, negative, multiplier < 1).
+    """
+    retry_table = file_data.get("retry", {})
+    if not isinstance(retry_table, dict):
+        raise ConfigError(f"Expected table for `retry`, got {type(retry_table).__name__}")
+
+    # max_retries: int >= 0
+    max_retries: int = DEFAULT_RETRY_POLICY.max_retries
+    if "max_retries" in retry_table:
+        raw = retry_table["max_retries"]
+        if not isinstance(raw, int) or isinstance(raw, bool) or raw < 0:
+            raise ConfigError(
+                f"Expected non-negative integer for `retry.max_retries`, got {raw!r}"
+            )
+        max_retries = raw
+    if overrides.retry_max is not None:
+        if overrides.retry_max < 0:
+            raise ConfigError(
+                f"Expected non-negative integer for `retry.max_retries`, got {overrides.retry_max!r}"
+            )
+        max_retries = overrides.retry_max
+
+    # backoff: float >= 0
+    backoff: float = DEFAULT_RETRY_POLICY.backoff
+    if "backoff" in retry_table:
+        raw = retry_table["backoff"]
+        if not isinstance(raw, (int, float)) or isinstance(raw, bool) or raw < 0:
+            raise ConfigError(
+                f"Expected non-negative number for `retry.backoff`, got {raw!r}"
+            )
+        backoff = float(raw)
+    if overrides.retry_backoff is not None:
+        if overrides.retry_backoff < 0:
+            raise ConfigError(
+                f"Expected non-negative number for `retry.backoff`, got {overrides.retry_backoff!r}"
+            )
+        backoff = float(overrides.retry_backoff)
+
+    # backoff_multiplier: float >= 1.0
+    multiplier: float = DEFAULT_RETRY_POLICY.backoff_multiplier
+    if "backoff_multiplier" in retry_table:
+        raw = retry_table["backoff_multiplier"]
+        if not isinstance(raw, (int, float)) or isinstance(raw, bool) or raw < 1.0:
+            raise ConfigError(
+                f"Expected number >= 1.0 for `retry.backoff_multiplier`, got {raw!r}"
+            )
+        multiplier = float(raw)
+    if overrides.retry_backoff_multiplier is not None:
+        if overrides.retry_backoff_multiplier < 1.0:
+            raise ConfigError(
+                f"Expected number >= 1.0 for `retry.backoff_multiplier`, got {overrides.retry_backoff_multiplier!r}"
+            )
+        multiplier = float(overrides.retry_backoff_multiplier)
+
+    return RetryPolicy(max_retries=max_retries, backoff=backoff, backoff_multiplier=multiplier)
+
+
 def resolve_config(
     overrides: ConfigOverrides,
     *,
@@ -240,4 +305,5 @@ def resolve_config(
         ollama_url=ollama_url,
         audit_include_text=audit_include_text_raw,
         backup_retention_hours=backup_retention_raw,
+        retry=_read_retry_policy(file_data, env, overrides),
     )

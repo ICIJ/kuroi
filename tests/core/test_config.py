@@ -343,3 +343,67 @@ def test_config_overrides_retry_fields_default_to_none() -> None:
     assert overrides.retry_max is None
     assert overrides.retry_backoff is None
     assert overrides.retry_backoff_multiplier is None
+
+
+def test_resolve_retry_from_toml(tmp_path: Path) -> None:
+    path = _file(
+        tmp_path,
+        'provider = "anthropic"\nmodel = "m"\n\n'
+        "[retry]\nmax_retries = 5\nbackoff = 1.5\nbackoff_multiplier = 3.0\n",
+    )
+    cfg = resolve_config(ConfigOverrides(), env={}, file_path=path)
+    assert cfg.retry.max_retries == 5
+    assert cfg.retry.backoff == 1.5
+    assert cfg.retry.backoff_multiplier == 3.0
+
+
+def test_resolve_retry_partial_toml_falls_back_to_defaults(tmp_path: Path) -> None:
+    """A `[retry]` table that sets only one key still produces a complete policy."""
+    path = _file(
+        tmp_path,
+        'provider = "anthropic"\nmodel = "m"\n\n[retry]\nmax_retries = 7\n',
+    )
+    cfg = resolve_config(ConfigOverrides(), env={}, file_path=path)
+    assert cfg.retry.max_retries == 7
+    assert cfg.retry.backoff == 2.0  # built-in default
+    assert cfg.retry.backoff_multiplier == 2.0
+
+
+def test_resolve_retry_rejects_negative_max_retries(tmp_path: Path) -> None:
+    path = _file(tmp_path, 'provider = "anthropic"\nmodel = "m"\n\n[retry]\nmax_retries = -1\n')
+    with pytest.raises(ConfigError, match="max_retries"):
+        resolve_config(ConfigOverrides(), env={}, file_path=path)
+
+
+def test_resolve_retry_rejects_non_int_max_retries(tmp_path: Path) -> None:
+    path = _file(tmp_path, 'provider = "anthropic"\nmodel = "m"\n\n[retry]\nmax_retries = 2.5\n')
+    with pytest.raises(ConfigError, match="max_retries"):
+        resolve_config(ConfigOverrides(), env={}, file_path=path)
+
+
+def test_resolve_retry_rejects_bool_max_retries(tmp_path: Path) -> None:
+    """bool is an int subclass in Python; explicitly reject it."""
+    path = _file(tmp_path, 'provider = "anthropic"\nmodel = "m"\n\n[retry]\nmax_retries = true\n')
+    with pytest.raises(ConfigError, match="max_retries"):
+        resolve_config(ConfigOverrides(), env={}, file_path=path)
+
+
+def test_resolve_retry_rejects_negative_backoff(tmp_path: Path) -> None:
+    path = _file(tmp_path, 'provider = "anthropic"\nmodel = "m"\n\n[retry]\nbackoff = -1.0\n')
+    with pytest.raises(ConfigError, match="backoff"):
+        resolve_config(ConfigOverrides(), env={}, file_path=path)
+
+
+def test_resolve_retry_rejects_multiplier_below_one(tmp_path: Path) -> None:
+    path = _file(
+        tmp_path,
+        'provider = "anthropic"\nmodel = "m"\n\n[retry]\nbackoff_multiplier = 0.5\n',
+    )
+    with pytest.raises(ConfigError, match="backoff_multiplier"):
+        resolve_config(ConfigOverrides(), env={}, file_path=path)
+
+
+def test_resolve_retry_rejects_non_table(tmp_path: Path) -> None:
+    path = _file(tmp_path, 'provider = "anthropic"\nmodel = "m"\nretry = "fast"\n')
+    with pytest.raises(ConfigError, match="retry"):
+        resolve_config(ConfigOverrides(), env={}, file_path=path)
