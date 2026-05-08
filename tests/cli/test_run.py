@@ -1023,7 +1023,64 @@ def test_run_with_pages_per_batch_aborts_on_batch_error(
     # subdivision-aware message format is used.
     assert f"attempts={expected_attempts}" in result.stdout
     assert "could not be processed" in result.stdout
-    assert "smaller --pages-per-batch" in result.stdout
+
+
+def test_run_floor_batch_error_renders_multi_line_diagnostic(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    stub_anthropic_client: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When BatchError carries floor diagnostics, the CLI prints the full
+    multi-line message rather than the legacy one-liner-plus-hint."""
+    # Arrange: a hard-failing provider on tiny pages -> floor BatchError
+    # after one subdivision level. A 1-word page hits the floor immediately.
+    pdf = make_pdf(["Hello"])
+
+    def _stub_detect(
+        self: Any,
+        pages: tuple[Any, ...],
+        llm_category_ids: tuple[str, ...],
+        *,
+        instructions: tuple[str, ...] = (),
+        seed: int | None = None,
+        attempt: int = 0,
+    ) -> tuple[list[Any], list[Any]]:
+        return [], []  # hard failure on every call
+
+    monkeypatch.setattr(
+        "kuroi.providers.anthropic.AnthropicProvider.detect_redactions",
+        _stub_detect,
+    )
+    monkeypatch.setattr("kuroi.core.chunking.time.sleep", lambda _: None)
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "--instruct",
+            "redact",
+            "-o",
+            str(tmp_path / "out.pdf"),
+            "-y",
+            "--max-retries",
+            "0",
+            "--backup-dir",
+            str(tmp_path / "backups"),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+
+    assert result.exit_code == 1
+    out = result.stdout
+    assert "could not be processed" in out
+    assert "Likely causes" in out
+    assert "Suggestions" in out
+    # The legacy hint is misleading once subdivision has already run:
+    # --pages-per-batch can't go below a single page.
+    assert "Re-run with a smaller --pages-per-batch" not in out
 
 
 def test_run_max_retries_zero_disables_retry(

@@ -262,11 +262,19 @@ def run(
                     on_batch_complete=_on_batch_complete if batched_ui else None,
                 )
             except BatchError as exc:
-                console.print(
-                    f"  [red]{exc}[/]\n"
-                    f"  Re-run with a smaller --pages-per-batch, "
-                    f"or check the WARNING(s) above for the cause."
-                )
+                if exc.subdivision_levels > 0:
+                    # Floor mode: the message itself is multi-line and
+                    # already includes targeted suggestions.
+                    console.print(f"  [red]{exc}[/]")
+                else:
+                    # Legacy multi-page failure: prepend a short hint so
+                    # the user knows their levers (smaller batch, longer
+                    # retries).
+                    console.print(
+                        f"  [red]{exc}[/]\n"
+                        f"  Re-run with a smaller --pages-per-batch, "
+                        f"or check the WARNING(s) above for the cause."
+                    )
                 raise typer.Exit(code=1) from exc
             findings.extend(provider_findings)
             actual_cost = 0.0
