@@ -42,10 +42,7 @@ class RetryPolicy:
     backoff_multiplier: float
 
     def schedule(self) -> tuple[float, ...]:
-        return tuple(
-            self.backoff * (self.backoff_multiplier ** k)
-            for k in range(self.max_retries)
-        )
+        return tuple(self.backoff * (self.backoff_multiplier**k) for k in range(self.max_retries))
 
 
 DEFAULT_RETRY_POLICY = RetryPolicy(max_retries=2, backoff=2.0, backoff_multiplier=2.0)
@@ -175,8 +172,8 @@ def _read_string(data: dict[str, Any], key: str, *, label: str | None = None) ->
 def _read_retry_policy(
     file_data: dict[str, Any],
     env: Mapping[str, str],
-    overrides: "ConfigOverrides",
-) -> "RetryPolicy":
+    overrides: ConfigOverrides,
+) -> RetryPolicy:
     """Resolve the retry policy by walking CLI → env → file → built-in defaults
     independently for each of the three keys.
 
@@ -191,9 +188,7 @@ def _read_retry_policy(
     if "max_retries" in retry_table:
         raw = retry_table["max_retries"]
         if not isinstance(raw, int) or isinstance(raw, bool) or raw < 0:
-            raise ConfigError(
-                f"Expected non-negative integer for `retry.max_retries`, got {raw!r}"
-            )
+            raise ConfigError(f"Expected non-negative integer for `retry.max_retries`, got {raw!r}")
         max_retries = raw
     if "KUROI_MAX_RETRIES" in env:
         try:
@@ -219,9 +214,7 @@ def _read_retry_policy(
     if "backoff" in retry_table:
         raw = retry_table["backoff"]
         if not isinstance(raw, (int, float)) or isinstance(raw, bool) or raw < 0:
-            raise ConfigError(
-                f"Expected non-negative number for `retry.backoff`, got {raw!r}"
-            )
+            raise ConfigError(f"Expected non-negative number for `retry.backoff`, got {raw!r}")
         backoff = float(raw)
     if "KUROI_RETRY_BACKOFF" in env:
         try:
@@ -247,9 +240,7 @@ def _read_retry_policy(
     if "backoff_multiplier" in retry_table:
         raw = retry_table["backoff_multiplier"]
         if not isinstance(raw, (int, float)) or isinstance(raw, bool) or raw < 1.0:
-            raise ConfigError(
-                f"Expected number >= 1.0 for `retry.backoff_multiplier`, got {raw!r}"
-            )
+            raise ConfigError(f"Expected number >= 1.0 for `retry.backoff_multiplier`, got {raw!r}")
         multiplier = float(raw)
     if "KUROI_RETRY_BACKOFF_MULTIPLIER" in env:
         try:
