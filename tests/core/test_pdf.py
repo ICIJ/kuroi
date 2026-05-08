@@ -243,3 +243,17 @@ def test_word_has_block_id_default_zero() -> None:
     w = Word(idx=0, text="hello", bbox=(0.0, 0.0, 1.0, 1.0))
 
     assert w.block_id == 0
+
+
+def test_extract_word_index_populates_block_id(make_pdf: Callable[..., Path]) -> None:
+    pdf = make_pdf(["First paragraph here.\n\nSecond paragraph here."])
+
+    result = extract_word_index(pdf)
+    page = result.pages[0]
+
+    block_ids = {w.block_id for w in page.words}
+    # Two visually-separated paragraphs produce at least two distinct blocks.
+    assert len(block_ids) >= 2
+    # Words sharing a paragraph share a block_id.
+    first_three = page.words[:3]
+    assert len({w.block_id for w in first_three}) == 1
