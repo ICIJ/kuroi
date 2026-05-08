@@ -33,21 +33,61 @@ def _format_page_range(page_numbers: tuple[int, ...]) -> str:
 
 
 class BatchError(Exception):
-    """Raised when a batch fails every attempt (initial call + retries)."""
+    """Raised when a batch fails every attempt (initial call + retries),
+    optionally after exhausting all subdivision levels.
+
+    The legacy single-line message
+    `"Batch N (pages X-Y) failed K times and was aborted."` is preserved
+    for the multi-page case where subdivision diagnostics aren't
+    populated. The richer multi-line message is used when subdivision
+    *did* run and bottomed out at the floor.
+    """
 
     def __init__(
         self,
         batch_idx: int,
         page_numbers: tuple[int, ...],
         attempts: int,
+        *,
+        subdivision_levels: int = 0,
+        last_failed_word_range: tuple[int, int] | None = None,
+        last_prompt_chars: int = 0,
     ) -> None:
         self.batch_idx = batch_idx
         self.page_numbers = page_numbers
         self.attempts = attempts
-        super().__init__(
-            f"Batch {batch_idx + 1} (pages {_format_page_range(page_numbers)}) "
-            f"failed {attempts} times and was aborted."
-        )
+        self.subdivision_levels = subdivision_levels
+        self.last_failed_word_range = last_failed_word_range
+        self.last_prompt_chars = last_prompt_chars
+        if subdivision_levels > 0 and last_failed_word_range is not None:
+            page_label = page_numbers[0] if len(page_numbers) == 1 else _format_page_range(
+                page_numbers
+            )
+            start, end = last_failed_word_range
+            n_words = end - start
+            super().__init__(
+                f"page {page_label} ({n_words} words) could not be processed "
+                f"even after subdividing to the minimum chunk size "
+                f"({2 * OVERLAP_WORDS} words).\n\n"
+                f"Tried {subdivision_levels} levels of subdivision. The last "
+                f"failed slice was page {page_label} words {start}..{end} "
+                f"(prompt_chars={last_prompt_chars}, attempts={attempts}).\n\n"
+                f"Likely causes:\n"
+                f"  - The model can't keep up with this prompt size in the "
+                f"available timeout\n"
+                f"  - Output truncation: the model has more findings than "
+                f"max_tokens allows\n"
+                f"  - The page contains content the model rejects "
+                f"(e.g., policy refusals)\n\n"
+                f"Suggestions:\n"
+                f"  - Use a model with larger context / faster throughput\n"
+                f"  - Increase the retry budget: --max-retries 5"
+            )
+        else:
+            super().__init__(
+                f"Batch {batch_idx + 1} (pages {_format_page_range(page_numbers)}) "
+                f"failed {attempts} times and was aborted."
+            )
 
 
 @dataclass(frozen=True)
@@ -149,8 +189,12 @@ def _halve(item: _WorkItem) -> tuple[_WorkItem, _WorkItem]:
     symmetric OVERLAP_WORDS overlap so entities straddling the cut
     survive in at least one half.
 
-    Floor handling (raising BatchError when no further halving makes
-    sense) lands in Task 11.
+    Raises BatchError when the floor is reached: a halving step that
+    would not produce children strictly smaller than the parent. With
+    OVERLAP_WORDS=50, the effective floor is N <= 100 words on a single
+    page. The caller (`_try_or_subdivide`) catches this and re-raises
+    with full diagnostics; we raise without diagnostics here and let
+    the caller fill them in.
     """
     if len(item.pages) >= 2:
         mid = len(item.pages) // 2
@@ -158,20 +202,30 @@ def _halve(item: _WorkItem) -> tuple[_WorkItem, _WorkItem]:
         right = _WorkItem.from_pages(item.pages[mid:])
         return left, right
 
-    # Single page (full or already-sliced).
     page = item.pages[0]
     base_start = item.word_range[0] if item.word_range is not None else 0
     base_end = item.word_range[1] if item.word_range is not None else len(page.words)
     n = base_end - base_start
+
+    # Floor check: each child has size n//2 + OVERLAP_WORDS. For the children
+    # to be strictly smaller than the parent we need n//2 + OVERLAP_WORDS < n,
+    # which simplifies to n > 2*OVERLAP_WORDS. We also require children to be
+    # at least MIN_CHUNK_WORDS so we don't dispatch trivially-tiny prompts.
+    if n <= 2 * OVERLAP_WORDS or n // 2 + OVERLAP_WORDS < MIN_CHUNK_WORDS:
+        raise BatchError(
+            batch_idx=0,  # filled in by _try_or_subdivide
+            page_numbers=(page.number,),
+            attempts=0,  # filled in by _try_or_subdivide
+            subdivision_levels=1,
+            last_failed_word_range=(base_start, base_end),
+        )
+
     mid = n // 2
-
-    # Boundaries inside the *current* page-slice (0..n).
     left_local_end = mid + OVERLAP_WORDS
-    right_local_start = mid - OVERLAP_WORDS
+    # Mirror left: each child has size (mid + OVERLAP_WORDS). For odd n
+    # this keeps both halves strictly smaller than the parent.
+    right_local_start = n - left_local_end
 
-    # The page object inside `item` is already (full or) sliced; we slice
-    # *it again* to produce children. For full-page items, that's the
-    # original page. For already-sliced items, that's the synthetic page.
     left_page = slice_page(page, 0, left_local_end)
     right_page = slice_page(page, right_local_start, n)
 

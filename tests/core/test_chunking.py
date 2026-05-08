@@ -728,3 +728,87 @@ def test_halve_single_page_re_indexes_words_to_zero_base() -> None:
 
     assert left.pages[0].words[0].idx == 0
     assert right.pages[0].words[0].idx == 0
+
+
+# ---------------------------------------------------------------------------
+# _halve floor + BatchError diagnostics
+# ---------------------------------------------------------------------------
+
+
+def test_halve_raises_at_floor_for_too_small_single_page() -> None:
+    """N <= 2 * OVERLAP_WORDS → no useful subdivision possible."""
+    import pytest
+
+    from kuroi.core.chunking import _halve, BatchError, _WorkItem
+
+    page = _page_with_words(num=1, n_words=80)  # 80 <= 2*50
+    item = _WorkItem.from_pages((page,))
+
+    with pytest.raises(BatchError) as exc_info:
+        _halve(item)
+
+    err = exc_info.value
+    assert err.last_failed_word_range == (0, 80)
+
+
+def test_halve_raises_at_floor_when_halves_would_be_too_small() -> None:
+    """N=99, OVERLAP=50: mid=49, left would be 99 words, right would be
+    99 words — neither is strictly smaller than the parent, so floor."""
+    import pytest
+
+    from kuroi.core.chunking import _halve, BatchError, _WorkItem
+
+    page = _page_with_words(num=1, n_words=99)
+    item = _WorkItem.from_pages((page,))
+
+    with pytest.raises(BatchError):
+        _halve(item)
+
+
+def test_halve_does_not_raise_just_above_the_floor() -> None:
+    """N=101, OVERLAP=50: mid=50, halves are 100 words each — strictly
+    smaller than 101. Floor not reached."""
+    from kuroi.core.chunking import _halve, _WorkItem
+
+    page = _page_with_words(num=1, n_words=101)
+    item = _WorkItem.from_pages((page,))
+
+    left, right = _halve(item)
+
+    assert len(left.pages[0].words) == 100
+    assert len(right.pages[0].words) == 100
+
+
+def test_batch_error_carries_subdivision_diagnostics_when_set() -> None:
+    """The new optional fields default cleanly when not set, and round-trip
+    when explicitly populated."""
+    from kuroi.core.chunking import BatchError
+
+    err = BatchError(
+        batch_idx=4,
+        page_numbers=(41,),
+        attempts=3,
+        subdivision_levels=7,
+        last_failed_word_range=(0, 100),
+        last_prompt_chars=4823,
+    )
+
+    assert err.subdivision_levels == 7
+    assert err.last_failed_word_range == (0, 100)
+    assert err.last_prompt_chars == 4823
+    msg = str(err)
+    assert "page 41" in msg
+    assert "100 words" in msg
+    assert "Tried 7 levels" in msg
+
+
+def test_batch_error_legacy_message_for_multi_page_failure() -> None:
+    """When subdivision diagnostics aren't set (e.g. simple multi-page
+    BatchError surfaced from the retry path), keep the old single-line
+    message for backward compatibility with existing CLI handling."""
+    from kuroi.core.chunking import BatchError
+
+    err = BatchError(batch_idx=3, page_numbers=(13, 14, 15), attempts=3)
+
+    msg = str(err)
+    assert msg == "Batch 4 (pages 13–15) failed 3 times and was aborted."  # noqa: RUF001
