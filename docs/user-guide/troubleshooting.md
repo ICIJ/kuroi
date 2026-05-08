@@ -108,3 +108,28 @@ with:
 2. `kuroi --version` and `kuroi doctor` output.
 3. The relevant audit JSONL excerpt (with `include_text = false` under
    `[audit]` so you don't leak the data you're trying to redact).
+
+## Transient provider failures
+
+If `kuroi run` aborts with `Batch N (pages X–Y) failed K times and was
+aborted.` (where `K` is `max_retries + 1`), the orchestrator hit a hard
+provider failure (HTTP error, timeout, or malformed response) on every
+attempt. Two knobs help:
+
+- **Slow Ollama / large model:** raise `--max-retries` and/or
+  `--retry-backoff` to give the daemon more time, e.g.
+  `--max-retries 5 --retry-backoff 5`. For a long-term setting, pin it
+  in `~/.config/kuroi/config.toml`:
+
+  ```toml
+  [retry]
+  max_retries = 5
+  backoff = 5.0
+  ```
+
+- **Fail fast in CI:** `--max-retries 0` disables retry so transient
+  errors surface immediately instead of waiting through backoff.
+
+Run with `-v` to see per-attempt logs (`retrying batch 3/12 (pages 9–12)
+in 4s (attempt 2/3)`) and the upstream WARNINGs that triggered the
+retry.
