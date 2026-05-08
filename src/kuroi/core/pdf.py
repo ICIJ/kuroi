@@ -20,6 +20,7 @@ class Word:
     idx: int
     text: str
     bbox: tuple[float, float, float, float]  # (x0, y0, x1, y1) in PDF points
+    block_id: int = 0  # PyMuPDF block_no; default 0 for synthetic/OCR pages
 
 
 @dataclass(frozen=True)

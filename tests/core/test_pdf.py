@@ -235,3 +235,11 @@ def test_slice_page_rejects_end_past_word_count() -> None:
 
     with pytest.raises(ValueError, match="out of range"):
         slice_page(page, 0, 3)
+
+
+def test_word_has_block_id_default_zero() -> None:
+    from kuroi.core.pdf import Word
+
+    w = Word(idx=0, text="hello", bbox=(0.0, 0.0, 1.0, 1.0))
+
+    assert w.block_id == 0
