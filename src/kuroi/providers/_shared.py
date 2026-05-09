@@ -3,12 +3,34 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from kuroi.core.findings import Confidence, Finding
 from kuroi.core.pdf import Page, serialize_for_llm
 
 logger = logging.getLogger("kuroi.providers")
+
+# Matches a markdown fenced code block that wraps the entire response, e.g.
+# ```json\n{...}\n```. The opening fence may carry an optional language tag
+# (or any text up to the newline); the closing fence is required. Anything
+# outside the fence is dropped after .strip().
+_FENCE_RE = re.compile(r"\A```[^\n]*\n(.*?)\n?```\Z", re.DOTALL)
+
+
+def strip_code_fence(text: str) -> str:
+    """Return ``text`` with a wrapping markdown code fence removed.
+
+    Some models — notably the Claude CLI, whose default style favors
+    markdown — wrap their JSON response in a ```` ```json ... ``` ````
+    block even when the system prompt forbids extra text. Strip exactly
+    that wrapper so ``json.loads`` succeeds. Plain JSON (or text the
+    regex doesn't match) is returned unchanged apart from outer
+    whitespace.
+    """
+    stripped = text.strip()
+    match = _FENCE_RE.match(stripped)
+    return match.group(1) if match else stripped
 
 SYSTEM_PROMPT = (
     "You are a redaction-assistant for kuroi, a CLI for stripping sensitive data "

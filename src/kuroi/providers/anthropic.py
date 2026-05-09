@@ -22,6 +22,7 @@ from kuroi.providers._shared import (
     build_user_prompt,
     build_user_static_prefix,
     parse_findings_payload,
+    strip_code_fence,
 )
 
 __all__ = ["AnthropicProvider", "build_user_prompt", "parse_findings_payload"]
@@ -252,7 +253,7 @@ class AnthropicProvider:
         )
 
         try:
-            payload = json.loads(text)
+            payload = json.loads(strip_code_fence(text))
         except json.JSONDecodeError as exc:
             logger.warning(
                 "anthropic returned non-JSON response (%s). The model may have wrapped "

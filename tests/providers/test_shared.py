@@ -6,6 +6,7 @@ from kuroi.providers._shared import (
     build_user_document_block,
     build_user_prompt,
     build_user_static_prefix,
+    strip_code_fence,
 )
 
 
@@ -143,3 +144,43 @@ def test_build_system_blocks_marks_prompt_with_cache_control() -> None:
     assert block["type"] == "text"
     assert block["cache_control"] == {"type": "ephemeral"}
     assert block["text"].startswith("You are a redaction-assistant for kuroi")
+
+
+def test_strip_code_fence_passes_plain_json_through() -> None:
+    text = '{"findings": []}'
+    assert strip_code_fence(text) == text
+
+
+def test_strip_code_fence_unwraps_json_language_tag() -> None:
+    text = '```json\n{"findings": [{"page": 1}]}\n```'
+    assert strip_code_fence(text) == '{"findings": [{"page": 1}]}'
+
+
+def test_strip_code_fence_unwraps_uppercase_language_tag() -> None:
+    text = '```JSON\n{"findings": []}\n```'
+    assert strip_code_fence(text) == '{"findings": []}'
+
+
+def test_strip_code_fence_unwraps_bare_fence() -> None:
+    text = '```\n{"findings": []}\n```'
+    assert strip_code_fence(text) == '{"findings": []}'
+
+
+def test_strip_code_fence_tolerates_outer_whitespace() -> None:
+    text = '\n  ```json\n{"findings": []}\n```  \n'
+    assert strip_code_fence(text) == '{"findings": []}'
+
+
+def test_strip_code_fence_leaves_unfenced_garbage_unchanged() -> None:
+    # Truly malformed input still surfaces to the json.JSONDecodeError path,
+    # so callers continue to log and subdivide rather than silently swallow.
+    text = "this is not json"
+    assert strip_code_fence(text) == "this is not json"
+
+
+def test_strip_code_fence_does_not_strip_orphan_opening_fence() -> None:
+    # Truncated response with only the opening fence: leaving it intact
+    # preserves the existing "non-JSON, will subdivide" behavior so we
+    # don't silently parse a half-message.
+    text = '```json\n{"findings": [{"page": 1'
+    assert strip_code_fence(text) == text

@@ -145,6 +145,33 @@ def test_provider_default_model_used_when_no_override() -> None:
     assert options.model == "claude-sonnet-4-6"
 
 
+def test_markdown_fenced_json_response_is_parsed() -> None:
+    # The Claude CLI's default rendering style wraps JSON in ```json fences
+    # even when the system prompt forbids extra text. Strip the fence so
+    # the response still produces findings instead of failing the batch.
+    fenced = (
+        '```json\n'
+        '{"findings": [{"page": 1, "start": 1, "end": 2, '
+        '"kind": "person_name", "confidence": "high"}]}\n'
+        '```'
+    )
+    qfn = _make_query_fn(
+        [
+            _StubAssistantMessage(fenced),
+            _StubResultMessage(input_tokens=10, output_tokens=2),
+        ]
+    )
+    provider = ClaudeCliProvider(query_fn=qfn)
+    pages = (_page(1, ["Hello", "Sarah", "Chen"]),)
+
+    findings, chunks = provider.detect_redactions(pages, ("person_name",))
+
+    assert len(findings) == 1
+    assert findings[0].kind == "person_name"
+    assert findings[0].source == "llm"
+    assert len(chunks) == 1
+
+
 def test_malformed_json_returns_empty_findings_with_chunk() -> None:
     qfn = _make_query_fn(
         [
