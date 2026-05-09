@@ -27,5 +27,6 @@ walks through using these fields end-to-end.
 | `detection` | `DetectionKind` |  |
 | `confidence` | `Confidence` |  |
 | `pattern` | `str | None` |  |
+| `model` | `str | None` |  |
 
 Refer to [`kuroi.core.rules`](api/rules.md) for the live definitions and helper functions (`load_rule_set`, `apply_regex_rules`).
