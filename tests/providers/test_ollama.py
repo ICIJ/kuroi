@@ -6,6 +6,7 @@ import json
 import json as _json_module
 import logging
 from typing import Any
+from unittest.mock import MagicMock
 
 import httpx
 import pytest
@@ -553,3 +554,23 @@ def test_ollama_non_object_payload_returns_empty_chunks() -> None:
 
     assert findings == []
     assert chunks == []
+
+
+def test_ollama_uses_per_call_model_override() -> None:
+    """Parity with Anthropic: an explicit model= overrides the instance default."""
+    response = MagicMock()
+    response.json.return_value = {
+        "message": {"content": '{"findings": []}'},
+        "prompt_eval_count": 10,
+        "eval_count": 2,
+    }
+    response.raise_for_status.return_value = None
+
+    client = MagicMock()
+    client.post.return_value = response
+
+    provider = OllamaProvider(model="llama3.1:8b", url="http://localhost:11434", client=client)
+    provider.detect_redactions(_one_page(), ("person_name",), model="qwen2:7b")
+
+    body = client.post.call_args.kwargs["json"]
+    assert body["model"] == "qwen2:7b"

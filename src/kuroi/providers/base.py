@@ -24,6 +24,7 @@ class Provider(Protocol):
         seed: int | None = None,
         attempt: int = 0,
         layout_aware: bool = False,
+        model: str | None = None,
     ) -> tuple[list[Finding], list[ChunkRecord]]:
         """Identify spans to redact across the supplied pages.
 
@@ -38,6 +39,10 @@ class Provider(Protocol):
             layout_aware: When True, wrap the prompt with PyMuPDF block
                 boundaries (<block id="N">…</block>) so the model sees
                 paragraph and other layout-detected structure. Default False.
+            model: If set, dispatch this call against the named model instead
+                of the provider instance's configured `self.model`. Used by
+                the chunker for per-category routing. Default None (use
+                instance default).
 
         Returns:
             A tuple of `(findings, chunk_records)` — findings are the proposed
