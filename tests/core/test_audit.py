@@ -168,3 +168,46 @@ def test_audit_finding_carries_bbox_and_hashes(tmp_path: Path) -> None:
     # Plaintext fields default off:
     assert "text" not in finding
     assert "context" not in finding
+
+
+def test_instruction_decomposed_event_serializes(tmp_path: Path) -> None:
+    """The instruction_decomposed event must round-trip through AuditLog
+    with all four fields preserved (source, detail, rule_count, rules)."""
+    log_path = tmp_path / "test.jsonl"
+    log = AuditLog.open(
+        log_path,
+        original=tmp_path / "in.pdf",
+        output=tmp_path / "out.pdf",
+        provider="ollama",
+        model="llama3.1:8b",
+        rules=(),
+        session_id="abc",
+        input_sha256="0" * 64,
+        input_pages=1,
+        input_bytes=100,
+        model_version="llama3.1:8b",
+        instructions=({"text": "Redact stuff"},),
+        config_resolved_from=(),
+    )
+    log.write_event(
+        "instruction_decomposed",
+        source="parser",
+        detail="parser split into 5 rules",
+        rule_count=5,
+        rules=["1. A", "2. B", "3. C", "4. D", "5. E"],
+    )
+    log.close(
+        verification_passed=True,
+        redaction_count=0,
+        tokens_in=0,
+        tokens_out=0,
+        cost_usd=0.0,
+        output_sha256="0" * 64,
+    )
+
+    events = [json.loads(line) for line in log_path.read_text().splitlines()]
+    decomp = next(e for e in events if e.get("event") == "instruction_decomposed")
+    assert decomp["source"] == "parser"
+    assert decomp["detail"] == "parser split into 5 rules"
+    assert decomp["rule_count"] == 5
+    assert decomp["rules"] == ["1. A", "2. B", "3. C", "4. D", "5. E"]
