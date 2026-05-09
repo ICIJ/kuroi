@@ -113,6 +113,47 @@ class BatchError(Exception):
 
 
 @dataclass(frozen=True)
+class BatchSummary:
+    """Per-batch metric aggregate, passed to on_batch_complete.
+
+    When the chunker dispatches a batch as multiple model-group calls
+    concurrently, this aggregates them into one user-visible summary
+    line: total token usage and the slowest group's wall-clock duration
+    (so duration_ms reflects observed latency rather than CPU sum).
+    """
+
+    batch_idx: int
+    total_batches: int
+    page_numbers: tuple[int, ...]
+    duration_ms: int  # max across concurrent groups
+    tokens_in: int  # sum across groups
+    tokens_out: int  # sum across groups
+    cache_creation_input_tokens: int  # sum
+    cache_read_input_tokens: int  # sum
+    chunks: tuple[ChunkRecord, ...]  # per-group records, in submission order
+
+    @classmethod
+    def from_chunks(
+        cls,
+        batch_idx: int,
+        total_batches: int,
+        page_numbers: tuple[int, ...],
+        chunks: tuple[ChunkRecord, ...],
+    ) -> BatchSummary:
+        return cls(
+            batch_idx=batch_idx,
+            total_batches=total_batches,
+            page_numbers=page_numbers,
+            duration_ms=max((c.duration_ms for c in chunks), default=0),
+            tokens_in=sum(c.tokens_in for c in chunks),
+            tokens_out=sum(c.tokens_out for c in chunks),
+            cache_creation_input_tokens=sum(c.cache_creation_input_tokens for c in chunks),
+            cache_read_input_tokens=sum(c.cache_read_input_tokens for c in chunks),
+            chunks=tuple(chunks),
+        )
+
+
+@dataclass(frozen=True)
 class _WorkItem:
     """One unit dispatched as a single Provider.detect_redactions call.
 
@@ -271,7 +312,7 @@ def detect_redactions_chunked(
     retry_policy: RetryPolicy,
     layout_aware: bool = False,
     on_batch_start: Callable[[int, int, tuple[int, ...]], None] | None = None,
-    on_batch_complete: Callable[[int, int, tuple[int, ...], ChunkRecord], None] | None = None,
+    on_batch_complete: Callable[[BatchSummary], None] | None = None,
 ) -> tuple[list[Finding], list[ChunkRecord]]:
     if pages_per_batch < 1:
         raise ValueError(f"pages_per_batch must be >= 1, got {pages_per_batch}")
@@ -319,7 +360,11 @@ def detect_redactions_chunked(
         aggregate_chunks.extend(chunks)
 
         if on_batch_complete is not None and chunks:
-            on_batch_complete(batch_idx, total_batches, page_numbers, chunks[-1])
+            on_batch_complete(
+                BatchSummary.from_chunks(
+                    batch_idx, total_batches, page_numbers, tuple(chunks)
+                )
+            )
 
     return aggregate_findings, aggregate_chunks
 

@@ -16,7 +16,7 @@ from rich.console import Console
 from kuroi.core.audit import AuditLog
 from kuroi.core.audit_records import ChunkRecord
 from kuroi.core.backup import create_backup, session_timestamp, sweep_backups
-from kuroi.core.chunking import BatchError, detect_redactions_chunked
+from kuroi.core.chunking import BatchError, BatchSummary, detect_redactions_chunked
 from kuroi.core.config import (
     ConfigError,
     ConfigOverrides,
@@ -248,21 +248,17 @@ def run(
                     rng = f"{page_numbers[0]}"
                 console.print(f"  Batch {batch_idx + 1}/{total} (pages {rng})...", end="")
 
-            def _on_batch_complete(
-                batch_idx: int,
-                total: int,
-                page_numbers: tuple[int, ...],
-                chunk: ChunkRecord,
-            ) -> None:
+            def _on_batch_complete(summary: BatchSummary) -> None:
                 extra = ""
                 if config.layout_aware:
                     block_total = sum(
-                        len({w.block_id for w in pages[pn - 1].words}) for pn in page_numbers
+                        len({w.block_id for w in pages[pn - 1].words})
+                        for pn in summary.page_numbers
                     )
                     extra = f" blocks={block_total}"
                 console.print(
-                    f" done in {chunk.duration_ms} ms, "
-                    f"tokens_in={chunk.tokens_in} tokens_out={chunk.tokens_out}{extra}"
+                    f" done in {summary.duration_ms} ms, "
+                    f"tokens_in={summary.tokens_in} tokens_out={summary.tokens_out}{extra}"
                 )
 
             try:
