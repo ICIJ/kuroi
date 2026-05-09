@@ -32,6 +32,6 @@ def _page(num: int, words: list[str]) -> Page:
 def test_real_query_returns_at_least_one_chunk() -> None:
     provider = ClaudeCliProvider(model="claude-haiku-4-5-20251001", timeout_s=120)
     pages = (_page(1, ["My", "name", "is", "Sarah", "Chen", "."]),)
-    findings, chunks = provider.detect_redactions(pages, ("person_name",))
+    _findings, chunks = provider.detect_redactions(pages, ("person_name",))
     assert len(chunks) == 1
     # Findings may be 0 if the model is conservative, so we don't assert > 0.
