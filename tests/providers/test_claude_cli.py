@@ -374,3 +374,60 @@ def test_no_warning_when_api_key_unset(caplog, monkeypatch) -> None:
         ClaudeCliProvider()
     messages = [r.message for r in caplog.records]
     assert not any("ANTHROPIC_API_KEY" in m for m in messages)
+
+
+class _DictUsageResultMessage:
+    """Stub matching the SDK's real shape: `usage` is a dict, not an object."""
+
+    def __init__(self, usage: dict[str, int]) -> None:
+        self.usage = usage
+
+
+def test_token_counts_extracted_from_dict_usage() -> None:
+    """Regression: claude-agent-sdk exposes `ResultMessage.usage` as a dict
+    keyed by Anthropic counter names. We must read tokens via dict.get,
+    not getattr, or every chunk record reports tokens_in=tokens_out=0."""
+    qfn = _make_query_fn(
+        [
+            _StubAssistantMessage('{"findings": []}'),
+            _DictUsageResultMessage(
+                usage={
+                    "input_tokens": 1234,
+                    "output_tokens": 42,
+                    "cache_creation_input_tokens": 100,
+                    "cache_read_input_tokens": 200,
+                }
+            ),
+        ]
+    )
+    provider = ClaudeCliProvider(query_fn=qfn)
+    pages = (_page(1, ["Hello"]),)
+
+    findings, chunks = provider.detect_redactions(pages, ("person_name",))
+
+    assert findings == []
+    assert len(chunks) == 1
+    assert chunks[0].tokens_in == 1234
+    assert chunks[0].tokens_out == 42
+    assert chunks[0].cache_creation_input_tokens == 100
+    assert chunks[0].cache_read_input_tokens == 200
+
+
+def test_token_counts_zero_when_usage_missing() -> None:
+    """A message without `usage` (or with usage=None) leaves counts at 0."""
+    qfn = _make_query_fn(
+        [
+            _StubAssistantMessage('{"findings": []}'),
+            _DictUsageResultMessage(usage={}),
+        ]
+    )
+    provider = ClaudeCliProvider(query_fn=qfn)
+    findings, chunks = provider.detect_redactions(
+        (_page(1, ["Hello"]),), ("person_name",)
+    )
+
+    assert findings == []
+    assert chunks[0].tokens_in == 0
+    assert chunks[0].tokens_out == 0
+    assert chunks[0].cache_creation_input_tokens == 0
+    assert chunks[0].cache_read_input_tokens == 0

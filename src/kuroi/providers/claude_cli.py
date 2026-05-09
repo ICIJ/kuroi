@@ -59,6 +59,23 @@ def _cli_connection_error_class() -> type[BaseException]:
 _AUTH_FAILURE_PATTERNS = ("not authenticated", "no credentials", "please log in")
 
 
+def _read_usage(usage: Any, key: str) -> int:
+    """Read a token-count `key` from an SDK `usage` payload.
+
+    `claude-agent-sdk` exposes `ResultMessage.usage` as a `dict[str, Any]`
+    keyed by the standard Anthropic counter names (`input_tokens`,
+    `output_tokens`, `cache_creation_input_tokens`,
+    `cache_read_input_tokens`). Older test stubs attach a Pydantic-style
+    object with the same names as attributes — we tolerate either.
+    Returns 0 if the key is missing or the value isn't an int.
+    """
+    value = usage.get(key, 0) if isinstance(usage, dict) else getattr(usage, key, 0)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _empty_chunk(
     pages: tuple[Page, ...],
     prompt_sha: str,
@@ -138,7 +155,7 @@ class ClaudeCliProvider:
 
         started = time.monotonic()
         try:
-            text, tokens_in, tokens_out = anyio.run(
+            text, tokens_in, tokens_out, cache_create, cache_read = anyio.run(
                 self._aexec, user_prompt, system_prompt, effective_model
             )
         except _cli_not_found_class() as exc:
@@ -205,6 +222,8 @@ class ClaudeCliProvider:
             tokens_in=tokens_in,
             tokens_out=tokens_out,
             duration_ms=duration_ms,
+            cache_creation_input_tokens=cache_create,
+            cache_read_input_tokens=cache_read,
         )
 
         try:
@@ -232,8 +251,17 @@ class ClaudeCliProvider:
         prompt: str,
         system_prompt: str,
         model: str,
-    ) -> tuple[str, int, int]:
-        """Run one `query()` call and return (text, tokens_in, tokens_out)."""
+    ) -> tuple[str, int, int, int, int]:
+        """Run one `query()` call.
+
+        Returns ``(text, tokens_in, tokens_out, cache_creation_input_tokens,
+        cache_read_input_tokens)``. The SDK exposes ``ResultMessage.usage``
+        as a ``dict`` whose keys mirror the Anthropic API
+        (``input_tokens``, ``output_tokens``,
+        ``cache_creation_input_tokens``, ``cache_read_input_tokens``); we
+        read it via ``.get`` rather than attribute access. Test stubs that
+        attach a Pydantic-style ``usage`` object are also tolerated.
+        """
         import anyio
         from claude_agent_sdk import (  # local import; SDK is heavy
             ClaudeAgentOptions,
@@ -256,6 +284,8 @@ class ClaudeCliProvider:
         result_text = ""
         tokens_in = 0
         tokens_out = 0
+        cache_create = 0
+        cache_read = 0
         with anyio.fail_after(self._timeout_s):
             async for message in qfn(prompt=prompt, options=options):
                 content = getattr(message, "content", None)
@@ -266,6 +296,12 @@ class ClaudeCliProvider:
                             result_text += text_attr
                 usage = getattr(message, "usage", None)
                 if usage is not None:
-                    tokens_in = int(getattr(usage, "input_tokens", 0)) or tokens_in
-                    tokens_out = int(getattr(usage, "output_tokens", 0)) or tokens_out
-        return result_text, tokens_in, tokens_out
+                    tokens_in = _read_usage(usage, "input_tokens") or tokens_in
+                    tokens_out = _read_usage(usage, "output_tokens") or tokens_out
+                    cache_create = (
+                        _read_usage(usage, "cache_creation_input_tokens") or cache_create
+                    )
+                    cache_read = (
+                        _read_usage(usage, "cache_read_input_tokens") or cache_read
+                    )
+        return result_text, tokens_in, tokens_out, cache_create, cache_read
