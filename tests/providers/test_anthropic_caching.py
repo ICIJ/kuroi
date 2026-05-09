@@ -103,3 +103,27 @@ def test_anthropic_records_zero_cache_tokens_when_usage_lacks_fields() -> None:
 
     assert chunks[0].cache_creation_input_tokens == 0
     assert chunks[0].cache_read_input_tokens == 0
+
+
+def test_anthropic_uses_per_call_model_override() -> None:
+    """When the chunker passes model=, the provider must dispatch the
+    request against that model rather than its instance-configured one."""
+    client = MagicMock()
+    client.messages.create.return_value = _stub_response()
+    provider = AnthropicProvider(model="claude-opus-4-7", client=client)
+
+    provider.detect_redactions(
+        _page(), ("person_name",), model="claude-haiku-4-5"
+    )
+
+    assert client.messages.create.call_args.kwargs["model"] == "claude-haiku-4-5"
+
+
+def test_anthropic_falls_back_to_instance_model_when_override_is_none() -> None:
+    client = MagicMock()
+    client.messages.create.return_value = _stub_response()
+    provider = AnthropicProvider(model="claude-opus-4-7", client=client)
+
+    provider.detect_redactions(_page(), ("person_name",), model=None)
+
+    assert client.messages.create.call_args.kwargs["model"] == "claude-opus-4-7"

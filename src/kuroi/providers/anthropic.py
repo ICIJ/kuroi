@@ -94,12 +94,14 @@ class AnthropicProvider:
         seed: int | None = None,
         attempt: int = 0,
         layout_aware: bool = False,
+        model: str | None = None,
     ) -> tuple[list[Finding], list[ChunkRecord]]:
         del (
             attempt
         )  # accepted for Provider protocol compliance; Anthropic SDK has its own retry/timeout
         if not llm_category_ids and not instructions:
             return [], []
+        effective_model = model or self.model
         static_prefix = build_user_static_prefix(llm_category_ids, instructions)
         document_block = build_user_document_block(pages, layout_aware=layout_aware)
         # Hash the joined prompt for audit-log continuity with prior runs.
@@ -107,12 +109,12 @@ class AnthropicProvider:
             (static_prefix + document_block).encode("utf-8")
         ).hexdigest()
 
-        extra: dict[str, Any] = {} if self.model in _NO_TEMPERATURE_MODELS else {"temperature": 0}
+        extra: dict[str, Any] = {} if effective_model in _NO_TEMPERATURE_MODELS else {"temperature": 0}
 
         logger.debug(
             "anthropic request model=%s max_tokens=%d prompt_chars=%d prompt_sha=%s\n"
             "FULL PROMPT:\n%s",
-            self.model,
+            effective_model,
             self._max_tokens,
             len(static_prefix) + len(document_block),
             prompt_sha[:8],
@@ -124,7 +126,7 @@ class AnthropicProvider:
         started = time.monotonic()
         try:
             response = self._client.messages.create(
-                model=self.model,
+                model=effective_model,
                 max_tokens=self._max_tokens,
                 system=build_system_blocks(layout_aware),
                 messages=[

@@ -67,9 +67,11 @@ class OllamaProvider:
         seed: int | None = None,
         attempt: int = 0,
         layout_aware: bool = False,
+        model: str | None = None,
     ) -> tuple[list[Finding], list[ChunkRecord]]:
         if not llm_category_ids and not instructions:
             return [], []
+        effective_model = model or self.model
         user_prompt = build_user_prompt(
             pages, llm_category_ids, instructions, layout_aware=layout_aware
         )
@@ -79,7 +81,7 @@ class OllamaProvider:
         if seed is not None:
             options["seed"] = seed
         body = {
-            "model": self.model,
+            "model": effective_model,
             "stream": False,
             "format": "json",
             "options": options,
@@ -100,7 +102,7 @@ class OllamaProvider:
         logger.debug(
             "ollama request model=%s url=%s prompt_chars=%d prompt_sha=%s "
             "attempt=%d read_timeout=%.0fs\nFULL PROMPT:\n%s",
-            self.model,
+            effective_model,
             self._url,
             len(user_prompt),
             prompt_sha[:8],
