@@ -381,17 +381,25 @@ def detect_redactions_chunked(
         if categories:
             for model, cat_ids in groups.items():
                 submissions.append(_Submission(model=model, category_ids=cat_ids, instructions=()))
-            if instructions:
+            for rule in instructions:
                 submissions.append(
-                    _Submission(model=provider.model, category_ids=(), instructions=instructions)
+                    _Submission(model=provider.model, category_ids=(), instructions=(rule,))
                 )
         else:
             # Legacy: single call with all category ids and instructions together.
             if groups or instructions:
                 default_cat_ids = next(iter(groups.values())) if groups else ()
-                submissions.append(
-                    _Submission(model=provider.model, category_ids=default_cat_ids, instructions=instructions)
-                )
+                if instructions:
+                    # Emit one submission per rule
+                    for rule in instructions:
+                        submissions.append(
+                            _Submission(model=provider.model, category_ids=default_cat_ids, instructions=(rule,))
+                        )
+                else:
+                    # No instructions: emit categories-only submission if groups exist
+                    submissions.append(
+                        _Submission(model=provider.model, category_ids=default_cat_ids, instructions=())
+                    )
 
         if not submissions:
             continue

@@ -391,3 +391,102 @@ def test_aggregate_chunk_order_is_submission_order() -> None:
     # because Category 'a' had model=claude-haiku-4-5).
     # Both calls produced exactly one ChunkRecord, so total is 2.
     assert len(aggregate_chunks) == 2
+
+
+def test_per_rule_submissions_emitted_for_multi_rule_instructions() -> None:
+    """When instructions tuple has length N>1, the chunker emits one
+    _Submission per rule (each carrying instructions=(rule_k,))."""
+    from kuroi.core.audit_records import ChunkRecord
+    from kuroi.core.chunking import detect_redactions_chunked
+    from kuroi.core.config import DEFAULT_RETRY_POLICY
+    from kuroi.core.pdf import Page, Word
+
+    class _Recorder:
+        name = "stub"
+        model = "claude-opus-4-7"
+
+        def __init__(self) -> None:
+            self.calls: list[tuple[tuple[str, ...], tuple[str, ...]]] = []
+
+        def detect_redactions(
+            self, pages, llm_category_ids, *, instructions=(),
+            seed=None, attempt=0, layout_aware=False, model=None,
+        ):
+            self.calls.append((llm_category_ids, instructions))
+            return [], [ChunkRecord(
+                chunk_idx=0,
+                pages=tuple(p.number for p in pages),
+                temperature=0.0,
+                seed_requested=None,
+                seed_honored=False,
+                system_fingerprint=None,
+                prompt_sha256="a" * 64,
+                response_sha256="b" * 64,
+                tokens_in=1,
+                tokens_out=1,
+                duration_ms=1,
+            )]
+
+    pages = (Page(number=1, words=(Word(idx=0, text="x", bbox=(0, 0, 1, 1)),)),)
+    provider = _Recorder()
+
+    detect_redactions_chunked(
+        provider,
+        pages,
+        (),                                      # no categories
+        instructions=("rule A", "rule B", "rule C"),
+        pages_per_batch=1,
+        retry_policy=DEFAULT_RETRY_POLICY,
+    )
+
+    # 3 rules → 3 calls per batch (1 batch). Each call carries one rule.
+    assert len(provider.calls) == 3
+    instr_tuples = [instr for cats, instr in provider.calls]
+    assert ("rule A",) in instr_tuples
+    assert ("rule B",) in instr_tuples
+    assert ("rule C",) in instr_tuples
+    # Categories empty on every call (instruction-only path).
+    for cats, _instr in provider.calls:
+        assert cats == ()
+
+
+def test_single_rule_instructions_keeps_one_submission() -> None:
+    """instructions=("only one",) → still 1 call per batch (today's shape)."""
+    from kuroi.core.audit_records import ChunkRecord
+    from kuroi.core.chunking import detect_redactions_chunked
+    from kuroi.core.config import DEFAULT_RETRY_POLICY
+    from kuroi.core.pdf import Page, Word
+
+    class _Recorder:
+        name = "stub"
+        model = "claude-opus-4-7"
+
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, ...]] = []
+
+        def detect_redactions(
+            self, pages, llm_category_ids, *, instructions=(),
+            seed=None, attempt=0, layout_aware=False, model=None,
+        ):
+            self.calls.append(instructions)
+            return [], [ChunkRecord(
+                chunk_idx=0, pages=tuple(p.number for p in pages),
+                temperature=0.0, seed_requested=None, seed_honored=False,
+                system_fingerprint=None, prompt_sha256="a" * 64,
+                response_sha256="b" * 64, tokens_in=1, tokens_out=1, duration_ms=1,
+            )]
+
+    pages = (Page(number=1, words=(Word(idx=0, text="x", bbox=(0, 0, 1, 1)),)),)
+    provider = _Recorder()
+
+    detect_redactions_chunked(
+        provider,
+        pages,
+        (),
+        instructions=("only one",),
+        pages_per_batch=1,
+        retry_policy=DEFAULT_RETRY_POLICY,
+    )
+
+    assert len(provider.calls) == 1
+    assert provider.calls[0] == ("only one",)
