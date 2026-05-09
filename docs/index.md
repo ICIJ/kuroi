@@ -21,7 +21,7 @@ $ export ANTHROPIC_API_KEY=sk-ant-...
 $ kuroi run report.pdf
 ✓ Detected 47 findings across 12 pages (32 regex, 15 llm)
 ✓ Wrote redacted file: report.redacted.pdf
-✓ Backup at: ~/.local/state/kuroi/backups/report-20260430-093102.pdf
+✓ Backup at: ~/.local/share/kuroi/backups/report-20260430-093102.pdf
 ```
 
 ## Get started
