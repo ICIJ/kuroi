@@ -356,3 +356,23 @@ def test_cli_path_override_propagates_to_options() -> None:
 
     options = captured["options"]
     assert options.cli_path == "/opt/claude"
+
+
+def test_anthropic_api_key_in_env_emits_warning(caplog, monkeypatch) -> None:
+    import logging
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    with caplog.at_level(logging.WARNING, logger="kuroi.providers.claude_cli"):
+        ClaudeCliProvider()
+    messages = [r.message for r in caplog.records]
+    assert any("ANTHROPIC_API_KEY" in m and "subscription" in m for m in messages)
+
+
+def test_no_warning_when_api_key_unset(caplog, monkeypatch) -> None:
+    import logging
+
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    with caplog.at_level(logging.WARNING, logger="kuroi.providers.claude_cli"):
+        ClaudeCliProvider()
+    messages = [r.message for r in caplog.records]
+    assert not any("ANTHROPIC_API_KEY" in m for m in messages)
