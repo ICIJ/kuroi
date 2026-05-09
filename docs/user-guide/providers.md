@@ -1,7 +1,7 @@
 # LLM providers
 
 kuroi uses an LLM as a "judge" to spot context-sensitive redactions that
-plain regex misses. Two providers ship with kuroi.
+plain regex misses. Three providers ship with kuroi: Anthropic (cloud, per-token), Claude CLI (cloud, subscription), and Ollama (local).
 
 ## Provider comparison
 
@@ -34,7 +34,7 @@ Ollama                                                      local
   seed support: full
 
 Default: anthropic / claude-opus-4-7   (configurable)
-Pricing last updated: 2026-04-01
+Pricing last updated: 2026-05-09
 ```
 
 `(installed)` is shown for Ollama models the local daemon currently
@@ -87,6 +87,19 @@ output, or `kuroi models ollama` to filter to one provider.
     `kuroi setup` will probe the CLI, verify it's authenticated, and write
     this file for you.
 
+    Or pass overrides per invocation without editing the config:
+
+    ```sh
+    $ kuroi run document.pdf --provider claude-cli \
+        --claude-cli-path /opt/claude/bin/claude \
+        --claude-cli-timeout 600
+    ```
+
+    `--claude-cli-path` overrides the bundled `claude-agent-sdk` binary (point
+    it at a system-installed `claude` if you prefer). `--claude-cli-timeout`
+    is the per-call timeout in seconds (default `300`); raise it for long
+    documents that exceed the default budget.
+
     !!! note "ANTHROPIC_API_KEY shadowing"
         If `ANTHROPIC_API_KEY` is set in your environment when you select the
         `claude-cli` provider, the Claude CLI will prefer API (per-token)
@@ -94,15 +107,8 @@ output, or `kuroi models ollama` to filter to one provider.
         the behavior is visible. Unset the variable to force subscription
         billing.
 
-    Per-rule `model:` overrides (in your rule packs or category YAML) work
-    the same way as for the Anthropic provider — the chunking layer dispatches
-    per-model groups concurrently per batch:
-
-    ```yaml
-    - id: contact_info
-      llm: true
-      model: claude-haiku-4-5-20251001
-    ```
+    Per-rule `model:` overrides work for every provider — see
+    [Per-category model routing](#per-category-model-routing) below.
 
 === "Ollama"
 
@@ -126,6 +132,29 @@ output, or `kuroi models ollama` to filter to one provider.
 
     `kuroi setup` will probe the daemon, list installed models, and write
     this file for you.
+
+## Per-category model routing
+
+Every category in a rule pack accepts an optional `model:` field. When set,
+calls for that category are dispatched against the named model instead of
+the provider's default — useful for routing cheap, repetitive categories
+(e.g. emails) to a small fast model and reserving the heavy default model
+for harder ones (e.g. names, addresses).
+
+```yaml
+- id: contact_info
+  llm: true
+  model: claude-haiku-4-5-20251001
+
+- id: full_name
+  llm: true
+  # falls back to the configured default model
+```
+
+The chunker groups dispatches by `model` and runs each group concurrently
+per batch, so per-category routing does not serialize calls. The override
+applies regardless of whether the provider is `anthropic`, `claude-cli`, or
+`ollama` — pick a model id the chosen provider can serve.
 
 ## Configuration precedence
 
