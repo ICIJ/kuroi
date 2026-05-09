@@ -580,3 +580,23 @@ def test_config_prompt_table_must_be_table(tmp_path: Path) -> None:
 
     with pytest.raises(ConfigError, match="prompt"):
         resolve_config(ConfigOverrides(), env={}, file_path=cfg_path)
+
+
+def test_claude_cli_is_a_valid_provider() -> None:
+    from kuroi.core.config import VALID_PROVIDERS
+
+    assert "claude-cli" in VALID_PROVIDERS
+
+
+def test_resolve_config_accepts_claude_cli_provider() -> None:
+    from pathlib import Path
+
+    from kuroi.core.config import ConfigOverrides, resolve_config
+
+    cfg = resolve_config(
+        ConfigOverrides(provider="claude-cli", model="claude-opus-4-7"),
+        env={},
+        file_path=Path("/nonexistent"),
+    )
+    assert cfg.provider == "claude-cli"
+    assert cfg.model == "claude-opus-4-7"
