@@ -1,6 +1,9 @@
 """Tests for the instruction decomposer module."""
 
+import json
 from unittest.mock import MagicMock
+
+import httpx
 
 from kuroi.core.instruction_decomposer import (
     DecompositionResult,
@@ -154,3 +157,154 @@ def test_decompose_threshold_boundary_at_300() -> None:
 
     assert result.source == "original"
     assert provider._client.post.call_count == 0
+
+
+def _llm_split_response(rules: list[str]) -> MagicMock:
+    """Build a MagicMock httpx.Response that returns Ollama's chat envelope
+    with `{"rules": [...]}` as the model's content."""
+    response = MagicMock()
+    response.json.return_value = {
+        "message": {"content": json.dumps({"rules": rules})},
+    }
+    response.raise_for_status.return_value = None
+    return response
+
+
+def _long_unstructured(n: int = 600) -> str:
+    """A single-paragraph string with no numbering / bullets / blank lines,
+    long enough to exceed LLM_FALLBACK_THRESHOLD_CHARS."""
+    return "Please redact every kind of personally identifiable information " * 8
+
+
+def test_decompose_llm_fallback_runs_when_long_unstructured() -> None:
+    long_instruction = _long_unstructured()
+    assert len(long_instruction) > LLM_FALLBACK_THRESHOLD_CHARS
+
+    provider = _MockOllamaProvider()
+    provider._client.post.return_value = _llm_split_response(
+        ["Redact names", "Redact emails", "Redact phone numbers"]
+    )
+
+    result = decompose(long_instruction, provider=provider)
+
+    assert provider._client.post.call_count == 1
+    assert result.source == "llm_fallback"
+    assert result.rules == ("Redact names", "Redact emails", "Redact phone numbers")
+    assert "3" in result.detail
+
+
+def test_decompose_llm_fallback_posts_to_ollama_chat_endpoint() -> None:
+    """The fallback should POST to <ollama_url>/api/chat with format=json
+    and model=<provider.model>."""
+    provider = _MockOllamaProvider()
+    provider._client.post.return_value = _llm_split_response(["A", "B"])
+
+    decompose(_long_unstructured(), provider=provider)
+
+    args, kwargs = provider._client.post.call_args
+    # First positional arg should be the chat endpoint URL.
+    assert args[0] == "http://localhost:11434/api/chat"
+    body = kwargs["json"]
+    assert body["model"] == "llama3.1:8b"
+    assert body["format"] == "json"
+    assert body["stream"] is False
+    # The user message should embed the original instruction text.
+    user_msg = next(m for m in body["messages"] if m["role"] == "user")
+    assert _long_unstructured() in user_msg["content"]
+
+
+def test_decompose_falls_back_on_timeout() -> None:
+    """A read-timeout from the daemon must not raise; original returned."""
+    provider = _MockOllamaProvider()
+    provider._client.post.side_effect = httpx.TimeoutException("timed out")
+
+    result = decompose(_long_unstructured(), provider=provider)
+
+    assert result.source == "llm_fallback"
+    assert result.rules == (_long_unstructured(),)  # original
+    assert "timed out" in result.detail.lower() or "timeout" in result.detail.lower()
+
+
+def test_decompose_falls_back_on_http_error() -> None:
+    provider = _MockOllamaProvider()
+    response = MagicMock()
+    response.status_code = 500
+    response.raise_for_status.side_effect = httpx.HTTPStatusError(
+        "boom", request=MagicMock(), response=response
+    )
+    provider._client.post.return_value = response
+
+    result = decompose(_long_unstructured(), provider=provider)
+
+    assert result.source == "llm_fallback"
+    assert result.rules == (_long_unstructured(),)
+    assert "http" in result.detail.lower() or "500" in result.detail
+
+
+def test_decompose_falls_back_on_malformed_json() -> None:
+    """Model returned text that isn't valid JSON for the rules envelope."""
+    provider = _MockOllamaProvider()
+    response = MagicMock()
+    response.json.return_value = {"message": {"content": "not json {{{"}}
+    response.raise_for_status.return_value = None
+    provider._client.post.return_value = response
+
+    result = decompose(_long_unstructured(), provider=provider)
+
+    assert result.source == "llm_fallback"
+    assert result.rules == (_long_unstructured(),)
+    assert "json" in result.detail.lower() or "parse" in result.detail.lower()
+
+
+def test_decompose_falls_back_on_missing_rules_key() -> None:
+    """Model returned valid JSON but the wrong shape."""
+    provider = _MockOllamaProvider()
+    response = MagicMock()
+    response.json.return_value = {"message": {"content": json.dumps({"foo": "bar"})}}
+    response.raise_for_status.return_value = None
+    provider._client.post.return_value = response
+
+    result = decompose(_long_unstructured(), provider=provider)
+
+    assert result.source == "llm_fallback"
+    assert result.rules == (_long_unstructured(),)
+    assert "shape" in result.detail.lower() or "rules" in result.detail.lower()
+
+
+def test_decompose_falls_back_on_single_rule_response() -> None:
+    """Model only returned one rule — not a useful split. Use original."""
+    provider = _MockOllamaProvider()
+    provider._client.post.return_value = _llm_split_response(["only one"])
+
+    result = decompose(_long_unstructured(), provider=provider)
+
+    assert result.source == "llm_fallback"
+    assert result.rules == (_long_unstructured(),)
+    assert "1" in result.detail or "one" in result.detail.lower()
+
+
+def test_decompose_falls_back_on_all_empty_rules() -> None:
+    """Model returned 2 rules but both empty/whitespace. Treat as <2 case."""
+    provider = _MockOllamaProvider()
+    provider._client.post.return_value = _llm_split_response(["  ", ""])
+
+    result = decompose(_long_unstructured(), provider=provider)
+
+    assert result.source == "llm_fallback"
+    assert result.rules == (_long_unstructured(),)
+
+
+def test_decompose_uses_ollama_read_timeout() -> None:
+    """The fallback's httpx.Timeout should match providers.ollama.READ_TIMEOUT_SECONDS."""
+    from kuroi.providers.ollama import READ_TIMEOUT_SECONDS
+
+    provider = _MockOllamaProvider()
+    provider._client.post.return_value = _llm_split_response(["A", "B"])
+
+    decompose(_long_unstructured(), provider=provider)
+
+    kwargs = provider._client.post.call_args.kwargs
+    timeout = kwargs.get("timeout")
+    assert timeout is not None
+    # httpx.Timeout exposes the read timeout as `.read`.
+    assert timeout.read == READ_TIMEOUT_SECONDS
