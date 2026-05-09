@@ -31,6 +31,7 @@ class Category:
     detection: DetectionKind
     confidence: Confidence
     pattern: str | None  # only for detection == "regex"
+    model: str | None = None  # if set, routes this category's calls to the named model
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,7 @@ def load_rule_set(name: str) -> RuleSet:
                 detection=c["detection"],
                 confidence=c["confidence"],
                 pattern=c.get("pattern"),
+                model=c.get("model"),
             )
         )
     return RuleSet(

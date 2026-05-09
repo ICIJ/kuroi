@@ -37,3 +37,59 @@ def test_llm_categories_lists_only_llm_kinds() -> None:
     cats = llm_categories(rs)
     ids = {c.id for c in cats}
     assert ids == {"person_name", "street_address"}
+
+
+def test_category_model_defaults_to_none() -> None:
+    from kuroi.core.rules import Category
+
+    cat = Category(
+        id="email_llm",
+        label="email (llm-only)",
+        detection="llm",
+        confidence="medium",
+        pattern=None,
+    )
+    assert cat.model is None
+
+
+def test_load_rule_set_reads_optional_model_field(tmp_path) -> None:
+    """A rule pack YAML may declare `model:` per category to route that
+    category's calls to a specific model. Categories that omit it inherit
+    the run's global model."""
+    from kuroi.core.rules import load_rule_set
+
+    pack = tmp_path / "test_pack.yaml"
+    pack.write_text(
+        """name: test_pack
+display_name: "Test"
+description: ""
+version: 1
+categories:
+  - id: cheap
+    label: "cheap one"
+    detection: llm
+    confidence: medium
+    model: claude-haiku-4-5
+  - id: pricey
+    label: "pricey one"
+    detection: llm
+    confidence: medium
+"""
+    )
+
+    # Patch resources.files to point at tmp_path for this one call.
+    import kuroi.core.rules as rules_module
+
+    monkey_files = lambda *_a, **_kw: type(
+        "X", (), {"joinpath": lambda self, name: tmp_path / name}
+    )()
+    original = rules_module.resources.files
+    rules_module.resources.files = monkey_files
+    try:
+        rs = load_rule_set("test_pack")
+    finally:
+        rules_module.resources.files = original
+
+    by_id = {c.id: c for c in rs.categories}
+    assert by_id["cheap"].model == "claude-haiku-4-5"
+    assert by_id["pricey"].model is None
