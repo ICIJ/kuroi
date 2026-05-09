@@ -97,7 +97,7 @@ def run(
     provider_name: str | None = typer.Option(
         None,
         "--provider",
-        help="LLM provider: 'anthropic' or 'ollama'. Overrides env and config.",
+        help="LLM provider: 'anthropic', 'ollama', or 'claude-cli'. Overrides env and config.",
     ),
     model: str | None = typer.Option(
         None,
@@ -108,6 +108,23 @@ def run(
         None,
         "--ollama-url",
         help="Base URL of the Ollama daemon. Overrides env and config.",
+    ),
+    claude_cli_path: str | None = typer.Option(
+        None,
+        "--claude-cli-path",
+        help=(
+            "Path to the local `claude` binary for the claude-cli provider. "
+            "Defaults to the binary bundled with claude-agent-sdk."
+        ),
+    ),
+    claude_cli_timeout: int | None = typer.Option(
+        None,
+        "--claude-cli-timeout",
+        help=(
+            "Per-call timeout in seconds for the claude-cli provider. "
+            "Default 300."
+        ),
+        min=1,
     ),
     seed: int | None = typer.Option(
         None,
@@ -203,6 +220,8 @@ def run(
                         retry_backoff=retry_backoff,
                         retry_backoff_multiplier=retry_backoff_multiplier,
                         layout_aware=layout_aware,
+                        claude_cli_path=claude_cli_path,
+                        claude_cli_timeout_s=claude_cli_timeout,
                     ),
                     env=os.environ,
                     file_path=xdg_config_home() / "kuroi" / "config.toml",
