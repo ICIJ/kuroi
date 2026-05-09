@@ -7,6 +7,9 @@
       "claude-sonnet-4-6": {"input_per_million":  3.00, "output_per_million": 15.00, "cache_write_multiplier": 1.25, "cache_read_multiplier": 0.1},
       "claude-haiku-4-5":  {"input_per_million":  0.80, "output_per_million":  4.00, "cache_write_multiplier": 1.25, "cache_read_multiplier": 0.1}
     },
+    "claude-cli": {
+      "*": {"input_per_million": 0.0, "output_per_million": 0.0, "cache_write_multiplier": 0.0, "cache_read_multiplier": 0.0}
+    },
     "ollama": {
       "*": {"input_per_million": 0.0, "output_per_million": 0.0, "cache_write_multiplier": 0.0, "cache_read_multiplier": 0.0}
     }

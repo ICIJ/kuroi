@@ -86,3 +86,23 @@ def test_estimate_cost_ollama_is_zero() -> None:
 
 def test_output_multiplier_constant() -> None:
     assert OUTPUT_MULTIPLIER == 0.18
+
+
+def test_claude_cli_pricing_rates_are_zero() -> None:
+    from kuroi.core.pricing import load_pricing
+
+    pricing = load_pricing()
+    rates = pricing.rates("claude-cli", "claude-opus-4-7")
+    assert rates.input_per_million == 0.0
+    assert rates.output_per_million == 0.0
+    assert rates.cache_write_multiplier == 0.0
+    assert rates.cache_read_multiplier == 0.0
+
+
+def test_claude_cli_pricing_uses_wildcard_for_unknown_model() -> None:
+    from kuroi.core.pricing import load_pricing
+
+    pricing = load_pricing()
+    rates = pricing.rates("claude-cli", "totally-made-up-model")
+    assert rates.input_per_million == 0.0
+    assert rates.output_per_million == 0.0
