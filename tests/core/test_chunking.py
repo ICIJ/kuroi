@@ -360,7 +360,7 @@ def test_on_batch_start_fires_once_per_batch_before_provider_call() -> None:
 
 
 def test_on_batch_complete_receives_renumbered_chunk() -> None:
-    from kuroi.core.chunking import detect_redactions_chunked
+    from kuroi.core.chunking import BatchSummary, detect_redactions_chunked
 
     pages = tuple(_page(i) for i in range(1, 5))
     provider = _RecordingProvider(
@@ -369,15 +369,10 @@ def test_on_batch_complete_receives_renumbered_chunk() -> None:
             ([], [_chunk((3, 4))]),
         ]
     )
-    completes: list[tuple[int, int, tuple[int, ...], int]] = []
+    received: list[BatchSummary] = []
 
-    def _capture(
-        batch_idx: int,
-        total: int,
-        page_numbers: tuple[int, ...],
-        chunk: ChunkRecord,
-    ) -> None:
-        completes.append((batch_idx, total, page_numbers, chunk.chunk_idx))
+    def _capture(summary: BatchSummary) -> None:
+        received.append(summary)
 
     detect_redactions_chunked(
         provider,
@@ -388,7 +383,15 @@ def test_on_batch_complete_receives_renumbered_chunk() -> None:
         on_batch_complete=_capture,
     )
 
-    assert completes == [(0, 2, (1, 2), 0), (1, 2, (3, 4), 1)]
+    assert len(received) == 2
+    assert received[0].batch_idx == 0
+    assert received[0].total_batches == 2
+    assert received[0].page_numbers == (1, 2)
+    assert received[0].chunks[-1].chunk_idx == 0
+    assert received[1].batch_idx == 1
+    assert received[1].total_batches == 2
+    assert received[1].page_numbers == (3, 4)
+    assert received[1].chunks[-1].chunk_idx == 1
 
 
 def test_on_batch_complete_does_not_fire_on_hard_failure(
@@ -414,7 +417,7 @@ def test_on_batch_complete_does_not_fire_on_hard_failure(
             ("x",),
             pages_per_batch=1,
             retry_policy=policy,
-            on_batch_complete=lambda *args: completes.append(args),
+            on_batch_complete=lambda summary: completes.append(summary),
         )
 
     assert completes == []

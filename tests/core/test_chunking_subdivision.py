@@ -6,6 +6,7 @@ to drive the orchestrator through real subdivision trees."""
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 import pytest
 
@@ -358,8 +359,8 @@ def test_progress_callbacks_fire_at_batch_boundary_only() -> None:
     def on_start(idx: int, total: int, _pn: tuple[int, ...]) -> None:
         starts.append(idx)
 
-    def on_complete(idx: int, total: int, _pn: tuple[int, ...], _ck: ChunkRecord) -> None:
-        completes.append(idx)
+    def on_complete(summary: Any) -> None:
+        completes.append(summary.batch_idx)
 
     detect_redactions_chunked(
         provider,
