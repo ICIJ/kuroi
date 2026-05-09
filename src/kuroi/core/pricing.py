@@ -20,6 +20,8 @@ class ProviderRates:
 
     input_per_million: float
     output_per_million: float
+    cache_write_multiplier: float = 1.25
+    cache_read_multiplier: float = 0.1
 
 
 @dataclass(frozen=True)
@@ -65,6 +67,8 @@ def load_pricing(path: Path | None = None) -> Pricing:
             model_name: ProviderRates(
                 input_per_million=float(rates["input_per_million"]),
                 output_per_million=float(rates["output_per_million"]),
+                cache_write_multiplier=float(rates.get("cache_write_multiplier", 1.25)),
+                cache_read_multiplier=float(rates.get("cache_read_multiplier", 0.1)),
             )
             for model_name, rates in models.items()
         }
