@@ -31,8 +31,14 @@ matches your workflow.
 ## System requirements
 
 - **Python 3.12 or newer.** Earlier versions are not supported.
-- **An LLM provider.** Either an Anthropic API key (cloud) or a running
-  [Ollama](https://ollama.ai) instance (local). See [LLM providers](providers.md).
+- **An LLM provider.** One of:
+    - An Anthropic API key (cloud, per-token).
+    - A Claude Code subscription (cloud, flat-rate). Install
+      `claude-agent-sdk` (`pip install claude-agent-sdk`) or the
+      `@anthropic-ai/claude-code` npm package and run `claude /login` once.
+    - A running [Ollama](https://ollama.ai) instance (local, free).
+
+    See [LLM providers](providers.md) for setup details.
 - **PDFs you have permission to redact.** kuroi never uploads files; only
   extracted text snippets are sent to the LLM.
 
