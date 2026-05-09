@@ -1,6 +1,29 @@
 """Tests for the instruction decomposer module."""
 
-from kuroi.core.instruction_decomposer import parse_instruction
+from unittest.mock import MagicMock
+
+from kuroi.core.instruction_decomposer import (
+    DecompositionResult,
+    LLM_FALLBACK_THRESHOLD_CHARS,
+    decompose,
+    parse_instruction,
+)
+
+
+class _MockOllamaProvider:
+    """A minimal Ollama-shaped stub for decomposer tests.
+
+    Exposes _client (httpx.Client surrogate), _url, and model — the three
+    fields the decomposer reads. Tests can configure _client.post to
+    return canned responses or raise.
+    """
+
+    name = "ollama"
+    model = "llama3.1:8b"
+
+    def __init__(self) -> None:
+        self._client = MagicMock()
+        self._url = "http://localhost:11434"
 
 
 def test_parser_splits_numbered_list() -> None:
@@ -82,3 +105,52 @@ def test_parser_handles_real_world_pacer_example() -> None:
     assert len(rules) == 5
     assert rules[0].startswith("1.")
     assert rules[4].startswith("5.")
+
+
+def test_decomposition_result_default_shape() -> None:
+    """Type contract: rules is a tuple, source is one of the three labels,
+    detail is a string."""
+    r = DecompositionResult(rules=("a",), source="original", detail="x")
+    assert r.rules == ("a",)
+    assert r.source == "original"
+    assert r.detail == "x"
+
+
+def test_decompose_returns_parser_result_when_multi_rule() -> None:
+    """When the parser splits the input into >=2 rules, decompose returns
+    those rules without invoking any LLM fallback."""
+    result = decompose(
+        "1. Redact emails\n2. Redact phones",
+        provider=_MockOllamaProvider(),
+    )
+    assert result.rules == ("1. Redact emails", "2. Redact phones")
+    assert result.source == "parser"
+    assert "2" in result.detail or "two" in result.detail.lower() or "split" in result.detail.lower()
+
+
+def test_decompose_short_single_rule_skips_fallback() -> None:
+    """Below the threshold, a single-rule parse is left alone — short
+    instructions aren't worth the LLM round-trip."""
+    short = "Redact all PII"  # well under 300 chars
+    assert len(short) < LLM_FALLBACK_THRESHOLD_CHARS
+
+    provider = _MockOllamaProvider()
+    result = decompose(short, provider=provider)
+
+    assert result.rules == (short,)
+    assert result.source == "original"
+    # Crucial: no HTTP call attempted.
+    assert provider._client.post.call_count == 0
+
+
+def test_decompose_threshold_boundary_at_300() -> None:
+    """Single-rule instruction of length exactly 300 — fallback does NOT run.
+    Uses `>` not `>=` so 300 stays in the original-pass-through bucket."""
+    boundary_input = "x" * 300  # single-rule prose, no structure
+    assert len(boundary_input) == LLM_FALLBACK_THRESHOLD_CHARS
+
+    provider = _MockOllamaProvider()
+    result = decompose(boundary_input, provider=provider)
+
+    assert result.source == "original"
+    assert provider._client.post.call_count == 0
