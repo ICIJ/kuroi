@@ -2,17 +2,21 @@
 
 Redact your first PDF in under five minutes.
 
-## 1. Set your provider key
+## 1. Pick a provider
 
-kuroi defaults to Anthropic. Export your API key once per shell, or add it
-to your shell rc file:
+kuroi supports three LLM providers — pick one:
 
-```sh
-export ANTHROPIC_API_KEY=sk-ant-...
-```
+- **Anthropic API** (cloud, default). Set `ANTHROPIC_API_KEY` once per shell:
+  ```sh
+  export ANTHROPIC_API_KEY=sk-ant-...
+  ```
+- **Claude CLI** (cloud, subscription). If you have a Claude Code plan, no
+  API key is needed. Run `claude /login` once, then pass `--provider claude-cli`.
+- **Ollama** (local, offline). Install [Ollama](https://ollama.ai) and pull a
+  model — no API key, no outbound HTTP. Pass `--provider ollama --model <name>`.
 
-If you want to stay fully offline, use [Ollama](providers.md)
-instead — no API key required.
+Run `kuroi setup` to configure interactively, or jump to
+[LLM providers](providers.md) for full details on each.
 
 ## 2. Run the redactor
 
@@ -31,6 +35,10 @@ Apply redactions? [Y/n]: y
   Backup: ~/.local/share/kuroi/backups/2026-04-30T09-31-02Z-a1b2c3/report.pdf
   Audit: ~/.local/share/kuroi/audit/2026-04-30T09-31-02Z-a1b2c3.jsonl
 ```
+
+The provider/model in the cost line reflects whatever is configured.
+For Claude CLI runs the cost shows as `subscription`; for Ollama it shows
+as `local (free)`.
 
 The `Backup:` line points at a copy of the original, kept so you can
 roll back at any time. Pass `--no-backup` to skip the copy when you
