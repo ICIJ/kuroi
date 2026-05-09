@@ -157,3 +157,39 @@ def test_probe_ollama_models_returns_names_on_success(monkeypatch: pytest.Monkey
 
     monkeypatch.setattr("httpx.get", _good_get)
     assert setup_module.probe_ollama_models("http://localhost:11434") == ["llama3.1:8b", "mistral:7b"]
+
+
+def test_setup_offers_claude_cli_option(monkeypatch, tmp_path) -> None:
+    """When the user picks 3, the config gets `provider = "claude-cli"`."""
+    from kuroi.cli import setup as setup_mod
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+
+    answers = iter(["3", "1"])  # provider=3 (claude-cli), model=1 (opus)
+
+    monkeypatch.setattr(setup_mod.typer, "prompt", lambda *a, **kw: next(answers))
+    # Stub the probe to succeed so setup writes the config.
+    monkeypatch.setattr(setup_mod, "probe_claude_cli", lambda cli_path=None: True)
+
+    setup_mod.setup()
+
+    cfg = (tmp_path / "kuroi" / "config.toml").read_text()
+    assert 'provider = "claude-cli"' in cfg
+    assert 'model = "claude-opus-4-7"' in cfg
+
+
+def test_setup_aborts_when_claude_cli_probe_fails(monkeypatch, tmp_path) -> None:
+    import pytest
+    import typer
+
+    from kuroi.cli import setup as setup_mod
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    answers = iter(["3", "1"])
+    monkeypatch.setattr(setup_mod.typer, "prompt", lambda *a, **kw: next(answers))
+    monkeypatch.setattr(setup_mod, "probe_claude_cli", lambda cli_path=None: False)
+
+    with pytest.raises(typer.Exit):
+        setup_mod.setup()
+    cfg_path = tmp_path / "kuroi" / "config.toml"
+    assert not cfg_path.exists()

@@ -53,6 +53,43 @@ def probe_ollama_models(url: str) -> list[str] | None:
     return names
 
 
+def probe_claude_cli(cli_path: str | None = None) -> bool:
+    """Verify the Claude CLI is reachable and authenticated. True on success.
+
+    Runs a single one-shot `query()` with a tiny prompt and asserts a
+    response message arrives. Returns False on any SDK error.
+    """
+    import anyio
+
+    async def _ping() -> bool:
+        try:
+            from claude_agent_sdk import (
+                ClaudeAgentOptions,
+                query as sdk_query,
+            )
+        except ImportError:
+            return False
+        options = ClaudeAgentOptions(
+            system_prompt="Reply with exactly: pong",
+            max_turns=1,
+            allowed_tools=[],
+            permission_mode="default",
+            setting_sources=[],
+            cli_path=cli_path,
+        )
+        try:
+            async for _ in sdk_query(prompt="ping", options=options):
+                return True
+        except Exception:
+            return False
+        return False
+
+    try:
+        return bool(anyio.run(_ping))
+    except Exception:
+        return False
+
+
 def _default_index(default: str | None, options: tuple[str, ...] | list[str]) -> str:
     """The numeric default for a numbered picker; falls back to '1' if `default` isn't listed."""
     if default is not None and default in options:
@@ -64,12 +101,20 @@ def _prompt_provider(default: str) -> str:
     console.print("[bold]Which LLM provider?[/]")
     console.print("  1. anthropic")
     console.print("  2. ollama")
-    default_index = "1" if default == "anthropic" else "2"
-    choice = typer.prompt("Enter choice [1/2]", default=default_index)
+    console.print("  3. claude-cli (uses your Claude Code subscription)")
+    if default == "anthropic":
+        default_index = "1"
+    elif default == "ollama":
+        default_index = "2"
+    else:
+        default_index = "3"
+    choice = typer.prompt("Enter choice [1/2/3]", default=default_index)
     if choice.strip() in ("1", "anthropic"):
         return "anthropic"
     if choice.strip() in ("2", "ollama"):
         return "ollama"
+    if choice.strip() in ("3", "claude-cli"):
+        return "claude-cli"
     console.print(f"[yellow]Unrecognized choice {choice!r}; keeping {default}.[/]")
     return default
 
@@ -142,6 +187,23 @@ def setup() -> None:
         )
         model = _prompt_anthropic_model(default_model)
         ollama_url: str = cur_ollama_url
+    elif provider_str == "claude-cli":
+        if not probe_claude_cli():
+            console.print(
+                "[red]Claude CLI is not reachable.[/] "
+                "Install with `pip install claude-agent-sdk` or "
+                "`npm install -g @anthropic-ai/claude-code`, then run "
+                "`claude /login` to authenticate. Re-run `kuroi setup` "
+                "when ready."
+            )
+            raise typer.Exit(code=2)
+        default_model = (
+            cur_model
+            if cur_model in CURATED_ANTHROPIC_MODELS
+            else CURATED_ANTHROPIC_MODELS[0]
+        )
+        model = _prompt_anthropic_model(default_model)
+        ollama_url = cur_ollama_url
     else:
         url_default: str = cur_ollama_url
         url = str(typer.prompt("Ollama base URL", default=url_default)).strip() or url_default
