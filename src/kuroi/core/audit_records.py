@@ -28,3 +28,5 @@ class ChunkRecord:
     tokens_out: int
     duration_ms: int
     page_word_range: tuple[int, int] | None = None
+    cache_creation_input_tokens: int = 0
+    cache_read_input_tokens: int = 0
