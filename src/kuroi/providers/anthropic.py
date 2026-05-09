@@ -17,8 +17,10 @@ from kuroi.core.audit_records import ChunkRecord
 from kuroi.core.findings import Finding
 from kuroi.core.pdf import Page
 from kuroi.providers._shared import (
-    build_system_prompt,
+    build_system_blocks,
+    build_user_document_block,
     build_user_prompt,
+    build_user_static_prefix,
     parse_findings_payload,
 )
 
@@ -98,10 +100,12 @@ class AnthropicProvider:
         )  # accepted for Provider protocol compliance; Anthropic SDK has its own retry/timeout
         if not llm_category_ids and not instructions:
             return [], []
-        user_prompt = build_user_prompt(
-            pages, llm_category_ids, instructions, layout_aware=layout_aware
-        )
-        prompt_sha = hashlib.sha256(user_prompt.encode("utf-8")).hexdigest()
+        static_prefix = build_user_static_prefix(llm_category_ids, instructions)
+        document_block = build_user_document_block(pages, layout_aware=layout_aware)
+        # Hash the joined prompt for audit-log continuity with prior runs.
+        prompt_sha = hashlib.sha256(
+            (static_prefix + document_block).encode("utf-8")
+        ).hexdigest()
 
         extra: dict[str, Any] = {} if self.model in _NO_TEMPERATURE_MODELS else {"temperature": 0}
 
@@ -110,9 +114,9 @@ class AnthropicProvider:
             "FULL PROMPT:\n%s",
             self.model,
             self._max_tokens,
-            len(user_prompt),
+            len(static_prefix) + len(document_block),
             prompt_sha[:8],
-            user_prompt,
+            static_prefix + document_block,
         )
 
         import anthropic  # local import to keep optional at module load
@@ -122,8 +126,23 @@ class AnthropicProvider:
             response = self._client.messages.create(
                 model=self.model,
                 max_tokens=self._max_tokens,
-                system=build_system_prompt(layout_aware),
-                messages=[{"role": "user", "content": user_prompt}],
+                system=build_system_blocks(layout_aware),
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": static_prefix,
+                                "cache_control": {"type": "ephemeral"},
+                            },
+                            {
+                                "type": "text",
+                                "text": document_block,
+                            },
+                        ],
+                    }
+                ],
                 **extra,
             )
         except anthropic.BadRequestError as exc:

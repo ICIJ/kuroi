@@ -102,11 +102,12 @@ def test_detect_redactions_round_trips_through_stub_client() -> None:
     f = findings[0]
     assert f.kind == "person_name"
     assert f.start == 1 and f.end == 2
-    # The system prompt was applied
-    assert "kuroi" in client.messages.last_call["system"]
-    # The user prompt contained the document tag
-    user_msg = client.messages.last_call["messages"][0]["content"]
-    assert "<document>" in user_msg
+    # The system prompt was applied — now a list of typed blocks
+    system = client.messages.last_call["system"]
+    assert isinstance(system, list) and "kuroi" in system[0]["text"]
+    # The user prompt contained the document tag — now a list of typed blocks
+    content = client.messages.last_call["messages"][0]["content"]
+    assert any("<document>" in block["text"] for block in content)
 
 
 def test_detect_redactions_short_circuits_with_no_categories() -> None:
@@ -218,9 +219,10 @@ def test_detect_redactions_with_instructions_only_makes_llm_call() -> None:
     assert findings[0].source == "instruction"
     assert findings[0].kind == "complainant_name"
     assert client.messages.last_call is not None
-    user_msg = client.messages.last_call["messages"][0]["content"]
-    assert "redact all complainant names" in user_msg
-    assert "Active LLM categories" not in user_msg
+    content = client.messages.last_call["messages"][0]["content"]
+    all_text = " ".join(block["text"] for block in content)
+    assert "redact all complainant names" in all_text
+    assert "Active LLM categories" not in all_text
 
 
 def test_detect_redactions_mixed_source_is_llm() -> None:
@@ -404,9 +406,12 @@ def test_anthropic_layout_aware_off_uses_plain_system_prompt() -> None:
     provider.detect_redactions(pages, llm_category_ids=("k",))
 
     kwargs = fake_client.messages.create.call_args.kwargs
-    assert kwargs["system"] == SYSTEM_PROMPT
-    assert LAYOUT_AWARE_INSTRUCTIONS not in kwargs["system"]
-    assert "<block" not in kwargs["messages"][0]["content"]
+    # system is now a list of typed blocks with cache_control
+    system = kwargs["system"]
+    assert isinstance(system, list) and system[0]["text"] == SYSTEM_PROMPT
+    assert LAYOUT_AWARE_INSTRUCTIONS not in system[0]["text"]
+    all_user_text = " ".join(b["text"] for b in kwargs["messages"][0]["content"])
+    assert "<block" not in all_user_text
 
 
 def test_anthropic_layout_aware_on_appends_paragraph_and_wraps_user_prompt() -> None:
@@ -433,7 +438,9 @@ def test_anthropic_layout_aware_on_appends_paragraph_and_wraps_user_prompt() -> 
     provider.detect_redactions(pages, llm_category_ids=("k",), layout_aware=True)
 
     kwargs = fake_client.messages.create.call_args.kwargs
-    assert LAYOUT_AWARE_INSTRUCTIONS in kwargs["system"]
-    user_content = kwargs["messages"][0]["content"]
-    assert '<block id="1">[0]Hello</block>' in user_content
-    assert '<block id="2">[1]world</block>' in user_content
+    # system is now a list of typed blocks with cache_control
+    system = kwargs["system"]
+    assert isinstance(system, list) and LAYOUT_AWARE_INSTRUCTIONS in system[0]["text"]
+    all_user_text = " ".join(b["text"] for b in kwargs["messages"][0]["content"])
+    assert '<block id="1">[0]Hello</block>' in all_user_text
+    assert '<block id="2">[1]world</block>' in all_user_text
