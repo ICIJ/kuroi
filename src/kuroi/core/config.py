@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-ProviderName = Literal["anthropic", "ollama"]
+ProviderName = Literal["anthropic", "ollama", "claude-cli"]
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
 DEFAULT_ANTHROPIC_MODEL = "claude-opus-4-7"
 
@@ -146,7 +146,7 @@ def write_config_file(path: Path, config: Config) -> None:
         raise
 
 
-VALID_PROVIDERS: tuple[ProviderName, ...] = ("anthropic", "ollama")
+VALID_PROVIDERS: tuple[ProviderName, ...] = ("anthropic", "ollama", "claude-cli")
 
 
 def _read_string(data: dict[str, Any], key: str, *, label: str | None = None) -> str | None:
