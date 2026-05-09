@@ -179,3 +179,30 @@ def test_non_object_json_payload_returns_empty_findings_with_chunk() -> None:
 
     assert findings == []
     assert len(chunks) == 1
+
+
+def test_cli_not_found_raises_config_error() -> None:
+    import pytest
+
+    from kuroi.core.config import ConfigError
+
+    class _FakeCLINotFound(Exception):
+        pass
+
+    async def qfn_raises(*, prompt: str, options: Any = None):
+        raise _FakeCLINotFound("CLI binary not on PATH")
+        yield  # pragma: no cover — make this an async generator
+
+    provider = ClaudeCliProvider(query_fn=qfn_raises)
+    pages = (_page(1, ["Hello"]),)
+
+    # Patch the SDK's exception class so the provider catches our fake one.
+    import kuroi.providers.claude_cli as mod
+
+    monkeyed = {"orig": mod._cli_not_found_class}
+    try:
+        mod._cli_not_found_class = lambda: _FakeCLINotFound  # type: ignore[assignment]
+        with pytest.raises(ConfigError, match="Claude CLI not found"):
+            provider.detect_redactions(pages, ("person_name",))
+    finally:
+        mod._cli_not_found_class = monkeyed["orig"]  # type: ignore[assignment]
