@@ -308,3 +308,21 @@ def test_decompose_uses_ollama_read_timeout() -> None:
     assert timeout is not None
     # httpx.Timeout exposes the read timeout as `.read`.
     assert timeout.read == READ_TIMEOUT_SECONDS
+
+
+def test_decompose_falls_back_on_non_json_http_body() -> None:
+    """The Ollama daemon returns a non-JSON body (e.g. a proxy error page).
+    response.json() raises JSONDecodeError, which must be caught — not
+    propagate out of decompose()."""
+    provider = _MockOllamaProvider()
+    response = MagicMock()
+    response.raise_for_status.return_value = None
+    response.json.side_effect = json.JSONDecodeError("Expecting value", "<html>", 0)
+    provider._client.post.return_value = response
+
+    # Must not raise.
+    result = decompose(_long_unstructured(), provider=provider)
+
+    assert result.source == "llm_fallback"
+    assert result.rules == (_long_unstructured(),)
+    assert "json" in result.detail.lower()

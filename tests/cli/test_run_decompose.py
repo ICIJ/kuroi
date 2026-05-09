@@ -245,3 +245,49 @@ def test_anthropic_multirule_instruct_does_not_decompose(
     events = _read_audit_events(audit_dir)
     decomp_events = [e for e in events if e.get("event") == "instruction_decomposed"]
     assert decomp_events == []
+
+
+def test_run_ollama_no_instruct_does_not_decompose(
+    tiny_pdf: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _pass_verification: None
+) -> None:
+    """Ollama run with no --instruct → no decomposer call, no audit event.
+    The decomposer gate checks `provider.name == "ollama" and instruct`; when
+    instruct is empty, decompose() is never called."""
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg-data"))
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "xdg-state"))
+
+    fake = _FakeOllamaProvider()
+    monkeypatch.setattr("kuroi.cli.run.make_provider", lambda cfg: fake)
+
+    audit_dir = tmp_path / "audit"
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(tiny_pdf),
+            "--rules", "pii-en",
+            "-o", str(tmp_path / "out.pdf"),
+            "--overwrite",
+            "-y",
+            "--no-backup",
+            "--audit-dir", str(audit_dir),
+            "--provider", "ollama",
+            "--model", "llama3.1:8b",
+            "--ollama-url", "http://localhost:11434",
+            "--pages-per-batch", "1",
+            "--max-retries", "0",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+
+    # With no --instruct, instruction tuple is empty even though --rules exists.
+    assert len(fake.detect_calls) == 1
+    assert fake.detect_calls[0]["instructions"] == ()
+    # Decomposer was never invoked, so no HTTP call attempted.
+    assert fake._client.post.call_count == 0
+
+    events = _read_audit_events(audit_dir)
+    decomp_events = [e for e in events if e.get("event") == "instruction_decomposed"]
+    assert decomp_events == []
