@@ -29,6 +29,7 @@ class _StubProvider:
         seed: int | None = None,
         attempt: int = 0,
         layout_aware: bool = False,
+        model: str | None = None,
     ) -> tuple[list[Finding], list[Any]]:
         from kuroi.core.audit_records import ChunkRecord
 
@@ -209,6 +210,7 @@ def test_run_layout_aware_flag_reaches_provider(
             seed: int | None = None,
             attempt: int = 0,
             layout_aware: bool = False,
+            model: str | None = None,
         ) -> tuple[list[Finding], list[Any]]:
             from kuroi.core.audit_records import ChunkRecord
 

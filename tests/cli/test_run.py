@@ -486,6 +486,7 @@ def test_run_instruct_flag_passes_instruction_to_provider(
         seed: Any = None,
         attempt: int = 0,
         layout_aware: bool = False,
+        model: str | None = None,
     ) -> Any:
         from kuroi.core.audit_records import ChunkRecord
 
@@ -561,7 +562,7 @@ def test_run_both_rules_and_instruct_run_together(
     make_pdf: Callable[..., Path], tmp_path: Path, monkeypatch
 ) -> None:
     """--rules and --instruct together: regex rules run AND instruction passed to LLM."""
-    captured: dict[str, Any] = {}
+    all_calls: list[dict[str, Any]] = []
 
     from kuroi.providers import anthropic as ap
 
@@ -574,11 +575,11 @@ def test_run_both_rules_and_instruct_run_together(
         seed: Any = None,
         attempt: int = 0,
         layout_aware: bool = False,
+        model: str | None = None,
     ) -> Any:
         from kuroi.core.audit_records import ChunkRecord
 
-        captured["instructions"] = instructions
-        captured["llm_category_ids"] = llm_category_ids
+        all_calls.append({"instructions": instructions, "llm_category_ids": llm_category_ids})
         return [], [
             ChunkRecord(
                 chunk_idx=0,
@@ -620,9 +621,12 @@ def test_run_both_rules_and_instruct_run_together(
     )
 
     assert result.exit_code == 0, result.stdout
-    assert captured.get("instructions") == ("also redact URLs",)
+    # pii categories and instructions are dispatched as separate per-batch calls.
+    all_instructions = [c["instructions"] for c in all_calls if c["instructions"]]
+    all_cat_ids = [c["llm_category_ids"] for c in all_calls if c["llm_category_ids"]]
+    assert any("also redact URLs" in instr for instr in all_instructions)
     # pii rule set has llm categories (person_name, street_address)
-    assert len(captured.get("llm_category_ids", ())) > 0
+    assert any(len(cat_ids) > 0 for cat_ids in all_cat_ids)
 
 
 def test_run_prints_ocr_notice_when_scanned_pages_found(
@@ -861,6 +865,7 @@ def test_run_with_pages_per_batch_invokes_orchestrator(
         seed: int | None = None,
         attempt: int = 0,
         layout_aware: bool = False,
+        model: str | None = None,
     ) -> tuple[list[Any], list[Any]]:
         from kuroi.core.audit_records import ChunkRecord
 
@@ -926,6 +931,7 @@ def test_run_with_pages_per_batch_prints_progress_per_batch(
         seed: int | None = None,
         attempt: int = 0,
         layout_aware: bool = False,
+        model: str | None = None,
     ) -> tuple[list[Any], list[Any]]:
         from kuroi.core.audit_records import ChunkRecord
 
@@ -992,6 +998,7 @@ def test_run_with_pages_per_batch_aborts_on_batch_error(
         seed: int | None = None,
         attempt: int = 0,
         layout_aware: bool = False,
+        model: str | None = None,
     ) -> tuple[list[Any], list[Any]]:
         return [], []  # hard failure on every call
 
@@ -1051,6 +1058,7 @@ def test_run_floor_batch_error_renders_multi_line_diagnostic(
         seed: int | None = None,
         attempt: int = 0,
         layout_aware: bool = False,
+        model: str | None = None,
     ) -> tuple[list[Any], list[Any]]:
         return [], []  # hard failure on every call
 
@@ -1109,6 +1117,7 @@ def test_run_max_retries_zero_disables_retry(
         seed: int | None = None,
         attempt: int = 0,
         layout_aware: bool = False,
+        model: str | None = None,
     ) -> tuple[list[Any], list[Any]]:
         call_count["n"] += 1
         return [], []  # hard failure

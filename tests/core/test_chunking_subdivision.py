@@ -87,6 +87,7 @@ class ScriptedFailureProvider:
         seed: int | None = None,
         attempt: int = 0,
         layout_aware: bool = False,
+        model: str | None = None,
     ) -> tuple[list[Finding], list[ChunkRecord]]:
         prompt = build_user_prompt(pages, llm_category_ids, instructions)
         self.calls.append((pages, attempt, prompt))
@@ -325,6 +326,7 @@ def test_subdivision_runs_after_retries_not_before() -> None:
             seed: int | None = None,
             attempt: int = 0,
             layout_aware: bool = False,
+            model: str | None = None,
         ) -> tuple[list[Finding], list[ChunkRecord]]:
             self.calls.append(attempt)
             if self.attempt_count < 2:
