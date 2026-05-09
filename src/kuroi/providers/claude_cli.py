@@ -169,6 +169,11 @@ class ClaudeCliProvider:
                 "claude-cli CLIJSONDecodeError (will subdivide): %s", exc
             )
             return [], _empty_chunk(pages, prompt_sha, seed)
+        except _cli_connection_error_class() as exc:
+            logger.warning(
+                "claude-cli CLIConnectionError (will subdivide): %s", exc
+            )
+            return [], _empty_chunk(pages, prompt_sha, seed)
         duration_ms = int((time.monotonic() - started) * 1000)
         response_sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
 
