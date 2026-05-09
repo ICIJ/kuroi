@@ -2,7 +2,7 @@
 
 Calls bill against the user's Claude Code subscription (no API key). The
 sync `Provider.detect_redactions` interface is bridged to the SDK's async
-`query()` via `anyio.run` per call. The event-loop spin-up cost is
+`query()` via `asyncio.run` per call. The event-loop spin-up cost is
 negligible compared to the LLM round-trip.
 
 Auth precedence: if `ANTHROPIC_API_KEY` is set in the environment, the CLI
@@ -13,6 +13,7 @@ the variable; we log a warning at provider init so the user can decide.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import time
@@ -70,4 +71,105 @@ class ClaudeCliProvider:
         del attempt  # accepted for Provider Protocol parity
         if not llm_category_ids and not instructions:
             return [], []
-        raise NotImplementedError("filled in by Task 8")
+
+        effective_model = model or self.model
+        static_prefix = build_user_static_prefix(llm_category_ids, instructions)
+        document_block = build_user_document_block(pages, layout_aware=layout_aware)
+        user_prompt = static_prefix + document_block
+        prompt_sha = hashlib.sha256(user_prompt.encode("utf-8")).hexdigest()
+        system_prompt = build_system_prompt(layout_aware)
+
+        import asyncio  # stdlib bridge from sync Provider Protocol to async SDK
+
+        started = time.monotonic()
+        text, tokens_in, tokens_out = asyncio.run(
+            self._aexec(user_prompt, system_prompt, effective_model)
+        )
+        duration_ms = int((time.monotonic() - started) * 1000)
+        response_sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+        logger.info(
+            "claude-cli response duration_ms=%d tokens_in=%d tokens_out=%d "
+            "response_chars=%d",
+            duration_ms,
+            tokens_in,
+            tokens_out,
+            len(text),
+        )
+
+        chunk = ChunkRecord(
+            chunk_idx=0,
+            pages=tuple(p.number for p in pages),
+            temperature=0.0,
+            seed_requested=seed,
+            seed_honored=False,
+            system_fingerprint=None,
+            prompt_sha256=prompt_sha,
+            response_sha256=response_sha,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            duration_ms=duration_ms,
+        )
+
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError as exc:
+            logger.warning(
+                "claude-cli returned non-JSON response (%s; will subdivide). "
+                "First 500 chars: %r",
+                exc,
+                text[:500],
+            )
+            return [], [chunk]
+        if not isinstance(payload, dict):
+            logger.warning(
+                "claude-cli payload is not an object (will subdivide; got %s)",
+                type(payload).__name__,
+            )
+            return [], [chunk]
+
+        source = "instruction" if not llm_category_ids else "llm"
+        return parse_findings_payload(payload, pages, source=source), [chunk]
+
+    async def _aexec(
+        self,
+        prompt: str,
+        system_prompt: str,
+        model: str,
+    ) -> tuple[str, int, int]:
+        """Run one `query()` call and return (text, tokens_in, tokens_out)."""
+        if self._query_fn is not None:
+            qfn = self._query_fn
+            options = None
+        else:
+            from claude_agent_sdk import (  # local import; SDK is heavy
+                ClaudeAgentOptions,
+                query as sdk_query,
+            )
+
+            options = ClaudeAgentOptions(
+                system_prompt=system_prompt,
+                model=model,
+                max_turns=1,
+                allowed_tools=[],
+                permission_mode="default",
+                setting_sources=[],
+                cli_path=self._cli_path,
+            )
+            qfn = sdk_query
+
+        result_text = ""
+        tokens_in = 0
+        tokens_out = 0
+        async for message in qfn(prompt=prompt, options=options):
+            content = getattr(message, "content", None)
+            if isinstance(content, list):
+                for block in content:
+                    text_attr = getattr(block, "text", None)
+                    if isinstance(text_attr, str):
+                        result_text += text_attr
+            usage = getattr(message, "usage", None)
+            if usage is not None:
+                tokens_in = int(getattr(usage, "input_tokens", 0)) or tokens_in
+                tokens_out = int(getattr(usage, "output_tokens", 0)) or tokens_out
+        return result_text, tokens_in, tokens_out
