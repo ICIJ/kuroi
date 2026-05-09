@@ -680,3 +680,36 @@ def test_claude_cli_timeout_must_be_positive(tmp_path) -> None:
     )
     with pytest.raises(ConfigError, match="claude_cli.timeout_s"):
         resolve_config(ConfigOverrides(), env={}, file_path=cfg_path)
+
+
+def test_write_config_file_omits_claude_cli_when_default(tmp_path) -> None:
+    from kuroi.core.config import Config, write_config_file
+
+    cfg = Config(
+        provider="claude-cli",
+        model="claude-opus-4-7",
+        ollama_url="http://localhost:11434",
+    )
+    out = tmp_path / "config.toml"
+    write_config_file(out, cfg)
+    body = out.read_text()
+    assert "[claude_cli]" not in body
+    assert 'provider = "claude-cli"' in body
+
+
+def test_write_config_file_emits_claude_cli_when_set(tmp_path) -> None:
+    from kuroi.core.config import Config, write_config_file
+
+    cfg = Config(
+        provider="claude-cli",
+        model="claude-opus-4-7",
+        ollama_url="http://localhost:11434",
+        claude_cli_path="/opt/claude",
+        claude_cli_timeout_s=600,
+    )
+    out = tmp_path / "config.toml"
+    write_config_file(out, cfg)
+    body = out.read_text()
+    assert "[claude_cli]" in body
+    assert 'cli_path = "/opt/claude"' in body
+    assert "timeout_s = 600" in body

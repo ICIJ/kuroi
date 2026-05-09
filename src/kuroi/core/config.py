@@ -125,13 +125,15 @@ def write_config_file(path: Path, config: Config) -> None:
     """Write `config` to `path` atomically.
 
     Serializes the on-disk schema (top-level `provider` and `model` plus a
-    nested `[ollama]` table). Writes to `<path>.tmp` then `os.replace()` so
+    nested `[ollama]` table, optionally a `[claude_cli]` table when any
+    field is non-default). Writes to `<path>.tmp` then `os.replace()` so
     a crash mid-write cannot corrupt an existing file.
 
-    Assumes `config.provider`, `config.model`, and `config.ollama_url` contain
-    no double-quote characters; the writer does not perform TOML escaping.
-    This holds because `provider` is a `Literal`, and `model` and `ollama_url`
-    are validated upstream during config resolution.
+    Assumes `config.provider`, `config.model`, `config.ollama_url`, and
+    `config.claude_cli_path` contain no double-quote characters; the writer
+    does not perform TOML escaping. This holds because `provider` is a
+    `Literal`, and the others are validated upstream during config
+    resolution.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     body = (
@@ -141,6 +143,14 @@ def write_config_file(path: Path, config: Config) -> None:
         f"[ollama]\n"
         f'url = "{config.ollama_url}"\n'
     )
+    has_custom_cli_path = config.claude_cli_path is not None
+    has_custom_timeout = config.claude_cli_timeout_s != 300
+    if has_custom_cli_path or has_custom_timeout:
+        body += "\n[claude_cli]\n"
+        if has_custom_cli_path:
+            body += f'cli_path = "{config.claude_cli_path}"\n'
+        if has_custom_timeout:
+            body += f"timeout_s = {config.claude_cli_timeout_s}\n"
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(body)
     try:
