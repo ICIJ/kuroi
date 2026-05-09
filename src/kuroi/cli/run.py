@@ -15,6 +15,7 @@ from rich.console import Console
 
 from kuroi.core.audit import AuditLog
 from kuroi.core.audit_records import ChunkRecord
+from kuroi.core.instruction_decomposer import DecompositionResult, decompose
 from kuroi.core.backup import create_backup, session_timestamp, sweep_backups
 from kuroi.core.chunking import BatchError, BatchSummary, detect_redactions_chunked
 from kuroi.core.config import (
@@ -263,6 +264,15 @@ def run(
                     "is enforced for this provider"
                 )
             instruction_tuple: tuple[str, ...] = (instruct,) if instruct else ()
+            decomp_result: DecompositionResult | None = None
+            if provider.name == "ollama" and instruct:
+                decomp_result = decompose(instruct, provider)
+                instruction_tuple = decomp_result.rules
+                if len(decomp_result.rules) > 1:
+                    console.print(
+                        f"  Decomposed instruction into {len(decomp_result.rules)} "
+                        f"atomic rules ({decomp_result.source})"
+                    )
 
             effective_batch_size = pages_per_batch if pages_per_batch > 0 else len(pages)
             total_batches = math.ceil(len(pages) / effective_batch_size)
@@ -358,6 +368,15 @@ def run(
                 instructions=({"text": instruct},) if instruct else (),
                 config_resolved_from=(),
             )
+
+            if decomp_result is not None:
+                audit.write_event(
+                    "instruction_decomposed",
+                    source=decomp_result.source,
+                    detail=decomp_result.detail,
+                    rule_count=len(decomp_result.rules),
+                    rules=list(decomp_result.rules),
+                )
 
             for chunk in chunks:
                 audit.write_event("chunk_request", **asdict(chunk))
