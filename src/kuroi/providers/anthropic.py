@@ -202,6 +202,19 @@ class AnthropicProvider:
             int(getattr(usage, "cache_read_input_tokens", 0)) if usage else 0
         )
 
+        if cache_create == 0 and cache_read == 0 and llm_category_ids:
+            # Per-batch silent cache miss: structured-blocks request was sent
+            # but neither write nor read landed. Either the static prefix was
+            # too short to qualify (Anthropic skips caching small blocks) or
+            # the cache TTL expired. Surface at debug to keep diagnosability
+            # without spamming default output.
+            logger.debug(
+                "anthropic cache neither written nor read on this call "
+                "(static_prefix=%d chars). The block may be below the cache "
+                "minimum or the TTL expired.",
+                len(static_prefix),
+            )
+
         logger.info(
             "anthropic response duration_ms=%d tokens_in=%d tokens_out=%d response_chars=%d",
             duration_ms,

@@ -106,3 +106,19 @@ def test_chunk_record_page_word_range_explicit_value_round_trips() -> None:
     )
 
     assert record.page_word_range == (3950, 8000)
+
+
+def test_chunk_record_asdict_includes_cache_fields() -> None:
+    """When ChunkRecord is serialized via dataclasses.asdict for JSONL audit
+    output, the cache-token fields must be present so the audit log captures
+    the prompt-cache savings for cost reconstruction."""
+    from dataclasses import asdict
+
+    rec = ChunkRecord(
+        **_base_kwargs(),
+        cache_creation_input_tokens=1180,
+        cache_read_input_tokens=64900,
+    )
+    payload = asdict(rec)
+    assert payload["cache_creation_input_tokens"] == 1180
+    assert payload["cache_read_input_tokens"] == 64900
