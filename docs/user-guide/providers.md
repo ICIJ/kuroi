@@ -8,6 +8,7 @@ plain regex misses. Two providers ship with kuroi.
 | Provider | Hosting | API key required | Cost | Best for |
 | --- | --- | --- | --- | --- |
 | **Anthropic** | Cloud | Yes (`ANTHROPIC_API_KEY`) | Per-token | Highest-quality detection on small batches. |
+| **Claude CLI** | Cloud | No (subscription) | Subscription | Heavy use under a Claude Code plan. |
 | **Ollama** | Local | No | Free (your hardware) | Offline workflows; sensitive data that must not leave the host. |
 
 ## List available models
@@ -20,6 +21,12 @@ Anthropic                                                   cloud
   claude-sonnet-4-6                  $3.00 / $15.00 per Mtok
   claude-haiku-4-5-20251001          $1.00 / $5.00 per Mtok
   seed support: temperature=0 only (best-effort, recorded in audit)
+
+Claude CLI                                                  cloud
+  claude-opus-4-7                    subscription billing
+  claude-sonnet-4-6                  subscription billing
+  claude-haiku-4-5-20251001          subscription billing
+  seed support: not available
 
 Ollama                                                      local
   llama3.1:8b            (installed) free
@@ -54,6 +61,48 @@ output, or `kuroi models ollama` to filter to one provider.
     ```
 
     `kuroi setup` will write this file for you interactively.
+
+=== "Claude CLI"
+
+    Pass per invocation:
+
+    ```sh
+    $ pip install claude-agent-sdk          # or `npm install -g @anthropic-ai/claude-code`
+    $ claude /login                          # one-time, authenticates your subscription
+    $ kuroi run document.pdf --provider claude-cli --model claude-opus-4-7
+    ```
+
+    Or persist by editing `~/.config/kuroi/config.toml`:
+
+    ```toml
+    provider = "claude-cli"
+    model = "claude-opus-4-7"
+
+    # Optional — both fields default sensibly.
+    [claude_cli]
+    cli_path = "/usr/local/bin/claude"
+    timeout_s = 300
+    ```
+
+    `kuroi setup` will probe the CLI, verify it's authenticated, and write
+    this file for you.
+
+    !!! note "ANTHROPIC_API_KEY shadowing"
+        If `ANTHROPIC_API_KEY` is set in your environment when you select the
+        `claude-cli` provider, the Claude CLI will prefer API (per-token)
+        billing over your subscription. kuroi prints a warning at startup so
+        the behavior is visible. Unset the variable to force subscription
+        billing.
+
+    Per-rule `model:` overrides (in your rule packs or category YAML) work
+    the same way as for the Anthropic provider — the chunking layer dispatches
+    per-model groups concurrently per batch:
+
+    ```yaml
+    - id: contact_info
+      llm: true
+      model: claude-haiku-4-5-20251001
+    ```
 
 === "Ollama"
 

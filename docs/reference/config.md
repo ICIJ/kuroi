@@ -24,6 +24,8 @@ The merged result is an immutable `Config` object defined in
 | `retry.backoff`               | float    | `2.0`                         | `[retry]` table, `backoff`             | `--retry-backoff`              | `KUROI_RETRY_BACKOFF`              |
 | `retry.backoff_multiplier`    | float    | `2.0`                         | `[retry]` table, `backoff_multiplier`  | `--retry-backoff-multiplier`   | `KUROI_RETRY_BACKOFF_MULTIPLIER`   |
 | `prompt.layout_aware`         | bool     | `false`                       | `[prompt]` table, `layout_aware`       | `--layout-aware` / `--no-layout-aware` | (none)                   |
+| `claude_cli.cli_path`         | string   | (unset)                       | `[claude_cli]` table, `cli_path`       | `--claude-cli-path`            | (none)                             |
+| `claude_cli.timeout_s`        | int      | `300`                         | `[claude_cli]` table, `timeout_s`      | `--claude-cli-timeout`         | (none)                             |
 | `ANTHROPIC_API_KEY`           | string   | (unset)                       | (not in TOML)                          | (env only)                     | `ANTHROPIC_API_KEY`                |
 
 When the provider is `ollama`, there is no built-in default model — you
@@ -55,12 +57,21 @@ backoff_multiplier = 2.0
 
 [prompt]
 layout_aware = false
+
+[claude_cli]
+# cli_path = "/usr/local/bin/claude"  # default: bundled CLI from claude-agent-sdk
+# timeout_s = 300
 ```
 
 `kuroi setup` writes the top-level `provider`/`model` keys and the
 `[ollama]` table interactively. `audit.include_text`,
 `backup.retention_hours`, and the `[retry]` table are not exposed by
 `setup` — edit `config.toml` directly to change them.
+
+The `[claude_cli]` table only applies when `provider = "claude-cli"`.
+`cli_path` lets you override the bundled `claude` binary (default: the one
+shipped with `claude-agent-sdk`); `timeout_s` caps each `query()` call.
+The CLI flags are `--claude-cli-path` and `--claude-cli-timeout`.
 
 ## Retry policy
 
