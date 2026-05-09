@@ -106,6 +106,34 @@ Then pass the resulting `RuleSet` into `apply_regex_rules` and to your
 provider's `detect_redactions`. See
 [Using kuroi as a library](library-usage.md) for the full pipeline.
 
+## Per-category model routing
+
+Each category accepts an optional `model:` field. When present, the
+chunker dispatches that category's calls against the named model instead
+of the default model selected at the top level. The chunker groups by
+model and runs each group concurrently per batch, so adding `model:`
+to a few categories does not serialize the run.
+
+```yaml
+categories:
+  - id: emails
+    label: Email addresses
+    detection: llm
+    confidence: high
+    model: claude-haiku-4-5-20251001     # cheap, plenty for emails
+
+  - id: full_names
+    label: Personal names
+    detection: llm
+    confidence: high
+    # no model: → uses the run's default model
+```
+
+The override applies whatever provider you choose; pass a model id the
+configured provider can serve. See
+[LLM providers → Per-category model routing](../user-guide/providers.md#per-category-model-routing)
+for an end-user-facing summary.
+
 ## Tips
 
 - Keep regex patterns tight. A loose pattern produces false positives
