@@ -34,7 +34,7 @@ from kuroi.core.output_resolution import (
 from kuroi.core.pdf import OcrRequiredError, extract_word_index, serialize_for_llm
 from kuroi.core.pricing import Pricing, count_tokens, estimate_cost, load_pricing
 from kuroi.core.redaction import apply_redactions
-from kuroi.core.rules import apply_regex_rules, llm_categories, load_rule_set
+from kuroi.core.rules import Category, apply_regex_rules, llm_categories, load_rule_set
 from kuroi.core.verification import verify_pdf
 from kuroi.providers.factory import make_provider
 
@@ -250,7 +250,7 @@ def run(
 
             findings: list[Finding] = []
             llm_cat_ids: list[str] = []
-            all_categories: list = []
+            all_categories: list[Category] = []
             for rs in rule_sets:
                 findings.extend(apply_regex_rules(pages, rs))
                 llm_cat_ids.extend(c.id for c in llm_categories(rs))

@@ -17,3 +17,5 @@ htmlcov/
 .vscode/
 *.swp
 .DS_Store
+prz.json
+*.kuroi-tmp.pdf
