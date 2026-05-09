@@ -225,9 +225,11 @@ def run(
 
             findings: list[Finding] = []
             llm_cat_ids: list[str] = []
+            all_categories: list = []
             for rs in rule_sets:
                 findings.extend(apply_regex_rules(pages, rs))
                 llm_cat_ids.extend(c.id for c in llm_categories(rs))
+                all_categories.extend(llm_categories(rs))
 
             provider = make_provider(config)
             if seed is not None and provider.name == "anthropic":
@@ -271,6 +273,7 @@ def run(
                     pages_per_batch=effective_batch_size,
                     retry_policy=config.retry,
                     layout_aware=config.layout_aware,
+                    categories=tuple(all_categories),
                     on_batch_start=_on_batch_start if batched_ui else None,
                     on_batch_complete=_on_batch_complete if batched_ui else None,
                 )

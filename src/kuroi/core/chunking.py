@@ -311,11 +311,29 @@ def detect_redactions_chunked(
     pages_per_batch: int,
     retry_policy: RetryPolicy,
     layout_aware: bool = False,
+    categories: tuple[Category, ...] = (),
     on_batch_start: Callable[[int, int, tuple[int, ...]], None] | None = None,
     on_batch_complete: Callable[[BatchSummary], None] | None = None,
 ) -> tuple[list[Finding], list[ChunkRecord]]:
     if pages_per_batch < 1:
         raise ValueError(f"pages_per_batch must be >= 1, got {pages_per_batch}")
+
+    # Resolve which categories actually go to the LLM and partition by target
+    # model. When `categories` is empty (legacy callers haven't been updated),
+    # fall back to a single default-model bucket containing all category ids.
+    if categories:
+        groups_full = _partition_categories_by_model(
+            categories, default_model=provider.model
+        )
+        # Restrict to ids the caller actually activated.
+        active = set(llm_category_ids)
+        groups = {
+            model: tuple(cid for cid in ids if cid in active)
+            for model, ids in groups_full.items()
+        }
+        groups = {model: ids for model, ids in groups.items() if ids}
+    else:
+        groups = {provider.model: llm_category_ids} if llm_category_ids else {}
 
     total_batches = math.ceil(len(pages) / pages_per_batch)
     aggregate_findings: list[Finding] = []
@@ -330,39 +348,62 @@ def detect_redactions_chunked(
         if on_batch_start is not None:
             on_batch_start(batch_idx, total_batches, page_numbers)
 
-        item = _WorkItem.from_pages(batch)
-        try:
-            findings, chunks = _try_or_subdivide(
-                item,
-                provider,
-                llm_category_ids,
-                instructions=instructions,
-                seed=seed,
-                retry_policy=retry_policy,
-                counter=counter,
-                batch_idx=batch_idx,
-                subdivision_level=0,
-                layout_aware=layout_aware,
-            )
-        except BatchError as exc:
-            # _halve raised at floor with batch_idx=0/attempts=0; replace
-            # those with the real values from this top-level batch.
-            raise BatchError(
-                batch_idx=batch_idx,
-                page_numbers=exc.page_numbers,
-                attempts=len(retry_policy.schedule()) + 1,
-                subdivision_levels=exc.subdivision_levels,
-                last_failed_word_range=exc.last_failed_word_range,
-                last_prompt_chars=exc.last_prompt_chars,
-            ) from exc
+        per_batch_chunks: list[ChunkRecord] = []
 
-        aggregate_findings.extend(findings)
-        aggregate_chunks.extend(chunks)
+        # Submission order: category-group calls in dict-iteration order,
+        # then the instructions call on the default model. dict preserves
+        # insertion order, so this is deterministic across runs.
+        #
+        # Legacy callers (categories=()) pass instructions in the same call
+        # as the single category bucket, preserving the old single-call-per-
+        # batch behavior. When categories= is provided, instructions get a
+        # separate per-batch call against the default model (they can't be
+        # bound to any specific category group model).
+        submissions: list[tuple[str, tuple[str, ...], tuple[str, ...]]] = []
+        if categories:
+            for model, cat_ids in groups.items():
+                submissions.append((model, cat_ids, ()))
+            if instructions:
+                submissions.append((provider.model, (), instructions))
+        else:
+            # Legacy: single call with all category ids and instructions together.
+            if groups or instructions:
+                default_cat_ids = next(iter(groups.values())) if groups else ()
+                submissions.append((provider.model, default_cat_ids, instructions))
 
-        if on_batch_complete is not None and chunks:
+        for model, cat_ids, instr in submissions:
+            item = _WorkItem.from_pages(batch)
+            try:
+                findings, chunks = _try_or_subdivide(
+                    item,
+                    provider,
+                    cat_ids,
+                    instructions=instr,
+                    seed=seed,
+                    retry_policy=retry_policy,
+                    counter=counter,
+                    batch_idx=batch_idx,
+                    subdivision_level=0,
+                    layout_aware=layout_aware,
+                    model=model,
+                )
+            except BatchError as exc:
+                raise BatchError(
+                    batch_idx=batch_idx,
+                    page_numbers=exc.page_numbers,
+                    attempts=len(retry_policy.schedule()) + 1,
+                    subdivision_levels=exc.subdivision_levels,
+                    last_failed_word_range=exc.last_failed_word_range,
+                    last_prompt_chars=exc.last_prompt_chars,
+                ) from exc
+            aggregate_findings.extend(findings)
+            aggregate_chunks.extend(chunks)
+            per_batch_chunks.extend(chunks)
+
+        if on_batch_complete is not None and per_batch_chunks:
             on_batch_complete(
                 BatchSummary.from_chunks(
-                    batch_idx, total_batches, page_numbers, tuple(chunks)
+                    batch_idx, total_batches, page_numbers, tuple(per_batch_chunks)
                 )
             )
 
@@ -379,6 +420,7 @@ def _try_with_retries(
     retry_policy: RetryPolicy,
     batch_idx: int,
     layout_aware: bool,
+    model: str,
 ) -> tuple[list[Finding], list[ChunkRecord]]:
     """Run the configured retry loop for a single work item.
 
@@ -399,6 +441,7 @@ def _try_with_retries(
             seed=seed,
             attempt=attempt,
             layout_aware=layout_aware,
+            model=model,
         )
         if chunks:
             assert len(chunks) == 1, (
@@ -432,6 +475,7 @@ def _try_or_subdivide(
     batch_idx: int,
     subdivision_level: int,
     layout_aware: bool,
+    model: str,
 ) -> tuple[list[Finding], list[ChunkRecord]]:
     """Try a work item; on full-retry failure, subdivide and recurse.
 
@@ -451,6 +495,7 @@ def _try_or_subdivide(
         retry_policy=retry_policy,
         batch_idx=batch_idx,
         layout_aware=layout_aware,
+        model=model,
     )
     if chunks:
         translated = _translate_indices(findings, item)
@@ -489,6 +534,7 @@ def _try_or_subdivide(
             batch_idx=batch_idx,
             subdivision_level=subdivision_level + 1,
             layout_aware=layout_aware,
+            model=model,
         )
         out_f.extend(f)
         out_c.extend(c)

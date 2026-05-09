@@ -59,6 +59,7 @@ class _RecordingProvider:
         seed: int | None = None,
         attempt: int = 0,
         layout_aware: bool = False,
+        model: str | None = None,
     ) -> tuple[list[Finding], list[ChunkRecord]]:
         self.calls.append(pages)
         self.attempts.append(attempt)
@@ -165,6 +166,7 @@ def test_chunked_call_forwards_categories_instructions_and_seed() -> None:
             seed: int | None = None,
             attempt: int = 0,
             layout_aware: bool = False,
+            model: str | None = None,
         ) -> tuple[list[Finding], list[ChunkRecord]]:
             self.last_kwargs = {
                 "llm_category_ids": llm_category_ids,
@@ -854,6 +856,7 @@ def test_chunked_call_forwards_layout_aware_to_provider() -> None:
             seed: int | None = None,
             attempt: int = 0,
             layout_aware: bool = False,
+            model: str | None = None,
         ) -> tuple[list[Finding], list[ChunkRecord]]:
             received.append(layout_aware)
             return [], [
