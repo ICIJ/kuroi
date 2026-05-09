@@ -229,3 +229,26 @@ def test_process_error_with_auth_marker_raises_config_error() -> None:
             provider.detect_redactions((_page(1, ["Hi"]),), ("person_name",))
     finally:
         mod._process_error_class = orig  # type: ignore[assignment]
+
+
+def test_process_error_without_auth_marker_returns_empty_findings() -> None:
+    import kuroi.providers.claude_cli as mod
+
+    class _FakeProcessError(Exception):
+        pass
+
+    async def qfn(*, prompt: str, options: Any = None):
+        raise _FakeProcessError("the model timed out")
+        yield  # pragma: no cover
+
+    orig = mod._process_error_class
+    mod._process_error_class = lambda: _FakeProcessError  # type: ignore[assignment]
+    try:
+        provider = ClaudeCliProvider(query_fn=qfn)
+        findings, chunks = provider.detect_redactions(
+            (_page(1, ["Hi"]),), ("person_name",)
+        )
+        assert findings == []
+        assert len(chunks) == 1
+    finally:
+        mod._process_error_class = orig  # type: ignore[assignment]
