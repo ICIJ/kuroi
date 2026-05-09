@@ -52,7 +52,7 @@ def test_category_model_defaults_to_none() -> None:
     assert cat.model is None
 
 
-def test_load_rule_set_reads_optional_model_field(tmp_path) -> None:
+def test_load_rule_set_reads_optional_model_field(tmp_path, monkeypatch) -> None:
     """A rule pack YAML may declare `model:` per category to route that
     category's calls to a specific model. Categories that omit it inherit
     the run's global model."""
@@ -78,17 +78,18 @@ categories:
     )
 
     # Patch resources.files to point at tmp_path for this one call.
-    import kuroi.core.rules as rules_module
+    class _FakeFiles:
+        def __init__(self, base):
+            self.base = base
 
-    monkey_files = lambda *_a, **_kw: type(
-        "X", (), {"joinpath": lambda self, name: tmp_path / name}
-    )()
-    original = rules_module.resources.files
-    rules_module.resources.files = monkey_files
-    try:
-        rs = load_rule_set("test_pack")
-    finally:
-        rules_module.resources.files = original
+        def joinpath(self, name):
+            return self.base / name
+
+    monkeypatch.setattr(
+        "kuroi.core.rules.resources.files",
+        lambda *_a, **_kw: _FakeFiles(tmp_path),
+    )
+    rs = load_rule_set("test_pack")
 
     by_id = {c.id: c for c in rs.categories}
     assert by_id["cheap"].model == "claude-haiku-4-5"
