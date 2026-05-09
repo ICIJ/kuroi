@@ -83,11 +83,17 @@ Options:
                                   unrecoverable.
   --audit-dir PATH                Audit log directory [default:
                                   $XDG_DATA_HOME/kuroi/audit].
-  --provider TEXT                 LLM provider: 'anthropic' or 'ollama'. Overrides env
-                                  and config.
+  --provider TEXT                 LLM provider: 'anthropic', 'ollama', or 'claude-cli'.
+                                  Overrides env and config.
   --model TEXT                    Model ID. Overrides env and config.
   --ollama-url TEXT               Base URL of the Ollama daemon. Overrides env and
                                   config.
+  --claude-cli-path TEXT          Path to the local `claude` binary for the claude-cli
+                                  provider. Defaults to the binary bundled with claude-
+                                  agent-sdk.
+  --claude-cli-timeout INTEGER RANGE
+                                  Per-call timeout in seconds for the claude-cli
+                                  provider. Default 300.  [x>=1]
   --seed INTEGER                  Reproducibility seed. Best-effort per provider;
                                   recorded in audit.
   --max-retries INTEGER RANGE     Number of retries after the initial attempt. 0
