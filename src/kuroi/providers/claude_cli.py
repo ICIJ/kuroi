@@ -32,25 +32,25 @@ from kuroi.providers._shared import (
 logger = logging.getLogger("kuroi.providers.claude_cli")
 
 
-def _cli_not_found_class():
+def _cli_not_found_class() -> type[BaseException]:
     from claude_agent_sdk import CLINotFoundError
 
     return CLINotFoundError
 
 
-def _process_error_class():
+def _process_error_class() -> type[BaseException]:
     from claude_agent_sdk import ProcessError
 
     return ProcessError
 
 
-def _cli_json_decode_error_class():
+def _cli_json_decode_error_class() -> type[BaseException]:
     from claude_agent_sdk import CLIJSONDecodeError
 
     return CLIJSONDecodeError
 
 
-def _cli_connection_error_class():
+def _cli_connection_error_class() -> type[BaseException]:
     from claude_agent_sdk import CLIConnectionError
 
     return CLIConnectionError
