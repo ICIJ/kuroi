@@ -161,6 +161,12 @@ class AnthropicProvider:
         usage = getattr(response, "usage", None)
         tokens_in = int(getattr(usage, "input_tokens", 0)) if usage else 0
         tokens_out = int(getattr(usage, "output_tokens", 0)) if usage else 0
+        cache_create = (
+            int(getattr(usage, "cache_creation_input_tokens", 0)) if usage else 0
+        )
+        cache_read = (
+            int(getattr(usage, "cache_read_input_tokens", 0)) if usage else 0
+        )
 
         logger.info(
             "anthropic response duration_ms=%d tokens_in=%d tokens_out=%d response_chars=%d",
@@ -194,6 +200,8 @@ class AnthropicProvider:
             tokens_in=tokens_in,
             tokens_out=tokens_out,
             duration_ms=duration_ms,
+            cache_creation_input_tokens=cache_create,
+            cache_read_input_tokens=cache_read,
         )
 
         try:
