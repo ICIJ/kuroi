@@ -254,6 +254,29 @@ def test_cli_json_decode_error_returns_empty_findings_with_chunk() -> None:
         mod._cli_json_decode_error_class = orig  # type: ignore[assignment]
 
 
+def test_cli_connection_error_returns_empty_findings_with_chunk() -> None:
+    import kuroi.providers.claude_cli as mod
+
+    class _FakeConnectionError(Exception):
+        pass
+
+    async def qfn(*, prompt: str, options: Any = None):
+        raise _FakeConnectionError("transient")
+        yield  # pragma: no cover
+
+    orig = mod._cli_connection_error_class
+    mod._cli_connection_error_class = lambda: _FakeConnectionError  # type: ignore[assignment]
+    try:
+        provider = ClaudeCliProvider(query_fn=qfn)
+        findings, chunks = provider.detect_redactions(
+            (_page(1, ["Hi"]),), ("person_name",)
+        )
+        assert findings == []
+        assert len(chunks) == 1
+    finally:
+        mod._cli_connection_error_class = orig  # type: ignore[assignment]
+
+
 def test_process_error_without_auth_marker_returns_empty_findings() -> None:
     import kuroi.providers.claude_cli as mod
 
