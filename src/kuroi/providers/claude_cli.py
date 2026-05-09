@@ -234,11 +234,13 @@ class ClaudeCliProvider:
         model: str,
     ) -> tuple[str, int, int]:
         """Run one `query()` call and return (text, tokens_in, tokens_out)."""
+        import anyio
         from claude_agent_sdk import (  # local import; SDK is heavy
             ClaudeAgentOptions,
+        )
+        from claude_agent_sdk import (
             query as sdk_query,
         )
-        import anyio
 
         options = ClaudeAgentOptions(
             system_prompt=system_prompt,
