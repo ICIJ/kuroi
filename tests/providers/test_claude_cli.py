@@ -298,3 +298,19 @@ def test_process_error_without_auth_marker_returns_empty_findings() -> None:
         assert len(chunks) == 1
     finally:
         mod._process_error_class = orig  # type: ignore[assignment]
+
+
+def test_timeout_returns_empty_findings_with_chunk() -> None:
+    import anyio
+
+    async def qfn(*, prompt: str, options: Any = None):
+        await anyio.sleep_forever()
+        yield  # pragma: no cover
+
+    provider = ClaudeCliProvider(query_fn=qfn, timeout_s=1)
+    pages = (_page(1, ["Hi"]),)
+
+    findings, chunks = provider.detect_redactions(pages, ("person_name",))
+
+    assert findings == []
+    assert len(chunks) == 1
