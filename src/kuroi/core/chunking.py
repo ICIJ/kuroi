@@ -13,6 +13,7 @@ import math
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from typing import NamedTuple
 
 from kuroi.core.audit_records import ChunkRecord
 from kuroi.core.config import RetryPolicy
@@ -172,6 +173,17 @@ class _WorkItem:
         return cls(pages=pages, word_range=None)
 
 
+class _Submission(NamedTuple):
+    """One unit of work for a batch: which model handles which categories
+    and (optionally) free-form instructions. Constructed by
+    detect_redactions_chunked and dispatched through _try_or_subdivide.
+    """
+
+    model: str
+    category_ids: tuple[str, ...]
+    instructions: tuple[str, ...]
+
+
 class _IndexCounter:
     """Globally-unique, monotonically-increasing chunk_idx generator.
 
@@ -322,14 +334,14 @@ def detect_redactions_chunked(
     # model. When `categories` is empty (legacy callers haven't been updated),
     # fall back to a single default-model bucket containing all category ids.
     if categories:
-        groups_full = _partition_categories_by_model(
+        groups_by_model = _partition_categories_by_model(
             categories, default_model=provider.model
         )
         # Restrict to ids the caller actually activated.
         active = set(llm_category_ids)
         groups = {
             model: tuple(cid for cid in ids if cid in active)
-            for model, ids in groups_full.items()
+            for model, ids in groups_by_model.items()
         }
         groups = {model: ids for model, ids in groups.items() if ids}
     else:
@@ -359,33 +371,37 @@ def detect_redactions_chunked(
         # batch behavior. When categories= is provided, instructions get a
         # separate per-batch call against the default model (they can't be
         # bound to any specific category group model).
-        submissions: list[tuple[str, tuple[str, ...], tuple[str, ...]]] = []
+        submissions: list[_Submission] = []
         if categories:
             for model, cat_ids in groups.items():
-                submissions.append((model, cat_ids, ()))
+                submissions.append(_Submission(model=model, category_ids=cat_ids, instructions=()))
             if instructions:
-                submissions.append((provider.model, (), instructions))
+                submissions.append(
+                    _Submission(model=provider.model, category_ids=(), instructions=instructions)
+                )
         else:
             # Legacy: single call with all category ids and instructions together.
             if groups or instructions:
                 default_cat_ids = next(iter(groups.values())) if groups else ()
-                submissions.append((provider.model, default_cat_ids, instructions))
+                submissions.append(
+                    _Submission(model=provider.model, category_ids=default_cat_ids, instructions=instructions)
+                )
 
-        for model, cat_ids, instr in submissions:
+        for submission in submissions:
             item = _WorkItem.from_pages(batch)
             try:
                 findings, chunks = _try_or_subdivide(
                     item,
                     provider,
-                    cat_ids,
-                    instructions=instr,
+                    submission.category_ids,
+                    instructions=submission.instructions,
                     seed=seed,
                     retry_policy=retry_policy,
                     counter=counter,
                     batch_idx=batch_idx,
                     subdivision_level=0,
                     layout_aware=layout_aware,
-                    model=model,
+                    model=submission.model,
                 )
             except BatchError as exc:
                 raise BatchError(
