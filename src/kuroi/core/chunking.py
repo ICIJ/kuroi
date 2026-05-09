@@ -12,6 +12,7 @@ import logging
 import math
 import time
 from collections.abc import Callable
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from typing import NamedTuple
 
@@ -26,6 +27,11 @@ logger = logging.getLogger("kuroi.core.chunking")
 
 MIN_CHUNK_WORDS = 50
 OVERLAP_WORDS = 50
+MAX_CONCURRENT_GROUPS = 4
+"""Cap on per-batch concurrency. With small group counts (2-3 typical)
+the ThreadPoolExecutor overhead is negligible; the cap exists to prevent
+pathological config (someone declares 10 categories on 10 different
+models) from spawning unbounded threads."""
 
 
 def _partition_categories_by_model(
@@ -387,11 +393,21 @@ def detect_redactions_chunked(
                     _Submission(model=provider.model, category_ids=default_cat_ids, instructions=instructions)
                 )
 
-        for submission in submissions:
-            item = _WorkItem.from_pages(batch)
-            try:
-                findings, chunks = _try_or_subdivide(
-                    item,
+        if not submissions:
+            continue
+
+        # Dispatch each group's full retry/subdivide loop on its own thread.
+        # Cap concurrency so a pathological rule set (10 categories on 10
+        # different models) can't spawn unbounded threads. Result gathering
+        # uses a list of Future and reads .result() in submission order so
+        # audit-log ordering is stable regardless of which group's API call
+        # returns first.
+        max_workers = min(len(submissions), MAX_CONCURRENT_GROUPS)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures: list[Future] = [
+                executor.submit(
+                    _try_or_subdivide,
+                    _WorkItem.from_pages(batch),
                     provider,
                     submission.category_ids,
                     instructions=submission.instructions,
@@ -403,18 +419,23 @@ def detect_redactions_chunked(
                     layout_aware=layout_aware,
                     model=submission.model,
                 )
-            except BatchError as exc:
-                raise BatchError(
-                    batch_idx=batch_idx,
-                    page_numbers=exc.page_numbers,
-                    attempts=len(retry_policy.schedule()) + 1,
-                    subdivision_levels=exc.subdivision_levels,
-                    last_failed_word_range=exc.last_failed_word_range,
-                    last_prompt_chars=exc.last_prompt_chars,
-                ) from exc
-            aggregate_findings.extend(findings)
-            aggregate_chunks.extend(chunks)
-            per_batch_chunks.extend(chunks)
+                for submission in submissions
+            ]
+            for future in futures:
+                try:
+                    findings, chunks = future.result()
+                except BatchError as exc:
+                    raise BatchError(
+                        batch_idx=batch_idx,
+                        page_numbers=exc.page_numbers,
+                        attempts=len(retry_policy.schedule()) + 1,
+                        subdivision_levels=exc.subdivision_levels,
+                        last_failed_word_range=exc.last_failed_word_range,
+                        last_prompt_chars=exc.last_prompt_chars,
+                    ) from exc
+                aggregate_findings.extend(findings)
+                aggregate_chunks.extend(chunks)
+                per_batch_chunks.extend(chunks)
 
         if on_batch_complete is not None and per_batch_chunks:
             on_batch_complete(
