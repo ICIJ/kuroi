@@ -16,13 +16,28 @@ class Provider(Protocol):
         pages: tuple[Page, ...],
         llm_category_ids: tuple[str, ...],
         *,
+        instructions: tuple[str, ...] = (),
         seed: int | None = None,
+        attempt: int = 0,
+        layout_aware: bool = False,
+        model: str | None = None,
     ) -> tuple[list[Finding], list[ChunkRecord]]: ...
 ```
 
 Two attributes for identification, one method that takes word-indexed
 pages and returns a flat list of `Finding`s plus per-chunk audit
-records.
+records. Three keyword-only parameters are advisory — providers may
+ignore them when their backend doesn't support the feature:
+
+- `instructions` — natural-language redaction instructions from the user
+  (`-i`/`--instruct`). Append to the prompt; on Ollama, the chunker has
+  already decomposed multi-rule instructions into atomic sub-rules.
+- `attempt` — zero-based retry index. Use it to scale per-call budgets
+  (e.g. Ollama gives slow models more time on each retry).
+- `layout_aware` — when `True`, wrap the prompt with PyMuPDF block
+  boundaries so the model sees paragraph structure.
+- `model` — per-call override for `self.model`, used by the chunker
+  when a category in the rule pack carries its own `model:` field.
 
 ## Step 1: Write the client
 
@@ -83,7 +98,11 @@ class MyProvider:
         pages: tuple[Page, ...],
         llm_category_ids: tuple[str, ...],
         *,
+        instructions: tuple[str, ...] = (),
         seed: int | None = None,
+        attempt: int = 0,
+        layout_aware: bool = False,
+        model: str | None = None,
     ) -> tuple[list[Finding], list[ChunkRecord]]:
         if not llm_category_ids:
             return [], []
@@ -107,6 +126,8 @@ class MyProvider:
             response_sha256=response_sha,
             tokens_in=...,
             tokens_out=...,
+            cache_creation_input_tokens=0,   # populate if your provider returns
+            cache_read_input_tokens=0,       # cache-write/read counters
             duration_ms=duration_ms,
         )
 
@@ -134,6 +155,12 @@ Edit `src/kuroi/providers/factory.py` to dispatch your provider name:
 def make_provider(config: Config) -> Provider:
     if config.provider == "anthropic":
         return AnthropicProvider(model=config.model)
+    if config.provider == "claude-cli":
+        return ClaudeCliProvider(
+            model=config.model,
+            cli_path=config.claude_cli_path,
+            timeout_s=config.claude_cli_timeout_s,
+        )
     if config.provider == "ollama":
         return OllamaProvider(model=config.model, url=config.ollama_url)
     if config.provider == "myprovider":
@@ -145,9 +172,9 @@ Then widen `ProviderName` and `VALID_PROVIDERS` in
 `src/kuroi/core/config.py`:
 
 ```python
-ProviderName = Literal["anthropic", "ollama", "myprovider"]
+ProviderName = Literal["anthropic", "claude-cli", "ollama", "myprovider"]
 VALID_PROVIDERS: tuple[ProviderName, ...] = (
-    "anthropic", "ollama", "myprovider",
+    "anthropic", "claude-cli", "ollama", "myprovider",
 )
 ```
 
@@ -159,10 +186,22 @@ in `cli/run.py`, and wire it through `ConfigOverrides`.
 ## Step 3: Add pricing
 
 If your provider charges per token, add an entry to
-`core/pricing.py` keyed by `(provider, model)` so
-`kuroi.core.pricing.estimate_cost` reads correctly. Free / local
-providers can leave the pricing table unchanged — `estimate_cost`
-already handles missing rates.
+`src/kuroi/data/pricing.json` keyed by the model id (the same string
+returned by `kuroi models`). The required shape is:
+
+```json
+"my-model-id": {
+  "input_per_million":  1.00,
+  "output_per_million": 5.00,
+  "cache_write_multiplier": 1.25,
+  "cache_read_multiplier": 0.1
+}
+```
+
+Free / local providers can leave the file unchanged — `estimate_cost`
+already handles missing rates by returning `$0.00`. To refresh a cached
+copy, ship a new `pricing.json` and run
+`kuroi config refresh-pricing --from path/to/pricing.json`.
 
 ## Step 4: Tests
 
@@ -186,8 +225,10 @@ $ make test
 - Add a `=== "MyProvider"` tab to the "Configure a provider" section.
 - Document any new config keys.
 
-The CLI reference and Python API reference update automatically when
-you re-run `uv run mkdocs build --strict`.
+The CLI reference and rule-schema reference update automatically when
+you re-run `make docs-gen` (which regenerates them from the live Typer
+app and dataclasses). `make docs-build` then verifies the strict
+zensical build.
 
 ## Worked example: Ollama
 
