@@ -28,8 +28,11 @@ the highest-listed `PROBLEM` first.
 $ export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-Persist by adding the export to your shell rc file. Or switch to Ollama
-for offline runs (see [LLM providers](providers.md)).
+Persist by adding the export to your shell rc file. Or switch providers:
+
+- **Claude CLI** (no API key, uses your Claude Code subscription) — see
+  [Claude CLI errors](#claude-cli-errors) below for setup quirks.
+- **Ollama** (local, offline) — see [LLM providers](providers.md).
 
 ## "File is locked" / `LockHeldError`
 
@@ -54,6 +57,74 @@ If you see `429 Too Many Requests` from Anthropic, wait a moment before
 retrying. `kuroi run` processes one PDF per invocation, so when you're
 batching in a shell loop, sleep between iterations or break the input
 list into smaller chunks.
+
+## Claude CLI errors
+
+The `claude-cli` provider shells out to the `claude` binary (bundled by
+`claude-agent-sdk`, or the `@anthropic-ai/claude-code` npm install). Three
+failure modes are common:
+
+### "claude binary not found"
+
+```sh
+$ kuroi run report.pdf --provider claude-cli
+ConfigError: claude CLI not found
+```
+
+The bundled binary is missing or outside `PATH`. Either:
+
+```sh
+$ pip install --upgrade claude-agent-sdk
+# or:
+$ npm install -g @anthropic-ai/claude-code
+```
+
+If you have a system install elsewhere, point at it:
+
+```sh
+$ kuroi run report.pdf --provider claude-cli \
+    --claude-cli-path /opt/claude/bin/claude
+```
+
+### "Not authenticated" / login required
+
+Run the one-time login flow:
+
+```sh
+$ claude /login
+```
+
+This stores OAuth credentials in your home directory. kuroi never sees
+the credential — it only invokes the binary.
+
+### `ANTHROPIC_API_KEY` shadowing your subscription
+
+If you set `ANTHROPIC_API_KEY` and select `--provider claude-cli`, the
+`claude` binary will silently prefer per-token API billing over your
+subscription. kuroi prints a warning at startup:
+
+```
+warning: ANTHROPIC_API_KEY is set; claude-cli will bill against the API
+key, not your subscription. Unset the variable to force subscription
+billing.
+```
+
+Unset the variable in the calling shell to force subscription billing:
+
+```sh
+$ unset ANTHROPIC_API_KEY
+$ kuroi run report.pdf --provider claude-cli
+```
+
+### Per-call timeout
+
+Long documents may exceed the default 300-second per-call budget. Raise
+it with `--claude-cli-timeout`, or persist via:
+
+```toml
+[claude_cli]
+timeout_s = 600
+```
 
 ## "PDF is too large to extract"
 
