@@ -145,3 +145,37 @@ def test_provider_default_model_used_when_no_override() -> None:
 
     options = captured["options"]
     assert options.model == "claude-sonnet-4-6"
+
+
+def test_malformed_json_returns_empty_findings_with_chunk() -> None:
+    qfn = _make_query_fn(
+        [
+            _StubAssistantMessage("this is not json"),
+            _StubResultMessage(input_tokens=10, output_tokens=2),
+        ]
+    )
+    provider = ClaudeCliProvider(query_fn=qfn)
+    pages = (_page(1, ["Hello"]),)
+
+    findings, chunks = provider.detect_redactions(pages, ("person_name",))
+
+    assert findings == []
+    assert len(chunks) == 1
+    assert chunks[0].tokens_in == 10
+    assert chunks[0].tokens_out == 2
+
+
+def test_non_object_json_payload_returns_empty_findings_with_chunk() -> None:
+    qfn = _make_query_fn(
+        [
+            _StubAssistantMessage("[1, 2, 3]"),
+            _StubResultMessage(input_tokens=10, output_tokens=2),
+        ]
+    )
+    provider = ClaudeCliProvider(query_fn=qfn)
+    pages = (_page(1, ["Hello"]),)
+
+    findings, chunks = provider.detect_redactions(pages, ("person_name",))
+
+    assert findings == []
+    assert len(chunks) == 1
