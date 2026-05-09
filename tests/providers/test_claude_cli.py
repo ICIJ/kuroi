@@ -107,3 +107,41 @@ def test_detect_redactions_round_trips_through_stub() -> None:
     # The prompt sent to the stub is static_prefix + document_block.
     assert "<document>" in captured["prompt"]
     assert "Active LLM categories: person_name" in captured["prompt"]
+
+
+def test_per_call_model_override_replaces_provider_default() -> None:
+    captured: dict[str, Any] = {}
+    qfn = _make_query_fn(
+        [
+            _StubAssistantMessage('{"findings": []}'),
+            _StubResultMessage(input_tokens=10, output_tokens=2),
+        ],
+        captured,
+    )
+    provider = ClaudeCliProvider(model="claude-opus-4-7", query_fn=qfn)
+    pages = (_page(1, ["Hello"]),)
+
+    provider.detect_redactions(
+        pages, ("person_name",), model="claude-haiku-4-5-20251001"
+    )
+
+    options = captured["options"]
+    assert options.model == "claude-haiku-4-5-20251001"
+
+
+def test_provider_default_model_used_when_no_override() -> None:
+    captured: dict[str, Any] = {}
+    qfn = _make_query_fn(
+        [
+            _StubAssistantMessage('{"findings": []}'),
+            _StubResultMessage(input_tokens=10, output_tokens=2),
+        ],
+        captured,
+    )
+    provider = ClaudeCliProvider(model="claude-sonnet-4-6", query_fn=qfn)
+    pages = (_page(1, ["Hello"]),)
+
+    provider.detect_redactions(pages, ("person_name",))
+
+    options = captured["options"]
+    assert options.model == "claude-sonnet-4-6"
