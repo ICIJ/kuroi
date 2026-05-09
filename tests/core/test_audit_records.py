@@ -1,6 +1,38 @@
 from kuroi.core.audit_records import ChunkRecord
 
 
+def _base_kwargs() -> dict:
+    return dict(
+        chunk_idx=0,
+        pages=(1,),
+        temperature=0.0,
+        seed_requested=None,
+        seed_honored=False,
+        system_fingerprint=None,
+        prompt_sha256="a" * 64,
+        response_sha256="b" * 64,
+        tokens_in=100,
+        tokens_out=20,
+        duration_ms=500,
+    )
+
+
+def test_chunk_record_defaults_cache_token_fields_to_zero() -> None:
+    rec = ChunkRecord(**_base_kwargs())
+    assert rec.cache_creation_input_tokens == 0
+    assert rec.cache_read_input_tokens == 0
+
+
+def test_chunk_record_accepts_cache_token_fields() -> None:
+    rec = ChunkRecord(
+        **_base_kwargs(),
+        cache_creation_input_tokens=1180,
+        cache_read_input_tokens=64900,
+    )
+    assert rec.cache_creation_input_tokens == 1180
+    assert rec.cache_read_input_tokens == 64900
+
+
 def test_chunk_record_is_frozen() -> None:
     rec = ChunkRecord(
         chunk_idx=0,
