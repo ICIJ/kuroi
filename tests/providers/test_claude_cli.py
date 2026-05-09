@@ -231,6 +231,29 @@ def test_process_error_with_auth_marker_raises_config_error() -> None:
         mod._process_error_class = orig  # type: ignore[assignment]
 
 
+def test_cli_json_decode_error_returns_empty_findings_with_chunk() -> None:
+    import kuroi.providers.claude_cli as mod
+
+    class _FakeJSONDecodeError(Exception):
+        pass
+
+    async def qfn(*, prompt: str, options: Any = None):
+        raise _FakeJSONDecodeError("malformed envelope")
+        yield  # pragma: no cover
+
+    orig = mod._cli_json_decode_error_class
+    mod._cli_json_decode_error_class = lambda: _FakeJSONDecodeError  # type: ignore[assignment]
+    try:
+        provider = ClaudeCliProvider(query_fn=qfn)
+        findings, chunks = provider.detect_redactions(
+            (_page(1, ["Hi"]),), ("person_name",)
+        )
+        assert findings == []
+        assert len(chunks) == 1
+    finally:
+        mod._cli_json_decode_error_class = orig  # type: ignore[assignment]
+
+
 def test_process_error_without_auth_marker_returns_empty_findings() -> None:
     import kuroi.providers.claude_cli as mod
 
