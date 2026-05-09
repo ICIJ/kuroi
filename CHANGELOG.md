@@ -7,6 +7,10 @@ project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `claude-cli` provider that routes through the local Claude CLI via
+  `claude-agent-sdk` (subscription billing, no `ANTHROPIC_API_KEY` required).
+  Per-rule `model:` overrides apply on the same terms as the Anthropic
+  provider.
 - MkDocs documentation site with Material dark theme, deployed to GitHub Pages.
 - Configurable retry policy: `--max-retries`, `--retry-backoff`,
   `--retry-backoff-multiplier` on `kuroi run`; corresponding
