@@ -30,7 +30,7 @@ def test_short_circuit_when_no_categories_and_no_instructions() -> None:
     assert chunks == []
 
 
-def _must_not_be_called(*args, **kwargs):
+def _must_not_be_called(*args: Any, **kwargs: Any) -> Any:
     raise AssertionError("query_fn should not be called when there is no work")
 
 
