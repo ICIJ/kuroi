@@ -51,15 +51,32 @@ OUTPUT_SCHEMA_HINT = (
 )
 
 
-def build_user_prompt(
-    pages: tuple[Page, ...],
+def build_system_blocks(layout_aware: bool) -> list[dict[str, Any]]:
+    """Return the system prompt as typed blocks with an ephemeral cache marker.
+
+    Used by the Anthropic provider to enable prompt caching of the system
+    prompt. The system prompt is constant across all batches in a session, so
+    caching it cuts duplicated input tokens to ~10% on cache reads.
+    """
+    return [
+        {
+            "type": "text",
+            "text": build_system_prompt(layout_aware),
+            "cache_control": {"type": "ephemeral"},
+        }
+    ]
+
+
+def build_user_static_prefix(
     llm_category_ids: tuple[str, ...],
     instructions: tuple[str, ...] = (),
-    *,
-    layout_aware: bool = False,
 ) -> str:
-    """Construct the user-message body sent to the model."""
-    doc = serialize_for_llm(pages, layout_aware=layout_aware)
+    """The portion of the user prompt that is identical across all batches
+    in a session: active categories, redaction instructions, and the
+    output-schema hint. The Anthropic provider marks this block as
+    cacheable; the Ollama provider concatenates it with the document
+    block via build_user_prompt().
+    """
     parts: list[str] = []
     if llm_category_ids:
         cats = ", ".join(llm_category_ids)
@@ -67,7 +84,33 @@ def build_user_prompt(
     if instructions:
         instr = "; ".join(instructions)
         parts.append(f"Redaction instructions: {instr}\n\n")
-    return "".join(parts) + f"Output schema: {OUTPUT_SCHEMA_HINT}\n\n<document>\n{doc}\n</document>"
+    parts.append(f"Output schema: {OUTPUT_SCHEMA_HINT}\n\n")
+    return "".join(parts)
+
+
+def build_user_document_block(
+    pages: tuple[Page, ...],
+    layout_aware: bool = False,
+) -> str:
+    """The variable per-batch portion of the user prompt: the page word
+    index wrapped in <document>...</document> tags. Never cached."""
+    doc = serialize_for_llm(pages, layout_aware=layout_aware)
+    return f"<document>\n{doc}\n</document>"
+
+
+def build_user_prompt(
+    pages: tuple[Page, ...],
+    llm_category_ids: tuple[str, ...],
+    instructions: tuple[str, ...] = (),
+    *,
+    layout_aware: bool = False,
+) -> str:
+    """Joined-string form for callers that don't use Anthropic's typed blocks
+    (currently the Ollama provider). Composes the static prefix and the
+    document block into a single string."""
+    return build_user_static_prefix(llm_category_ids, instructions) + build_user_document_block(
+        pages, layout_aware=layout_aware
+    )
 
 
 def parse_findings_payload(

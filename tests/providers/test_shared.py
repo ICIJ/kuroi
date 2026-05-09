@@ -1,8 +1,11 @@
 from kuroi.core.pdf import Page, Word
 from kuroi.providers._shared import (
     SYSTEM_PROMPT,
+    build_system_blocks,
     build_system_prompt,
+    build_user_document_block,
     build_user_prompt,
+    build_user_static_prefix,
 )
 
 
@@ -101,3 +104,42 @@ def test_build_user_prompt_layout_aware_includes_block_tags() -> None:
 
     assert '<block id="3">[0]A</block>' in prompt
     assert '<block id="4">[1]B</block>' in prompt
+
+
+def test_build_user_static_prefix_contains_categories_and_schema() -> None:
+    prefix = build_user_static_prefix(("person_name",), instructions=())
+    assert "Active LLM categories: person_name" in prefix
+    assert "Output schema:" in prefix
+    assert "<document>" not in prefix
+
+
+def test_build_user_static_prefix_includes_instructions() -> None:
+    prefix = build_user_static_prefix(("name",), instructions=("Redact all URLs",))
+    assert "Redaction instructions: Redact all URLs" in prefix
+
+
+def test_build_user_document_block_wraps_pages() -> None:
+    pages = (_page(1, ["Hello"]),)
+    block = build_user_document_block(pages, layout_aware=False)
+    assert block.startswith("<document>")
+    assert block.endswith("</document>")
+    assert "[0]Hello" in block
+
+
+def test_build_user_prompt_concatenates_prefix_and_document() -> None:
+    """The legacy joined-string form is preserved for the Ollama path."""
+    pages = (_page(1, ["Hello"]),)
+    cat_ids = ("name",)
+    prefix = build_user_static_prefix(cat_ids, instructions=())
+    doc = build_user_document_block(pages, layout_aware=False)
+    assert build_user_prompt(pages, cat_ids) == prefix + doc
+
+
+def test_build_system_blocks_marks_prompt_with_cache_control() -> None:
+    blocks = build_system_blocks(layout_aware=False)
+    assert isinstance(blocks, list)
+    assert len(blocks) == 1
+    block = blocks[0]
+    assert block["type"] == "text"
+    assert block["cache_control"] == {"type": "ephemeral"}
+    assert block["text"].startswith("You are a redaction-assistant for kuroi")
