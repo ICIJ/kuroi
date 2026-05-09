@@ -18,12 +18,34 @@ from kuroi.core.audit_records import ChunkRecord
 from kuroi.core.config import RetryPolicy
 from kuroi.core.findings import Finding
 from kuroi.core.pdf import Page, slice_page
+from kuroi.core.rules import Category
 from kuroi.providers.base import Provider
 
 logger = logging.getLogger("kuroi.core.chunking")
 
 MIN_CHUNK_WORDS = 50
 OVERLAP_WORDS = 50
+
+
+def _partition_categories_by_model(
+    categories: tuple[Category, ...],
+    *,
+    default_model: str,
+) -> dict[str, tuple[str, ...]]:
+    """Group LLM categories by their target model.
+
+    Categories with `model=None` go into the `default_model` bucket. Regex
+    categories are silently skipped (they don't dispatch to the LLM). The
+    insertion order of categories within each group is preserved so the
+    prompt's "Active LLM categories: ..." line is deterministic.
+    """
+    groups: dict[str, list[str]] = {}
+    for cat in categories:
+        if cat.detection != "llm":
+            continue
+        target = cat.model or default_model
+        groups.setdefault(target, []).append(cat.id)
+    return {model: tuple(ids) for model, ids in groups.items()}
 
 
 def _format_page_range(page_numbers: tuple[int, ...]) -> str:
