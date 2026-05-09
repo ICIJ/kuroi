@@ -314,3 +314,45 @@ def test_timeout_returns_empty_findings_with_chunk() -> None:
 
     assert findings == []
     assert len(chunks) == 1
+
+
+def test_query_options_silence_the_agent_loop() -> None:
+    captured: dict[str, Any] = {}
+    qfn = _make_query_fn(
+        [
+            _StubAssistantMessage('{"findings": []}'),
+            _StubResultMessage(input_tokens=10, output_tokens=2),
+        ],
+        captured,
+    )
+    provider = ClaudeCliProvider(model="claude-opus-4-7", query_fn=qfn)
+    pages = (_page(1, ["Hello"]),)
+
+    provider.detect_redactions(pages, ("person_name",))
+
+    options = captured["options"]
+    assert options.max_turns == 1
+    assert options.allowed_tools == []
+    assert options.permission_mode == "default"
+    assert options.setting_sources == []
+    assert options.model == "claude-opus-4-7"
+    assert "kuroi" in options.system_prompt
+    assert options.cli_path is None  # default; no override
+
+
+def test_cli_path_override_propagates_to_options() -> None:
+    captured: dict[str, Any] = {}
+    qfn = _make_query_fn(
+        [
+            _StubAssistantMessage('{"findings": []}'),
+            _StubResultMessage(input_tokens=10, output_tokens=2),
+        ],
+        captured,
+    )
+    provider = ClaudeCliProvider(cli_path="/opt/claude", query_fn=qfn)
+    pages = (_page(1, ["Hello"]),)
+
+    provider.detect_redactions(pages, ("person_name",))
+
+    options = captured["options"]
+    assert options.cli_path == "/opt/claude"
