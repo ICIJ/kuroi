@@ -2,7 +2,7 @@
 
 Calls bill against the user's Claude Code subscription (no API key). The
 sync `Provider.detect_redactions` interface is bridged to the SDK's async
-`query()` via `asyncio.run` per call. The event-loop spin-up cost is
+`query()` via `anyio.run` per call. The event-loop spin-up cost is
 negligible compared to the LLM round-trip.
 
 Auth precedence: if `ANTHROPIC_API_KEY` is set in the environment, the CLI
@@ -79,11 +79,11 @@ class ClaudeCliProvider:
         prompt_sha = hashlib.sha256(user_prompt.encode("utf-8")).hexdigest()
         system_prompt = build_system_prompt(layout_aware)
 
-        import asyncio  # stdlib bridge from sync Provider Protocol to async SDK
+        import anyio  # local import keeps Provider Protocol pure
 
         started = time.monotonic()
-        text, tokens_in, tokens_out = asyncio.run(
-            self._aexec(user_prompt, system_prompt, effective_model)
+        text, tokens_in, tokens_out = anyio.run(
+            self._aexec, user_prompt, system_prompt, effective_model
         )
         duration_ms = int((time.monotonic() - started) * 1000)
         response_sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -138,25 +138,21 @@ class ClaudeCliProvider:
         model: str,
     ) -> tuple[str, int, int]:
         """Run one `query()` call and return (text, tokens_in, tokens_out)."""
-        if self._query_fn is not None:
-            qfn = self._query_fn
-            options = None
-        else:
-            from claude_agent_sdk import (  # local import; SDK is heavy
-                ClaudeAgentOptions,
-                query as sdk_query,
-            )
+        from claude_agent_sdk import (  # local import; SDK is heavy
+            ClaudeAgentOptions,
+            query as sdk_query,
+        )
 
-            options = ClaudeAgentOptions(
-                system_prompt=system_prompt,
-                model=model,
-                max_turns=1,
-                allowed_tools=[],
-                permission_mode="default",
-                setting_sources=[],
-                cli_path=self._cli_path,
-            )
-            qfn = sdk_query
+        options = ClaudeAgentOptions(
+            system_prompt=system_prompt,
+            model=model,
+            max_turns=1,
+            allowed_tools=[],
+            permission_mode="default",
+            setting_sources=[],
+            cli_path=self._cli_path,
+        )
+        qfn = self._query_fn if self._query_fn is not None else sdk_query
 
         result_text = ""
         tokens_in = 0
