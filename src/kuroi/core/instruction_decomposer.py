@@ -213,6 +213,10 @@ def _llm_split(
         msg = f"llm fallback: connection error ({exc})"
         logger.warning(msg)
         return None, msg
+    except (json.JSONDecodeError, ValueError) as exc:
+        msg = f"llm fallback: response body not valid JSON ({exc})"
+        logger.warning(msg)
+        return None, msg
 
     message = envelope.get("message") if isinstance(envelope, dict) else None
     content = message.get("content") if isinstance(message, dict) else None
