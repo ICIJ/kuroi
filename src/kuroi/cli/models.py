@@ -20,11 +20,17 @@ models_app = typer.Typer()
 console = Console()
 
 
-PRIVACY_POSTURE = {"anthropic": "cloud", "openai": "cloud", "ollama": "local"}
+PRIVACY_POSTURE = {
+    "anthropic": "cloud",
+    "openai": "cloud",
+    "ollama": "local",
+    "claude-cli": "cloud",
+}
 SEED_SUPPORT = {
     "anthropic": "temperature=0 only (best-effort, recorded in audit)",
     "openai": "full (system_fingerprint-bounded)",
     "ollama": "full",
+    "claude-cli": "not available",
 }
 
 
@@ -54,6 +60,14 @@ def models(
         installed: set[str] = set()
         if prov_name == "ollama":
             installed = _ollama_installed_models(config.ollama_url)
+        # claude-cli has only a wildcard pricing entry; expose the same
+        # model IDs we list under anthropic so the user picker matches.
+        if prov_name == "claude-cli":
+            wildcard = prov_models.get("*")
+            if wildcard is not None:
+                from kuroi.cli.setup import CURATED_ANTHROPIC_MODELS
+
+                prov_models = {m: wildcard for m in CURATED_ANTHROPIC_MODELS}
         for model_name, rates in prov_models.items():
             if model_name == "*":
                 continue
@@ -61,11 +75,15 @@ def models(
                 "(default)" if (config.provider == prov_name and config.model == model_name) else ""
             )
             install_marker = "(installed)" if model_name in installed else ""
-            cost = (
-                "free"
-                if rates.input_per_million == 0.0 and rates.output_per_million == 0.0
-                else f"${rates.input_per_million:.2f} / ${rates.output_per_million:.2f} per Mtok"
-            )
+            if prov_name == "claude-cli":
+                cost = "subscription billing"
+            elif rates.input_per_million == 0.0 and rates.output_per_million == 0.0:
+                cost = "free"
+            else:
+                cost = (
+                    f"${rates.input_per_million:.2f} / "
+                    f"${rates.output_per_million:.2f} per Mtok"
+                )
             console.print(f"  {model_name:<22} {default_marker or install_marker:<11} {cost}")
         console.print(f"  seed support: {SEED_SUPPORT.get(prov_name, 'unknown')}")
 
