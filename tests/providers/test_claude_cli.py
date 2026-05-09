@@ -206,3 +206,26 @@ def test_cli_not_found_raises_config_error() -> None:
             provider.detect_redactions(pages, ("person_name",))
     finally:
         mod._cli_not_found_class = monkeyed["orig"]  # type: ignore[assignment]
+
+
+def test_process_error_with_auth_marker_raises_config_error() -> None:
+    import pytest
+
+    import kuroi.providers.claude_cli as mod
+    from kuroi.core.config import ConfigError
+
+    class _FakeProcessError(Exception):
+        pass
+
+    async def qfn(*, prompt: str, options: Any = None):
+        raise _FakeProcessError("not authenticated: run claude /login")
+        yield  # pragma: no cover
+
+    orig = mod._process_error_class
+    mod._process_error_class = lambda: _FakeProcessError  # type: ignore[assignment]
+    try:
+        provider = ClaudeCliProvider(query_fn=qfn)
+        with pytest.raises(ConfigError, match="claude /login"):
+            provider.detect_redactions((_page(1, ["Hi"]),), ("person_name",))
+    finally:
+        mod._process_error_class = orig  # type: ignore[assignment]
