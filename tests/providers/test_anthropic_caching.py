@@ -127,3 +127,44 @@ def test_anthropic_falls_back_to_instance_model_when_override_is_none() -> None:
     provider.detect_redactions(_page(), ("person_name",), model=None)
 
     assert client.messages.create.call_args.kwargs["model"] == "claude-opus-4-7"
+
+
+import anthropic
+import pytest
+
+from kuroi.core.config import ConfigError
+
+
+def _bad_request(message: str, error_type: str = "invalid_request_error"):
+    """Construct a BadRequestError that matches the SDK's structured shape."""
+    body = {"error": {"type": error_type, "message": message}}
+    response = MagicMock()
+    response.status_code = 400
+    return anthropic.BadRequestError(message=message, response=response, body=body)
+
+
+def test_anthropic_raises_config_error_on_unknown_model() -> None:
+    """A 'model not found' / unsupported-model error must surface as
+    ConfigError so the chunker doesn't waste retries / subdivide on a
+    fundamentally broken request."""
+    client = MagicMock()
+    client.messages.create.side_effect = _bad_request(
+        "model: claude-foo-bar not found"
+    )
+    provider = AnthropicProvider(model="claude-opus-4-7", client=client)
+
+    with pytest.raises(ConfigError, match="claude-foo-bar"):
+        provider.detect_redactions(_page(), ("person_name",), model="claude-foo-bar")
+
+
+def test_anthropic_keeps_subdivide_path_for_prompt_too_long() -> None:
+    """Regression check: prompt-too-long is still classified as soft (return
+    [], []) so subdivision still triggers."""
+    client = MagicMock()
+    client.messages.create.side_effect = _bad_request("prompt is too long: 200000 tokens")
+    provider = AnthropicProvider(model="claude-opus-4-7", client=client)
+
+    findings, chunks = provider.detect_redactions(_page(), ("person_name",))
+
+    assert findings == []
+    assert chunks == []
