@@ -18,6 +18,8 @@ Two stages:
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
+from typing import Any, Literal
 
 _NUMBERED_PREFIX = re.compile(r"^\d+\.\s", re.MULTILINE)
 _BULLETED_PREFIX = re.compile(r"^[-*]\s", re.MULTILINE)
@@ -71,3 +73,76 @@ def _split_by_line_prefix(text: str, matcher: re.Pattern[str]) -> tuple[str, ...
         if not marker_match:  # Has content beyond just the marker
             rules.append(rule)
     return tuple(rules) if len(rules) >= 2 else ()
+
+
+LLM_FALLBACK_THRESHOLD_CHARS = 300
+"""Below this length, a single-rule parse is left alone — short
+instructions are unlikely to benefit from LLM splitting and aren't
+worth the round-trip.
+"""
+
+
+@dataclass(frozen=True)
+class DecompositionResult:
+    """Outcome of decomposing an instruction.
+
+    rules: atomic sub-rules. Always at least one element. Equal to
+        (instruction,) when no useful split was found.
+    source: where the rules came from.
+        "original"     — parser returned 1 rule and threshold gate
+                         skipped LLM fallback (or input was empty).
+        "parser"       — deterministic splitter found >=2 rules.
+        "llm_fallback" — LLM split call was attempted (it may still
+                         have failed; rules may equal (instruction,)
+                         in that case; check `detail` for the reason).
+    detail: human-readable note for the audit log.
+    """
+
+    rules: tuple[str, ...]
+    source: Literal["original", "parser", "llm_fallback"]
+    detail: str
+
+
+def decompose(
+    instruction: str,
+    provider: Any,
+    *,
+    threshold_chars: int = LLM_FALLBACK_THRESHOLD_CHARS,
+) -> DecompositionResult:
+    """Decompose `instruction` into atomic rules.
+
+    Parser first. If the parser returns 1 rule AND len(instruction) >
+    threshold_chars, dispatches one LLM split call against `provider`
+    (an Ollama provider exposing _client / _url / model). Best-effort:
+    any failure mode collapses to (instruction,) with source set to
+    "llm_fallback" or "original".
+
+    Never raises.
+    """
+    parser_rules = parse_instruction(instruction)
+    if len(parser_rules) >= 2:
+        return DecompositionResult(
+            rules=parser_rules,
+            source="parser",
+            detail=f"parser split into {len(parser_rules)} rules",
+        )
+
+    # Parser returned 1 rule. Decide whether to fall back to the LLM.
+    stripped = instruction.strip()
+    if len(stripped) <= threshold_chars:
+        return DecompositionResult(
+            rules=parser_rules,
+            source="original",
+            detail=(
+                f"single-rule input under {threshold_chars}-char threshold; "
+                "no LLM fallback attempted"
+            ),
+        )
+
+    # LLM fallback path lands in the next task. For now, return original
+    # so the threshold-skipped tests pass.
+    return DecompositionResult(
+        rules=parser_rules,
+        source="original",
+        detail="LLM fallback not yet wired up",
+    )
