@@ -17,9 +17,20 @@ Two stages:
 
 from __future__ import annotations
 
+import json
+import logging
 import re
 from dataclasses import dataclass
 from typing import Any, Literal
+
+import httpx
+
+from kuroi.providers.ollama import (
+    CONNECT_TIMEOUT_SECONDS,
+    READ_TIMEOUT_SECONDS,
+)
+
+logger = logging.getLogger("kuroi.core.instruction_decomposer")
 
 _NUMBERED_PREFIX = re.compile(r"^\d+\.\s", re.MULTILINE)
 _BULLETED_PREFIX = re.compile(r"^[-*]\s", re.MULTILINE)
@@ -81,6 +92,13 @@ instructions are unlikely to benefit from LLM splitting and aren't
 worth the round-trip.
 """
 
+_SPLIT_SYSTEM_PROMPT = (
+    "You are a parser. Split the following redaction instruction into "
+    "atomic rules. Return JSON only: {\"rules\": [\"rule 1\", \"rule 2\", ...]}. "
+    "Each rule must be self-contained — a person reading just that rule "
+    "should know what to redact. Do not add rules that aren't in the input."
+)
+
 
 @dataclass(frozen=True)
 class DecompositionResult:
@@ -114,8 +132,7 @@ def decompose(
     Parser first. If the parser returns 1 rule AND len(instruction) >
     threshold_chars, dispatches one LLM split call against `provider`
     (an Ollama provider exposing _client / _url / model). Best-effort:
-    any failure mode collapses to (instruction,) with source set to
-    "llm_fallback" or "original".
+    any failure mode collapses to (instruction,).
 
     Never raises.
     """
@@ -127,7 +144,6 @@ def decompose(
             detail=f"parser split into {len(parser_rules)} rules",
         )
 
-    # Parser returned 1 rule. Decide whether to fall back to the LLM.
     stripped = instruction.strip()
     if len(stripped) <= threshold_chars:
         return DecompositionResult(
@@ -139,10 +155,92 @@ def decompose(
             ),
         )
 
-    # LLM fallback path lands in the next task. For now, return original
-    # so the threshold-skipped tests pass.
+    rules, detail = _llm_split(instruction, provider)
+    if rules is not None:
+        return DecompositionResult(
+            rules=rules,
+            source="llm_fallback",
+            detail=detail,
+        )
     return DecompositionResult(
-        rules=parser_rules,
-        source="original",
-        detail="LLM fallback not yet wired up",
+        rules=(instruction,),
+        source="llm_fallback",
+        detail=detail,
     )
+
+
+def _llm_split(
+    instruction: str,
+    provider: Any,
+) -> tuple[tuple[str, ...] | None, str]:
+    """Dispatch one Ollama "split this" call. Return (rules, detail) where
+    rules is None on any failure that should collapse to the original.
+
+    Failure modes (network, parse, shape, count) are caught individually
+    so the audit detail can be specific.
+    """
+    body = {
+        "model": provider.model,
+        "stream": False,
+        "format": "json",
+        "options": {"temperature": 0},
+        "messages": [
+            {"role": "system", "content": _SPLIT_SYSTEM_PROMPT},
+            {"role": "user", "content": instruction},
+        ],
+    }
+    timeout = httpx.Timeout(
+        connect=CONNECT_TIMEOUT_SECONDS,
+        read=READ_TIMEOUT_SECONDS,
+        write=READ_TIMEOUT_SECONDS,
+        pool=READ_TIMEOUT_SECONDS,
+    )
+    try:
+        response = provider._client.post(
+            f"{provider._url}/api/chat", json=body, timeout=timeout
+        )
+        response.raise_for_status()
+        envelope = response.json()
+    except httpx.TimeoutException as exc:
+        msg = f"llm fallback: timed out after {READ_TIMEOUT_SECONDS}s ({exc})"
+        logger.warning(msg)
+        return None, msg
+    except httpx.HTTPStatusError as exc:
+        msg = f"llm fallback: HTTP {exc.response.status_code}"
+        logger.warning(msg)
+        return None, msg
+    except httpx.HTTPError as exc:
+        msg = f"llm fallback: connection error ({exc})"
+        logger.warning(msg)
+        return None, msg
+
+    message = envelope.get("message") if isinstance(envelope, dict) else None
+    content = message.get("content") if isinstance(message, dict) else None
+    if not isinstance(content, str):
+        msg = "llm fallback: response missing message.content"
+        logger.warning(msg)
+        return None, msg
+
+    try:
+        payload = json.loads(content)
+    except json.JSONDecodeError:
+        msg = "llm fallback: response not valid JSON"
+        logger.warning(msg)
+        return None, msg
+
+    if not isinstance(payload, dict) or not isinstance(payload.get("rules"), list):
+        msg = "llm fallback: response shape invalid (no `rules` array)"
+        logger.warning(msg)
+        return None, msg
+
+    rules = tuple(
+        rule.strip()
+        for rule in payload["rules"]
+        if isinstance(rule, str) and rule.strip()
+    )
+    if len(rules) < 2:
+        msg = f"llm fallback: only {len(rules)} valid rule(s) returned"
+        logger.warning(msg)
+        return None, msg
+
+    return rules, f"llm split into {len(rules)} rules"
