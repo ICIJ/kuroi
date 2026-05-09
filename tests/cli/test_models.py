@@ -35,3 +35,16 @@ def test_models_json_output_is_parseable():
     assert "providers" in data
     assert "anthropic" in data["providers"]
     assert "models" in data["providers"]["anthropic"]
+
+
+def test_models_lists_claude_cli_with_subscription_label() -> None:
+    from typer.testing import CliRunner
+
+    from kuroi.cli import app
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["models"])
+    assert result.exit_code == 0
+    out = result.stdout.lower()
+    assert "claude-cli" in out
+    assert "subscription" in out
