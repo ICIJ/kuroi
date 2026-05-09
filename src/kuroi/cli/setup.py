@@ -65,6 +65,8 @@ def probe_claude_cli(cli_path: str | None = None) -> bool:
         try:
             from claude_agent_sdk import (
                 ClaudeAgentOptions,
+            )
+            from claude_agent_sdk import (
                 query as sdk_query,
             )
         except ImportError:

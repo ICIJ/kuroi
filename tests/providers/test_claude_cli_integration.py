@@ -13,7 +13,6 @@ import pytest
 from kuroi.core.pdf import Page, Word
 from kuroi.providers.claude_cli import ClaudeCliProvider
 
-
 pytestmark = [
     pytest.mark.slow,
     pytest.mark.skipif(
