@@ -616,3 +616,67 @@ def test_config_overrides_defaults_have_claude_cli_fields_none() -> None:
     o = ConfigOverrides()
     assert o.claude_cli_path is None
     assert o.claude_cli_timeout_s is None
+
+
+def test_claude_cli_path_resolved_from_overrides(tmp_path) -> None:
+    from kuroi.core.config import ConfigOverrides, resolve_config
+
+    cfg = resolve_config(
+        ConfigOverrides(
+            provider="claude-cli",
+            model="claude-opus-4-7",
+            claude_cli_path="/usr/local/bin/claude",
+        ),
+        env={},
+        file_path=tmp_path / "absent.toml",
+    )
+    assert cfg.claude_cli_path == "/usr/local/bin/claude"
+
+
+def test_claude_cli_timeout_resolved_from_overrides(tmp_path) -> None:
+    from kuroi.core.config import ConfigOverrides, resolve_config
+
+    cfg = resolve_config(
+        ConfigOverrides(
+            provider="claude-cli",
+            model="claude-opus-4-7",
+            claude_cli_timeout_s=600,
+        ),
+        env={},
+        file_path=tmp_path / "absent.toml",
+    )
+    assert cfg.claude_cli_timeout_s == 600
+
+
+def test_claude_cli_path_resolved_from_toml(tmp_path) -> None:
+    from kuroi.core.config import ConfigOverrides, resolve_config
+
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        'provider = "claude-cli"\n'
+        'model = "claude-opus-4-7"\n'
+        '\n'
+        '[claude_cli]\n'
+        'cli_path = "/opt/claude"\n'
+        'timeout_s = 900\n'
+    )
+    cfg = resolve_config(ConfigOverrides(), env={}, file_path=cfg_path)
+    assert cfg.claude_cli_path == "/opt/claude"
+    assert cfg.claude_cli_timeout_s == 900
+
+
+def test_claude_cli_timeout_must_be_positive(tmp_path) -> None:
+    import pytest
+
+    from kuroi.core.config import ConfigError, ConfigOverrides, resolve_config
+
+    cfg_path = tmp_path / "config.toml"
+    cfg_path.write_text(
+        'provider = "claude-cli"\n'
+        'model = "claude-opus-4-7"\n'
+        '\n'
+        '[claude_cli]\n'
+        'timeout_s = -1\n'
+    )
+    with pytest.raises(ConfigError, match="claude_cli.timeout_s"):
+        resolve_config(ConfigOverrides(), env={}, file_path=cfg_path)
