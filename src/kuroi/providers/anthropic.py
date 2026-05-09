@@ -48,6 +48,29 @@ def _is_prompt_too_long(exc: object) -> bool:
     return isinstance(message, str) and "prompt is too long" in message.lower()
 
 
+def _is_unknown_model(exc: object) -> bool:
+    """True iff an Anthropic BadRequestError signals an unknown / unavailable
+    model id. Distinguishes config bugs (typo'd Category.model in YAML)
+    from soft failures like prompt-too-long.
+    """
+    body = getattr(exc, "body", None)
+    if not isinstance(body, dict):
+        return False
+    error = body.get("error")
+    if not isinstance(error, dict):
+        return False
+    if error.get("type") != "invalid_request_error":
+        return False
+    message = error.get("message", "")
+    if not isinstance(message, str):
+        return False
+    msg_lower = message.lower()
+    return (
+        "model" in msg_lower
+        and ("not found" in msg_lower or "does not exist" in msg_lower or "unknown" in msg_lower)
+    )
+
+
 logger = logging.getLogger("kuroi.providers.anthropic")
 
 # claude-opus-4-x and newer extended-thinking models reject temperature
@@ -148,6 +171,15 @@ class AnthropicProvider:
                 **extra,
             )
         except anthropic.BadRequestError as exc:
+            if _is_unknown_model(exc):
+                from kuroi.core.config import ConfigError  # local import to avoid cycle
+
+                raise ConfigError(
+                    f"Anthropic does not recognize model {effective_model!r}. "
+                    f"Check your config or category model field. "
+                    f"Run `kuroi models` to see what's available. "
+                    f"(API said: {exc})"
+                ) from exc
             if _is_prompt_too_long(exc):
                 logger.warning(
                     "anthropic rejected prompt as too long (will subdivide): %s",

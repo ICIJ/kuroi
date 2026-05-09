@@ -369,9 +369,36 @@ def test_anthropic_truncated_response_returns_empty_to_signal_subdivide(
 
 
 def test_anthropic_other_bad_request_errors_still_raise() -> None:
-    """Non-size BadRequestErrors (malformed schema, unknown model, etc.)
+    """Non-size, non-model BadRequestErrors (malformed schema, etc.)
     are real bugs; subdivision won't help, so they keep propagating."""
     import anthropic
+
+    from kuroi.core.config import ConfigError
+
+    client = MagicMock()
+    err = anthropic.BadRequestError(
+        message="invalid json schema",
+        response=MagicMock(),
+        body={
+            "error": {
+                "type": "invalid_request_error",
+                "message": "invalid json schema",
+            }
+        },
+    )
+    client.messages.create.side_effect = err
+    provider = AnthropicProvider(model="claude-opus-4-7", client=client)
+
+    with pytest.raises(anthropic.BadRequestError):
+        provider.detect_redactions(_one_page(), ("person_name",))
+
+
+def test_anthropic_unknown_model_raises_config_error() -> None:
+    """An 'unknown model' BadRequestError is a config bug and must surface as
+    ConfigError so the chunker doesn't waste retries / subdivide."""
+    import anthropic
+
+    from kuroi.core.config import ConfigError
 
     client = MagicMock()
     err = anthropic.BadRequestError(
@@ -387,7 +414,7 @@ def test_anthropic_other_bad_request_errors_still_raise() -> None:
     client.messages.create.side_effect = err
     provider = AnthropicProvider(model="unknown-model", client=client)
 
-    with pytest.raises(anthropic.BadRequestError):
+    with pytest.raises(ConfigError, match="unknown-model"):
         provider.detect_redactions(_one_page(), ("person_name",))
 
 
