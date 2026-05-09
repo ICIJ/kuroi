@@ -174,6 +174,13 @@ class ClaudeCliProvider:
                 "claude-cli CLIConnectionError (will subdivide): %s", exc
             )
             return [], _empty_chunk(pages, prompt_sha, seed)
+        except TimeoutError as exc:
+            logger.warning(
+                "claude-cli timed out after %ds (will subdivide): %s",
+                self._timeout_s,
+                exc,
+            )
+            return [], _empty_chunk(pages, prompt_sha, seed)
         duration_ms = int((time.monotonic() - started) * 1000)
         response_sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
 
@@ -231,6 +238,7 @@ class ClaudeCliProvider:
             ClaudeAgentOptions,
             query as sdk_query,
         )
+        import anyio
 
         options = ClaudeAgentOptions(
             system_prompt=system_prompt,
@@ -246,15 +254,16 @@ class ClaudeCliProvider:
         result_text = ""
         tokens_in = 0
         tokens_out = 0
-        async for message in qfn(prompt=prompt, options=options):
-            content = getattr(message, "content", None)
-            if isinstance(content, list):
-                for block in content:
-                    text_attr = getattr(block, "text", None)
-                    if isinstance(text_attr, str):
-                        result_text += text_attr
-            usage = getattr(message, "usage", None)
-            if usage is not None:
-                tokens_in = int(getattr(usage, "input_tokens", 0)) or tokens_in
-                tokens_out = int(getattr(usage, "output_tokens", 0)) or tokens_out
+        with anyio.fail_after(self._timeout_s):
+            async for message in qfn(prompt=prompt, options=options):
+                content = getattr(message, "content", None)
+                if isinstance(content, list):
+                    for block in content:
+                        text_attr = getattr(block, "text", None)
+                        if isinstance(text_attr, str):
+                            result_text += text_attr
+                usage = getattr(message, "usage", None)
+                if usage is not None:
+                    tokens_in = int(getattr(usage, "input_tokens", 0)) or tokens_in
+                    tokens_out = int(getattr(usage, "output_tokens", 0)) or tokens_out
         return result_text, tokens_in, tokens_out
