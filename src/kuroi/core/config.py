@@ -63,6 +63,8 @@ class Config:
     backup_retention_hours: int = 24
     retry: RetryPolicy = DEFAULT_RETRY_POLICY
     layout_aware: bool = False
+    claude_cli_path: str | None = None
+    claude_cli_timeout_s: int = 300
 
 
 @dataclass(frozen=True)
@@ -79,6 +81,8 @@ class ConfigOverrides:
     retry_backoff: float | None = None
     retry_backoff_multiplier: float | None = None
     layout_aware: bool | None = None
+    claude_cli_path: str | None = None
+    claude_cli_timeout_s: int | None = None
 
 
 def xdg_config_home() -> Path:

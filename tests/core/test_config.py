@@ -600,3 +600,19 @@ def test_resolve_config_accepts_claude_cli_provider() -> None:
     )
     assert cfg.provider == "claude-cli"
     assert cfg.model == "claude-opus-4-7"
+
+
+def test_config_has_claude_cli_path_default_none() -> None:
+    from kuroi.core.config import Config
+
+    cfg = Config(provider="anthropic", model="claude-opus-4-7", ollama_url="http://x")
+    assert cfg.claude_cli_path is None
+    assert cfg.claude_cli_timeout_s == 300
+
+
+def test_config_overrides_defaults_have_claude_cli_fields_none() -> None:
+    from kuroi.core.config import ConfigOverrides
+
+    o = ConfigOverrides()
+    assert o.claude_cli_path is None
+    assert o.claude_cli_timeout_s is None
