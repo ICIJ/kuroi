@@ -32,13 +32,38 @@ from kuroi.core.output_resolution import (
     resolve_output_path,
 )
 from kuroi.core.pdf import OcrRequiredError, extract_word_index, serialize_for_llm
-from kuroi.core.pricing import count_tokens, estimate_cost, load_pricing
+from kuroi.core.pricing import Pricing, count_tokens, estimate_cost, load_pricing
 from kuroi.core.redaction import apply_redactions
 from kuroi.core.rules import apply_regex_rules, llm_categories, load_rule_set
 from kuroi.core.verification import verify_pdf
 from kuroi.providers.factory import make_provider
 
 console = Console()
+
+
+def _compute_actual_cost(
+    chunks: list[ChunkRecord],
+    pricing: Pricing,
+    provider_name: str,
+    model: str,
+) -> float:
+    """USD cost for a run, factoring Anthropic prompt-cache multipliers.
+
+    Anthropic's `usage.input_tokens` already excludes cached tokens, so the
+    four counters (regular input, cache_creation, cache_read, output)
+    partition total billed input cleanly with no double-counting.
+    """
+    rates = pricing.rates(provider_name, model)
+    regular_in = sum(c.tokens_in for c in chunks)
+    cache_write = sum(c.cache_creation_input_tokens for c in chunks)
+    cache_read = sum(c.cache_read_input_tokens for c in chunks)
+    tokens_out = sum(c.tokens_out for c in chunks)
+    return (
+        regular_in / 1_000_000 * rates.input_per_million
+        + cache_write / 1_000_000 * rates.input_per_million * rates.cache_write_multiplier
+        + cache_read / 1_000_000 * rates.input_per_million * rates.cache_read_multiplier
+        + tokens_out / 1_000_000 * rates.output_per_million
+    )
 
 
 def run(
@@ -390,11 +415,11 @@ def run(
 
                 actual_in = sum(c.tokens_in for c in chunks)
                 actual_out = sum(c.tokens_out for c in chunks)
-                if actual_in > 0:
-                    rates = pricing.rates(config.provider, config.model)
-                    actual_cost = (
-                        actual_in / 1_000_000 * rates.input_per_million
-                        + actual_out / 1_000_000 * rates.output_per_million
+                actual_cache_write = sum(c.cache_creation_input_tokens for c in chunks)
+                actual_cache_read = sum(c.cache_read_input_tokens for c in chunks)
+                if actual_in > 0 or actual_cache_write > 0 or actual_cache_read > 0:
+                    actual_cost = _compute_actual_cost(
+                        chunks, pricing, config.provider, config.model
                     )
                     if estimated_cost > 0 and actual_cost / estimated_cost > 2.0:
                         console.print(
