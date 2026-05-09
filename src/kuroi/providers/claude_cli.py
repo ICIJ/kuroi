@@ -27,6 +27,7 @@ from kuroi.providers._shared import (
     build_user_document_block,
     build_user_static_prefix,
     parse_findings_payload,
+    strip_code_fence,
 )
 
 logger = logging.getLogger("kuroi.providers.claude_cli")
@@ -227,7 +228,7 @@ class ClaudeCliProvider:
         )
 
         try:
-            payload = json.loads(text)
+            payload = json.loads(strip_code_fence(text))
         except json.JSONDecodeError as exc:
             logger.warning(
                 "claude-cli returned non-JSON response (%s; will subdivide). "
