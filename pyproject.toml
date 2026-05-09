@@ -69,3 +69,6 @@ disallow_untyped_calls = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
+markers = [
+    "slow: opt-in tests that hit external systems (run with `pytest -m slow`)",
+]
