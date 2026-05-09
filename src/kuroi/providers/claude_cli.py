@@ -32,6 +32,33 @@ from kuroi.providers._shared import (
 logger = logging.getLogger("kuroi.providers.claude_cli")
 
 
+def _cli_not_found_class():
+    from claude_agent_sdk import CLINotFoundError
+
+    return CLINotFoundError
+
+
+def _process_error_class():
+    from claude_agent_sdk import ProcessError
+
+    return ProcessError
+
+
+def _cli_json_decode_error_class():
+    from claude_agent_sdk import CLIJSONDecodeError
+
+    return CLIJSONDecodeError
+
+
+def _cli_connection_error_class():
+    from claude_agent_sdk import CLIConnectionError
+
+    return CLIConnectionError
+
+
+_AUTH_FAILURE_PATTERNS = ("not authenticated", "no credentials", "please log in")
+
+
 class ClaudeCliProvider:
     """Provider that calls `claude` via claude-agent-sdk (subscription billing)."""
 
@@ -82,9 +109,19 @@ class ClaudeCliProvider:
         import anyio  # local import keeps Provider Protocol pure
 
         started = time.monotonic()
-        text, tokens_in, tokens_out = anyio.run(
-            self._aexec, user_prompt, system_prompt, effective_model
-        )
+        try:
+            text, tokens_in, tokens_out = anyio.run(
+                self._aexec, user_prompt, system_prompt, effective_model
+            )
+        except _cli_not_found_class() as exc:
+            from kuroi.core.config import ConfigError  # local to avoid cycle
+
+            raise ConfigError(
+                "Claude CLI not found. Install with `pip install "
+                "claude-agent-sdk` or `npm install -g "
+                "@anthropic-ai/claude-code`, then run `claude /login` to "
+                f"authenticate. (SDK said: {exc})"
+            ) from exc
         duration_ms = int((time.monotonic() - started) * 1000)
         response_sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
 
