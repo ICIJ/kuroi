@@ -118,6 +118,23 @@ sensitive):
 include_text = true
 ```
 
+## Prompt-cache token fields
+
+Each chunk record carries two cache-related token counters:
+
+- `cache_creation_input_tokens` — input tokens written to Anthropic's
+  prompt cache on this call. These are billed at the cache-write rate
+  (1.25× input by default) but mean subsequent matching prompts pay the
+  cheaper read rate.
+- `cache_read_input_tokens` — input tokens served from cache on this
+  call. These are billed at the cache-read rate (0.1× input by default).
+  A growing share of cache reads across a run is a sign caching is
+  working — it should reduce total cost on repetitive batches.
+
+Cache fields are zero for providers that do not support prompt caching
+(Ollama, Claude CLI). They are populated by the Anthropic provider when
+the request structure permits caching.
+
 ## Next steps
 
 - [Troubleshooting](troubleshooting.md) — when `kuroi verify` flags a leak.
