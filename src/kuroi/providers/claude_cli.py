@@ -59,6 +59,34 @@ def _cli_connection_error_class():
 _AUTH_FAILURE_PATTERNS = ("not authenticated", "no credentials", "please log in")
 
 
+def _empty_chunk(
+    pages: tuple[Page, ...],
+    prompt_sha: str,
+    seed: int | None,
+) -> list[ChunkRecord]:
+    """Audit chunk for a soft-failed call (no usable response text).
+
+    Token counts and SHAs default to zero / the empty-string SHA, but the
+    prompt SHA is preserved so a later replay can still re-run the same
+    prompt.
+    """
+    return [
+        ChunkRecord(
+            chunk_idx=0,
+            pages=tuple(p.number for p in pages),
+            temperature=0.0,
+            seed_requested=seed,
+            seed_honored=False,
+            system_fingerprint=None,
+            prompt_sha256=prompt_sha,
+            response_sha256=hashlib.sha256(b"").hexdigest(),
+            tokens_in=0,
+            tokens_out=0,
+            duration_ms=0,
+        )
+    ]
+
+
 class ClaudeCliProvider:
     """Provider that calls `claude` via claude-agent-sdk (subscription billing)."""
 
@@ -122,6 +150,20 @@ class ClaudeCliProvider:
                 "@anthropic-ai/claude-code`, then run `claude /login` to "
                 f"authenticate. (SDK said: {exc})"
             ) from exc
+        except _process_error_class() as exc:
+            from kuroi.core.config import ConfigError  # local to avoid cycle
+
+            message = str(exc).lower()
+            if any(p in message for p in _AUTH_FAILURE_PATTERNS):
+                raise ConfigError(
+                    "Claude CLI is not authenticated. Run `claude /login` "
+                    "to log in with your subscription account. (SDK said: "
+                    f"{exc})"
+                ) from exc
+            logger.warning(
+                "claude-cli ProcessError (will subdivide): %s", exc
+            )
+            return [], _empty_chunk(pages, prompt_sha, seed)
         duration_ms = int((time.monotonic() - started) * 1000)
         response_sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
 
