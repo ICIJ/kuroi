@@ -41,6 +41,8 @@ class AuditLog:
         model_version: str,
         instructions: tuple[dict[str, Any], ...] = (),
         config_resolved_from: tuple[str, ...] = (),
+        pages_spec: str | None = None,
+        pages_resolved: tuple[int, ...] = (),
     ) -> AuditLog:
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         # mkdir's mode is subject to umask; force the right mode after creation.
@@ -49,26 +51,28 @@ class AuditLog:
         fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         fh = os.fdopen(fd, "w", encoding="utf-8")
         log = cls(fh)
-        log._write(
-            {
-                "event": "session_start",
-                "audit_schema_version": 1,
-                "session_id": session_id,
-                "ts_start": _now_iso(),
-                "kuroi_version": _kuroi_version(),
-                "input_path": str(original),
-                "input_sha256": input_sha256,
-                "input_pages": input_pages,
-                "input_bytes": input_bytes,
-                "output_path": str(output),
-                "provider": provider,
-                "model": model,
-                "model_version": model_version,
-                "rules": list(rules),
-                "instructions": list(instructions),
-                "config_resolved_from": list(config_resolved_from),
-            }
-        )
+        payload: dict[str, Any] = {
+            "event": "session_start",
+            "audit_schema_version": 1,
+            "session_id": session_id,
+            "ts_start": _now_iso(),
+            "kuroi_version": _kuroi_version(),
+            "input_path": str(original),
+            "input_sha256": input_sha256,
+            "input_pages": input_pages,
+            "input_bytes": input_bytes,
+            "output_path": str(output),
+            "provider": provider,
+            "model": model,
+            "model_version": model_version,
+            "rules": list(rules),
+            "instructions": list(instructions),
+            "config_resolved_from": list(config_resolved_from),
+        }
+        if pages_spec is not None:
+            payload["pages_spec"] = pages_spec
+            payload["pages_resolved"] = list(pages_resolved)
+        log._write(payload)
         return log
 
     def write_finding(
