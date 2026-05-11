@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from typer.testing import CliRunner
+import typer
 
 from kuroi.cli import app
 
 
 def test_claude_cli_path_flag_is_recognized() -> None:
-    runner = CliRunner()
-    result = runner.invoke(app, ["run", "--help"], env={"TERMINAL_WIDTH": "200"})
-    assert "--claude-cli-path" in result.stdout
-    assert "--claude-cli-timeout" in result.stdout
+    cmd = typer.main.get_command(app).get_command(None, "run")  # type: ignore[attr-defined]
+    flags = {opt for param in cmd.params for opt in param.opts}
+    assert "--claude-cli-path" in flags
+    assert "--claude-cli-timeout" in flags
