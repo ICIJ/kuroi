@@ -40,6 +40,7 @@ class OcrRequiredError(Exception):
 class ExtractionResult:
     pages: tuple[Page, ...]
     ocr_page_count: int  # 0 if no OCR was needed
+    total_pages: int     # doc.page_count, regardless of any --pages selection
 
 
 def _ocr_page_words(page: pymupdf.Page) -> list[Any]:
@@ -98,7 +99,11 @@ def extract_word_index(pdf_path: Path) -> ExtractionResult:
                 )
                 pages[page_1idx - 1] = Page(number=page_1idx, words=words)
 
-        return ExtractionResult(pages=tuple(pages), ocr_page_count=len(scan_candidates))
+        return ExtractionResult(
+            pages=tuple(pages),
+            ocr_page_count=len(scan_candidates),
+            total_pages=doc.page_count,
+        )
     finally:
         doc.close()  # type: ignore[no-untyped-call]
 
@@ -180,3 +185,14 @@ def serialize_for_llm(
             body = " ".join(f"[{w.idx}]{w.text}" for w in page.words)
         chunks.append(f'<page n="{page.number}">\n{body}\n</page>')
     return "\n".join(chunks)
+
+
+def index_by_number(pages: tuple[Page, ...]) -> dict[int, Page]:
+    """Map 1-indexed page number → Page.
+
+    Useful wherever callers want to look up a page by its document-side
+    number rather than its position in the tuple. With ``--pages`` in
+    effect, the tuple is no longer 1-indexed-dense, so positional access
+    breaks; this helper is the safe replacement.
+    """
+    return {p.number: p for p in pages}
