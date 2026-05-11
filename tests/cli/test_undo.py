@@ -415,3 +415,90 @@ def test_undo_verification_failure_exits_4(
     )
     assert result.exit_code == 4
     assert "verification failed" in result.stdout.lower()
+
+
+def test_undo_invokes_picker_when_tty_and_no_element_selectors(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdf = make_pdf(["alpha bravo"], filename="doc.pdf")
+    backup_root = tmp_path / "backups"
+    audit_dir = tmp_path / "audit"
+    findings = [
+        Finding(page=1, start=0, end=0, kind="email", confidence="high", source="llm"),
+        Finding(page=1, start=1, end=1, kind="person", confidence="high", source="llm"),
+    ]
+    _seed_run(
+        tmp_path, pdf,
+        findings=findings, backup_root=backup_root, audit_dir=audit_dir,
+    )
+
+    monkeypatch.setattr("kuroi.cli.undo._stdin_isatty", lambda: True)
+    monkeypatch.setattr(
+        "kuroi.cli.undo.pick_findings",
+        lambda session, text_by_index, pages_filter: (0,),
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "undo",
+            str(pdf),
+            "-y",
+            "--backup-dir",
+            str(backup_root),
+            "--audit-dir",
+            str(audit_dir),
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    undo_logs = list(audit_dir.glob("*.undo.jsonl"))
+    assert len(undo_logs) == 1
+    lines = [json.loads(l) for l in undo_logs[0].read_text().splitlines() if l]
+    assert lines[0]["findings_excluded"] == 1
+    assert lines[0]["selector"]["interactive"] is True
+
+
+def test_undo_non_tty_no_selector_falls_back_to_full_restore(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdf = make_pdf(["alpha bravo"], filename="doc.pdf")
+    backup_root = tmp_path / "backups"
+    audit_dir = tmp_path / "audit"
+    findings = [
+        Finding(page=1, start=0, end=0, kind="email", confidence="high", source="llm"),
+    ]
+    _seed_run(
+        tmp_path, pdf,
+        findings=findings, backup_root=backup_root, audit_dir=audit_dir,
+    )
+    monkeypatch.setattr("kuroi.cli.undo._stdin_isatty", lambda: False)
+
+    # picker_calls should not be invoked
+    def boom(*a, **kw):
+        raise AssertionError("picker called in non-TTY mode")
+
+    monkeypatch.setattr("kuroi.cli.undo.pick_findings", boom)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "undo",
+            str(pdf),
+            "-y",
+            "--backup-dir",
+            str(backup_root),
+            "--audit-dir",
+            str(audit_dir),
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    # No element-selector → backup contents now in pdf
+    sessions = list(backup_root.iterdir())
+    backup_pdf = next(p for p in sessions[0].iterdir() if p.suffix == ".pdf")
+    assert pdf.read_bytes() == backup_pdf.read_bytes()
