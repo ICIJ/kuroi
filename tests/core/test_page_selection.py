@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from kuroi.core.page_selection import PageSelection, PageSelectionError, parse
+from kuroi.core.page_selection import PageSelectionError, parse
 
 
 def test_parse_single() -> None:
