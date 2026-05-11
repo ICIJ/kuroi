@@ -90,11 +90,31 @@ def undo(
 
     sweep_backups(backup_dir, retention_hours=config.backup_retention_hours)
 
-    # TODO(Task 8): replace this block with the locator + audit-driven flow.
-    bak = latest_backup(backup_dir)
-    if bak is None:
-        console.print(f"  No backup found in {backup_dir}.")
-        raise typer.Exit(code=1)
+    from kuroi.core.backup import (
+        find_session_by_path,
+        find_session_by_timestamp,
+    )
+
+    bak = None
+    if session is not None:
+        bak = find_session_by_timestamp(backup_dir, session)
+        if bak is None:
+            console.print(f"  No backup at {backup_dir}/{session}.")
+            console.print("  Run 'kuroi backups list' to see what exists.")
+            raise typer.Exit(code=1)
+    elif input is not None:
+        bak = find_session_by_path(backup_dir, input)
+        if bak is None:
+            console.print(
+                f"  No backup found for {input}. "
+                "Was this run made with --no-backup?"
+            )
+            raise typer.Exit(code=1)
+    else:
+        bak = latest_backup(backup_dir)
+        if bak is None:
+            console.print(f"  No backup found in {backup_dir}.")
+            raise typer.Exit(code=1)
 
     console.print(f"  Last backup: {bak.timestamp}")
     console.print(f"  Will restore: {bak.original_path}")
