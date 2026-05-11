@@ -32,12 +32,9 @@ from kuroi.core.output_resolution import (
     OutputResolutionError,
     resolve_output_path,
 )
-from kuroi.core.page_selection import (
-    PageSelection,
-    PageSelectionError,
-    parse as parse_page_selection,
-    validate as validate_page_selection,
-)
+from kuroi.core.page_selection import PageSelection, PageSelectionError
+from kuroi.core.page_selection import parse as parse_page_selection
+from kuroi.core.page_selection import validate as validate_page_selection
 from kuroi.core.pdf import (
     OcrRequiredError,
     extract_word_index,
@@ -285,9 +282,7 @@ def run(
 
             if selection is not None:
                 try:
-                    selection = validate_page_selection(
-                        selection, page_count=result.total_pages
-                    )
+                    selection = validate_page_selection(selection, page_count=result.total_pages)
                 except PageSelectionError as exc:
                     console.print(f"  [red]{exc}[/]")
                     raise typer.Exit(code=2) from exc
@@ -300,9 +295,7 @@ def run(
                 pricing, config.provider, config.model, input_tokens=input_tokens
             )
             selection_note = (
-                f", pages {selection.raw} of {result.total_pages}"
-                if selection is not None
-                else ""
+                f", pages {selection.raw} of {result.total_pages}" if selection is not None else ""
             )
             console.print(
                 f"  Estimated cost: ${estimated_cost:.4f}  "

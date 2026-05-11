@@ -8,6 +8,7 @@ import pytest
 from kuroi.core.pdf import (
     ExtractionResult,
     OcrRequiredError,
+    Page,
     extract_word_index,
     index_by_number,
     serialize_for_llm,
@@ -149,8 +150,7 @@ def test_slice_page_reindexes_words_to_zero_base() -> None:
     from kuroi.core.pdf import Page, Word, slice_page
 
     words = tuple(
-        Word(idx=i, text=f"w{i}", bbox=(float(i), 0.0, float(i + 1), 1.0))
-        for i in range(10)
+        Word(idx=i, text=f"w{i}", bbox=(float(i), 0.0, float(i + 1), 1.0)) for i in range(10)
     )
     page = Page(number=7, words=words)
 
@@ -163,9 +163,7 @@ def test_slice_page_reindexes_words_to_zero_base() -> None:
 def test_slice_page_preserves_page_number() -> None:
     from kuroi.core.pdf import Page, Word, slice_page
 
-    words = tuple(
-        Word(idx=i, text=f"w{i}", bbox=(0.0, 0.0, 1.0, 1.0)) for i in range(5)
-    )
+    words = tuple(Word(idx=i, text=f"w{i}", bbox=(0.0, 0.0, 1.0, 1.0)) for i in range(5))
     page = Page(number=42, words=words)
 
     sliced = slice_page(page, 1, 4)
@@ -194,9 +192,7 @@ def test_slice_page_preserves_word_text_and_bbox() -> None:
 def test_slice_page_full_range_round_trips_text() -> None:
     from kuroi.core.pdf import Page, Word, slice_page
 
-    words = tuple(
-        Word(idx=i, text=f"w{i}", bbox=(0.0, 0.0, 1.0, 1.0)) for i in range(3)
-    )
+    words = tuple(Word(idx=i, text=f"w{i}", bbox=(0.0, 0.0, 1.0, 1.0)) for i in range(3))
     page = Page(number=1, words=words)
 
     sliced = slice_page(page, 0, 3)
@@ -334,7 +330,7 @@ def test_serialize_for_llm_default_no_block_tags() -> None:
     assert text == '<page n="1">\n[0]Hello [1]world [2]Other\n</page>'
 
 
-def _layout_pages() -> tuple["Page", ...]:
+def _layout_pages() -> tuple[Page, ...]:
     from kuroi.core.pdf import Page, Word
 
     return (

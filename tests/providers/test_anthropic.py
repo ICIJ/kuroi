@@ -176,9 +176,7 @@ def test_anthropic_returns_findings_and_chunk_record() -> None:
 
 def test_anthropic_records_seed_but_does_not_send_it() -> None:
     client = MagicMock()
-    client.messages.create.return_value = _stub_response(
-        '{"findings": []}', in_t=10, out_t=2
-    )
+    client.messages.create.return_value = _stub_response('{"findings": []}', in_t=10, out_t=2)
     provider = AnthropicProvider(model="claude-opus-4-7", client=client)
 
     _, chunks = provider.detect_redactions(_one_page(), ("person_name",), seed=42)
@@ -228,8 +226,7 @@ def test_detect_redactions_with_instructions_only_makes_llm_call() -> None:
 def test_detect_redactions_mixed_source_is_llm() -> None:
     """When both categories and instructions given, source is 'llm'."""
     response_text = (
-        '{"findings": [{"page": 1, "start": 0, "end": 0, '
-        '"kind": "email", "confidence": "high"}]}'
+        '{"findings": [{"page": 1, "start": 0, "end": 0, "kind": "email", "confidence": "high"}]}'
     )
     client = _StubClient(response_text)
     provider = AnthropicProvider(model="claude-opus-4-7", client=client)
@@ -268,9 +265,7 @@ def test_anthropic_logs_token_and_duration_at_info(
     """-v must surface tokens_in/tokens_out so the user can compare against
     the local estimate and spot context-window truncation."""
     client = MagicMock()
-    client.messages.create.return_value = _stub_response(
-        '{"findings": []}', in_t=164411, out_t=12
-    )
+    client.messages.create.return_value = _stub_response('{"findings": []}', in_t=164411, out_t=12)
     provider = AnthropicProvider(model="claude-opus-4-7", client=client)
 
     with caplog.at_level(logging.INFO, logger="kuroi.providers.anthropic"):
@@ -287,7 +282,9 @@ def test_anthropic_warns_when_response_likely_truncated(
     cut mid-JSON — the user must see this even at default verbosity."""
     client = MagicMock()
     client.messages.create.return_value = _stub_response(
-        '{"findings": [', in_t=1000, out_t=4096  # truncated payload, hit max_tokens
+        '{"findings": [',
+        in_t=1000,
+        out_t=4096,  # truncated payload, hit max_tokens
     )
     provider = AnthropicProvider(model="claude-opus-4-7", client=client, max_tokens=4096)
 
@@ -373,8 +370,6 @@ def test_anthropic_other_bad_request_errors_still_raise() -> None:
     are real bugs; subdivision won't help, so they keep propagating."""
     import anthropic
 
-    from kuroi.core.config import ConfigError
-
     client = MagicMock()
     err = anthropic.BadRequestError(
         message="invalid json schema",
@@ -419,7 +414,7 @@ def test_anthropic_unknown_model_raises_config_error() -> None:
 
 
 def test_anthropic_layout_aware_off_uses_plain_system_prompt() -> None:
-    from kuroi.providers._shared import SYSTEM_PROMPT, LAYOUT_AWARE_INSTRUCTIONS
+    from kuroi.providers._shared import LAYOUT_AWARE_INSTRUCTIONS, SYSTEM_PROMPT
 
     pages = (_page(1, ["Hello", "world"]),)
     fake_client = MagicMock()

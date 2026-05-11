@@ -108,11 +108,10 @@ def test_batch_summary_aggregates_chunks() -> None:
 def test_uniform_default_model_dispatches_one_call_per_batch() -> None:
     """When all categories use the default model, behavior is identical to
     today's single-call-per-batch shape."""
+    from kuroi.core.audit_records import ChunkRecord
     from kuroi.core.chunking import detect_redactions_chunked
     from kuroi.core.config import DEFAULT_RETRY_POLICY
-    from kuroi.core.findings import Finding
     from kuroi.core.pdf import Page, Word
-    from kuroi.core.audit_records import ChunkRecord
 
     class _Recorder:
         name = "stub"
@@ -121,8 +120,17 @@ def test_uniform_default_model_dispatches_one_call_per_batch() -> None:
         def __init__(self):
             self.calls: list[tuple[tuple[str, ...], str | None]] = []
 
-        def detect_redactions(self, pages, llm_category_ids, *, instructions=(),
-                              seed=None, attempt=0, layout_aware=False, model=None):
+        def detect_redactions(
+            self,
+            pages,
+            llm_category_ids,
+            *,
+            instructions=(),
+            seed=None,
+            attempt=0,
+            layout_aware=False,
+            model=None,
+        ):
             self.calls.append((llm_category_ids, model))
             return [], [_chunk_for(pages)]
 
@@ -160,9 +168,9 @@ def test_uniform_default_model_dispatches_one_call_per_batch() -> None:
 def test_mixed_models_dispatch_per_group() -> None:
     """Categories declared on different models produce one provider call
     per non-empty model group, per page-batch."""
+    from kuroi.core.audit_records import ChunkRecord
     from kuroi.core.chunking import detect_redactions_chunked
     from kuroi.core.config import DEFAULT_RETRY_POLICY
-    from kuroi.core.audit_records import ChunkRecord
     from kuroi.core.pdf import Page, Word
     from kuroi.core.rules import Category
 
@@ -173,22 +181,33 @@ def test_mixed_models_dispatch_per_group() -> None:
         def __init__(self):
             self.calls: list[tuple[tuple[str, ...], str | None]] = []
 
-        def detect_redactions(self, pages, llm_category_ids, *, instructions=(),
-                              seed=None, attempt=0, layout_aware=False, model=None):
+        def detect_redactions(
+            self,
+            pages,
+            llm_category_ids,
+            *,
+            instructions=(),
+            seed=None,
+            attempt=0,
+            layout_aware=False,
+            model=None,
+        ):
             self.calls.append((llm_category_ids, model))
-            return [], [ChunkRecord(
-                chunk_idx=0,
-                pages=tuple(p.number for p in pages),
-                temperature=0.0,
-                seed_requested=None,
-                seed_honored=False,
-                system_fingerprint=None,
-                prompt_sha256="a" * 64,
-                response_sha256="b" * 64,
-                tokens_in=1,
-                tokens_out=1,
-                duration_ms=1,
-            )]
+            return [], [
+                ChunkRecord(
+                    chunk_idx=0,
+                    pages=tuple(p.number for p in pages),
+                    temperature=0.0,
+                    seed_requested=None,
+                    seed_honored=False,
+                    system_fingerprint=None,
+                    prompt_sha256="a" * 64,
+                    response_sha256="b" * 64,
+                    tokens_in=1,
+                    tokens_out=1,
+                    duration_ms=1,
+                )
+            ]
 
     pages = (Page(number=1, words=(Word(idx=0, text="x", bbox=(0, 0, 1, 1)),)),)
     cats = (
@@ -217,9 +236,9 @@ def test_mixed_models_dispatch_per_group() -> None:
 def test_instructions_route_to_default_model_in_their_own_call() -> None:
     """Instructions get dispatched on the default model with empty categories,
     one call per batch in addition to any category-group calls."""
+    from kuroi.core.audit_records import ChunkRecord
     from kuroi.core.chunking import detect_redactions_chunked
     from kuroi.core.config import DEFAULT_RETRY_POLICY
-    from kuroi.core.audit_records import ChunkRecord
     from kuroi.core.pdf import Page, Word
     from kuroi.core.rules import Category
 
@@ -230,22 +249,33 @@ def test_instructions_route_to_default_model_in_their_own_call() -> None:
         def __init__(self):
             self.calls: list[tuple[tuple[str, ...], tuple[str, ...], str | None]] = []
 
-        def detect_redactions(self, pages, llm_category_ids, *, instructions=(),
-                              seed=None, attempt=0, layout_aware=False, model=None):
+        def detect_redactions(
+            self,
+            pages,
+            llm_category_ids,
+            *,
+            instructions=(),
+            seed=None,
+            attempt=0,
+            layout_aware=False,
+            model=None,
+        ):
             self.calls.append((llm_category_ids, instructions, model))
-            return [], [ChunkRecord(
-                chunk_idx=0,
-                pages=tuple(p.number for p in pages),
-                temperature=0.0,
-                seed_requested=None,
-                seed_honored=False,
-                system_fingerprint=None,
-                prompt_sha256="a" * 64,
-                response_sha256="b" * 64,
-                tokens_in=1,
-                tokens_out=1,
-                duration_ms=1,
-            )]
+            return [], [
+                ChunkRecord(
+                    chunk_idx=0,
+                    pages=tuple(p.number for p in pages),
+                    temperature=0.0,
+                    seed_requested=None,
+                    seed_honored=False,
+                    system_fingerprint=None,
+                    prompt_sha256="a" * 64,
+                    response_sha256="b" * 64,
+                    tokens_in=1,
+                    tokens_out=1,
+                    duration_ms=1,
+                )
+            ]
 
     pages = (Page(number=1, words=(Word(idx=0, text="x", bbox=(0, 0, 1, 1)),)),)
     cats = (Category("a", "a", "llm", "medium", None, model="claude-haiku-4-5"),)
@@ -277,9 +307,10 @@ def test_groups_dispatched_concurrently() -> None:
     first returns, so the barrier never trips and BrokenBarrierError fires
     after the timeout."""
     import threading
+
+    from kuroi.core.audit_records import ChunkRecord
     from kuroi.core.chunking import detect_redactions_chunked
     from kuroi.core.config import DEFAULT_RETRY_POLICY
-    from kuroi.core.audit_records import ChunkRecord
     from kuroi.core.pdf import Page, Word
     from kuroi.core.rules import Category
 
@@ -292,22 +323,33 @@ def test_groups_dispatched_concurrently() -> None:
             # returns. With sequential dispatch only one party arrives.
             self.barrier = threading.Barrier(2, timeout=2.0)
 
-        def detect_redactions(self, pages, llm_category_ids, *, instructions=(),
-                              seed=None, attempt=0, layout_aware=False, model=None):
+        def detect_redactions(
+            self,
+            pages,
+            llm_category_ids,
+            *,
+            instructions=(),
+            seed=None,
+            attempt=0,
+            layout_aware=False,
+            model=None,
+        ):
             self.barrier.wait()
-            return [], [ChunkRecord(
-                chunk_idx=0,
-                pages=tuple(p.number for p in pages),
-                temperature=0.0,
-                seed_requested=None,
-                seed_honored=False,
-                system_fingerprint=None,
-                prompt_sha256="a" * 64,
-                response_sha256="b" * 64,
-                tokens_in=1,
-                tokens_out=1,
-                duration_ms=1,
-            )]
+            return [], [
+                ChunkRecord(
+                    chunk_idx=0,
+                    pages=tuple(p.number for p in pages),
+                    temperature=0.0,
+                    seed_requested=None,
+                    seed_honored=False,
+                    system_fingerprint=None,
+                    prompt_sha256="a" * 64,
+                    response_sha256="b" * 64,
+                    tokens_in=1,
+                    tokens_out=1,
+                    duration_ms=1,
+                )
+            ]
 
     pages = (Page(number=1, words=(Word(idx=0, text="x", bbox=(0, 0, 1, 1)),)),)
     cats = (
@@ -338,9 +380,10 @@ def test_aggregate_chunk_order_is_submission_order() -> None:
     fast group (opus); we then assert the aggregate has haiku's chunk first
     if haiku is the first submission."""
     import time
+
+    from kuroi.core.audit_records import ChunkRecord
     from kuroi.core.chunking import detect_redactions_chunked
     from kuroi.core.config import DEFAULT_RETRY_POLICY
-    from kuroi.core.audit_records import ChunkRecord
     from kuroi.core.pdf import Page, Word
     from kuroi.core.rules import Category
 
@@ -350,24 +393,35 @@ def test_aggregate_chunk_order_is_submission_order() -> None:
         name = "stub"
         model = "claude-opus-4-7"
 
-        def detect_redactions(self, pages, llm_category_ids, *, instructions=(),
-                              seed=None, attempt=0, layout_aware=False, model=None):
+        def detect_redactions(
+            self,
+            pages,
+            llm_category_ids,
+            *,
+            instructions=(),
+            seed=None,
+            attempt=0,
+            layout_aware=False,
+            model=None,
+        ):
             if model == "claude-haiku-4-5":
                 time.sleep(0.2)
             finish_order.append(model)
-            return [], [ChunkRecord(
-                chunk_idx=0,
-                pages=tuple(p.number for p in pages),
-                temperature=0.0,
-                seed_requested=None,
-                seed_honored=False,
-                system_fingerprint=None,
-                prompt_sha256="a" * 64,
-                response_sha256="b" * 64,
-                tokens_in=1,
-                tokens_out=1,
-                duration_ms=1,
-            )]
+            return [], [
+                ChunkRecord(
+                    chunk_idx=0,
+                    pages=tuple(p.number for p in pages),
+                    temperature=0.0,
+                    seed_requested=None,
+                    seed_honored=False,
+                    system_fingerprint=None,
+                    prompt_sha256="a" * 64,
+                    response_sha256="b" * 64,
+                    tokens_in=1,
+                    tokens_out=1,
+                    duration_ms=1,
+                )
+            ]
 
     pages = (Page(number=1, words=(Word(idx=0, text="x", bbox=(0, 0, 1, 1)),)),)
     cats = (
@@ -409,23 +463,32 @@ def test_per_rule_submissions_emitted_for_multi_rule_instructions() -> None:
             self.calls: list[tuple[tuple[str, ...], tuple[str, ...]]] = []
 
         def detect_redactions(
-            self, pages, llm_category_ids, *, instructions=(),
-            seed=None, attempt=0, layout_aware=False, model=None,
+            self,
+            pages,
+            llm_category_ids,
+            *,
+            instructions=(),
+            seed=None,
+            attempt=0,
+            layout_aware=False,
+            model=None,
         ):
             self.calls.append((llm_category_ids, instructions))
-            return [], [ChunkRecord(
-                chunk_idx=0,
-                pages=tuple(p.number for p in pages),
-                temperature=0.0,
-                seed_requested=None,
-                seed_honored=False,
-                system_fingerprint=None,
-                prompt_sha256="a" * 64,
-                response_sha256="b" * 64,
-                tokens_in=1,
-                tokens_out=1,
-                duration_ms=1,
-            )]
+            return [], [
+                ChunkRecord(
+                    chunk_idx=0,
+                    pages=tuple(p.number for p in pages),
+                    temperature=0.0,
+                    seed_requested=None,
+                    seed_honored=False,
+                    system_fingerprint=None,
+                    prompt_sha256="a" * 64,
+                    response_sha256="b" * 64,
+                    tokens_in=1,
+                    tokens_out=1,
+                    duration_ms=1,
+                )
+            ]
 
     pages = (Page(number=1, words=(Word(idx=0, text="x", bbox=(0, 0, 1, 1)),)),)
     provider = _Recorder()
@@ -433,7 +496,7 @@ def test_per_rule_submissions_emitted_for_multi_rule_instructions() -> None:
     detect_redactions_chunked(
         provider,
         pages,
-        (),                                      # no categories
+        (),  # no categories
         instructions=("rule A", "rule B", "rule C"),
         pages_per_batch=1,
         retry_policy=DEFAULT_RETRY_POLICY,
@@ -465,16 +528,32 @@ def test_single_rule_instructions_keeps_one_submission() -> None:
             self.calls: list[tuple[str, ...]] = []
 
         def detect_redactions(
-            self, pages, llm_category_ids, *, instructions=(),
-            seed=None, attempt=0, layout_aware=False, model=None,
+            self,
+            pages,
+            llm_category_ids,
+            *,
+            instructions=(),
+            seed=None,
+            attempt=0,
+            layout_aware=False,
+            model=None,
         ):
             self.calls.append(instructions)
-            return [], [ChunkRecord(
-                chunk_idx=0, pages=tuple(p.number for p in pages),
-                temperature=0.0, seed_requested=None, seed_honored=False,
-                system_fingerprint=None, prompt_sha256="a" * 64,
-                response_sha256="b" * 64, tokens_in=1, tokens_out=1, duration_ms=1,
-            )]
+            return [], [
+                ChunkRecord(
+                    chunk_idx=0,
+                    pages=tuple(p.number for p in pages),
+                    temperature=0.0,
+                    seed_requested=None,
+                    seed_honored=False,
+                    system_fingerprint=None,
+                    prompt_sha256="a" * 64,
+                    response_sha256="b" * 64,
+                    tokens_in=1,
+                    tokens_out=1,
+                    duration_ms=1,
+                )
+            ]
 
     pages = (Page(number=1, words=(Word(idx=0, text="x", bbox=(0, 0, 1, 1)),)),)
     provider = _Recorder()

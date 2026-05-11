@@ -3,6 +3,10 @@ cache-token recording in ChunkRecord."""
 
 from unittest.mock import MagicMock
 
+import anthropic
+import pytest
+
+from kuroi.core.config import ConfigError
 from kuroi.core.pdf import Page, Word
 from kuroi.providers.anthropic import AnthropicProvider
 
@@ -112,9 +116,7 @@ def test_anthropic_uses_per_call_model_override() -> None:
     client.messages.create.return_value = _stub_response()
     provider = AnthropicProvider(model="claude-opus-4-7", client=client)
 
-    provider.detect_redactions(
-        _page(), ("person_name",), model="claude-haiku-4-5"
-    )
+    provider.detect_redactions(_page(), ("person_name",), model="claude-haiku-4-5")
 
     assert client.messages.create.call_args.kwargs["model"] == "claude-haiku-4-5"
 
@@ -127,12 +129,6 @@ def test_anthropic_falls_back_to_instance_model_when_override_is_none() -> None:
     provider.detect_redactions(_page(), ("person_name",), model=None)
 
     assert client.messages.create.call_args.kwargs["model"] == "claude-opus-4-7"
-
-
-import anthropic
-import pytest
-
-from kuroi.core.config import ConfigError
 
 
 def _bad_request(message: str, error_type: str = "invalid_request_error"):
@@ -148,9 +144,7 @@ def test_anthropic_raises_config_error_on_unknown_model() -> None:
     ConfigError so the chunker doesn't waste retries / subdivide on a
     fundamentally broken request."""
     client = MagicMock()
-    client.messages.create.side_effect = _bad_request(
-        "model: claude-foo-bar not found"
-    )
+    client.messages.create.side_effect = _bad_request("model: claude-foo-bar not found")
     provider = AnthropicProvider(model="claude-opus-4-7", client=client)
 
     with pytest.raises(ConfigError, match="claude-foo-bar"):
