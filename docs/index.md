@@ -18,10 +18,13 @@ removed and restore the original at any time.
 
 ```sh
 $ export ANTHROPIC_API_KEY=sk-ant-...
-$ kuroi run report.pdf
-✓ Detected 47 findings across 12 pages (32 regex, 15 llm)
-✓ Wrote redacted file: report.redacted.pdf
-✓ Backup at: ~/.local/share/kuroi/backups/report-20260430-093102.pdf
+$ kuroi run report.pdf -o report.redacted.pdf
+  Estimated cost: $0.0042  (3219 input tokens, anthropic/claude-opus-4-7)
+  Found 47 candidate redactions.
+Apply redactions? [Y/n]: y
+  Wrote report.redacted.pdf
+  Backup: ~/.local/share/kuroi/backups/2026-04-30T09-31-02Z-a1b2c3/report.pdf
+  Audit: ~/.local/share/kuroi/audit/2026-04-30T09-31-02Z-a1b2c3.jsonl
 ```
 
 ## Get started
