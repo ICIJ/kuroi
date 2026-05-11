@@ -627,3 +627,131 @@ def test_undo_no_backup_message_mentions_no_backup_flag(
     )
     assert result.exit_code == 1
     assert "--no-backup" in result.stdout
+
+
+def test_undo_missing_audit_with_element_selector_exits_3(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+) -> None:
+    pdf = make_pdf(["alpha bravo"], filename="doc.pdf")
+    backup_root = tmp_path / "backups"
+    audit_dir = tmp_path / "audit"
+    audit_dir.mkdir()
+    create_backup(pdf, backup_root=backup_root)
+    # deliberately no audit log written
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "undo",
+            str(pdf),
+            "-y",
+            "--page",
+            "1",
+            "--backup-dir",
+            str(backup_root),
+            "--audit-dir",
+            str(audit_dir),
+        ],
+    )
+    assert result.exit_code == 3, result.stdout
+    assert "audit log not found" in result.stdout.lower()
+
+
+def test_undo_picker_keyboardinterrupt_exits_130(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pdf = make_pdf(["alpha bravo"], filename="doc.pdf")
+    backup_root = tmp_path / "backups"
+    audit_dir = tmp_path / "audit"
+    findings = [
+        Finding(page=1, start=0, end=0, kind="email", confidence="high", source="llm"),
+    ]
+    _seed_run(
+        tmp_path,
+        pdf,
+        findings=findings,
+        backup_root=backup_root,
+        audit_dir=audit_dir,
+    )
+
+    monkeypatch.setattr("kuroi.cli.undo._stdin_isatty", lambda: True)
+
+    def cancel(*_a, **_kw):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("kuroi.cli.undo.pick_findings", cancel)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "undo",
+            str(pdf),
+            "-y",
+            "--backup-dir",
+            str(backup_root),
+            "--audit-dir",
+            str(audit_dir),
+        ],
+    )
+    assert result.exit_code == 130, result.stdout
+    # No undo log should have been written
+    assert list(audit_dir.glob("*.undo.jsonl")) == []
+
+
+def test_undo_pages_range_excludes_all_findings_on_listed_pages(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+) -> None:
+    pdf = make_pdf(
+        [
+            "alpha bravo charlie",  # page 1
+            "delta echo foxtrot",  # page 2
+            "golf hotel india",  # page 3
+        ],
+        filename="doc.pdf",
+    )
+    backup_root = tmp_path / "backups"
+    audit_dir = tmp_path / "audit"
+    findings = [
+        Finding(page=1, start=0, end=0, kind="email", confidence="high", source="llm"),
+        Finding(page=2, start=0, end=0, kind="person", confidence="high", source="llm"),
+        Finding(page=3, start=0, end=0, kind="email", confidence="high", source="llm"),
+    ]
+    _seed_run(
+        tmp_path,
+        pdf,
+        findings=findings,
+        backup_root=backup_root,
+        audit_dir=audit_dir,
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "undo",
+            str(pdf),
+            "-y",
+            "--pages",
+            "1-2",
+            "--backup-dir",
+            str(backup_root),
+            "--audit-dir",
+            str(audit_dir),
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+
+    undo_logs = list(audit_dir.glob("*.undo.jsonl"))
+    assert len(undo_logs) == 1
+    lines = [json.loads(line) for line in undo_logs[0].read_text().splitlines() if line]
+
+    assert lines[0]["findings_excluded"] == 2  # both findings on pages 1+2
+    finding_events = [line for line in lines if line["event"] == "undo_finding"]
+    assert {e["page"] for e in finding_events} == {1, 2}
+    assert lines[-1]["status"] == "ok"
