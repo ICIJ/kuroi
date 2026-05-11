@@ -72,6 +72,13 @@ output, or `kuroi models ollama` to filter to one provider.
     $ kuroi run document.pdf --provider claude-cli --model claude-opus-4-7
     ```
 
+    If you installed kuroi with `pipx`, inject the SDK into kuroi's
+    isolated environment instead:
+
+    ```sh
+    $ pipx inject kuroi claude-agent-sdk
+    ```
+
     Or persist by editing `~/.config/kuroi/config.toml`:
 
     ```toml

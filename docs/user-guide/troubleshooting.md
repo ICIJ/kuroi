@@ -75,6 +75,8 @@ The bundled binary is missing or outside `PATH`. Either:
 
 ```sh
 $ pip install --upgrade claude-agent-sdk
+# or, if you installed kuroi with pipx:
+$ pipx inject kuroi claude-agent-sdk --force
 # or:
 $ npm install -g @anthropic-ai/claude-code
 ```
