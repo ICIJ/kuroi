@@ -94,14 +94,16 @@ def validate(selection: PageSelection, *, page_count: int) -> PageSelection:
     bad = [p for p in selection.pages if p > page_count]
     if bad:
         bad_str = _format_pages(bad)
+        label = "pages" if len(bad) > 1 else "page"
         raise PageSelectionError(
-            f"page(s) {bad_str} not in document (1-{page_count})"
+            f"{label} {bad_str} not in document (1-{page_count})"
         )
     return selection
 
 
 def _format_pages(pages: list[int]) -> str:
-    """Compact representation of a sorted page list: contiguous runs as ranges."""
+    """Compact representation of a sorted page list: contiguous runs as ranges,
+    joined by ", " (comma-space) for readability."""
     if not pages:
         return ""
     runs: list[str] = []
@@ -113,4 +115,4 @@ def _format_pages(pages: list[int]) -> str:
         runs.append(str(start) if start == prev else f"{start}-{prev}")
         start = prev = p
     runs.append(str(start) if start == prev else f"{start}-{prev}")
-    return ",".join(runs)
+    return ", ".join(runs)
