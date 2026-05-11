@@ -5,7 +5,13 @@ from typing import Any
 import pymupdf
 import pytest
 
-from kuroi.core.pdf import ExtractionResult, OcrRequiredError, extract_word_index, serialize_for_llm
+from kuroi.core.pdf import (
+    ExtractionResult,
+    OcrRequiredError,
+    extract_word_index,
+    index_by_number,
+    serialize_for_llm,
+)
 
 
 def test_extract_word_index_returns_words_with_bboxes(make_pdf: Callable[..., Path]) -> None:
@@ -405,13 +411,14 @@ def test_extract_word_index_reports_total_pages(make_pdf: Callable[..., Path]) -
     pdf = make_pdf(["page one", "page two", "page three"])
     result = extract_word_index(pdf)
     assert result.total_pages == 3
+    # No selection: total_pages must equal the returned page count.
+    # Task 4 will introduce the case where these diverge.
+    assert result.total_pages == len(result.pages)
 
 
 def test_index_by_number_maps_pages_by_1indexed_number(
     make_pdf: Callable[..., Path],
 ) -> None:
-    from kuroi.core.pdf import index_by_number
-
     pdf = make_pdf(["one", "two", "three"])
     result = extract_word_index(pdf)
     lookup = index_by_number(result.pages)
