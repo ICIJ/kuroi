@@ -641,7 +641,7 @@ def test_run_prints_ocr_notice_when_scanned_pages_found(
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     monkeypatch.setattr(
         "kuroi.cli.run.extract_word_index",
-        lambda path: ExtractionResult(
+        lambda path, *, selection=None: ExtractionResult(
             pages=(Page(number=1, words=()),),
             ocr_page_count=2,
             total_pages=1,
@@ -678,7 +678,7 @@ def test_run_exits_2_when_ocr_required_error(
     pdf = make_pdf(["Hello world"])
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
 
-    def _raise(path: Path) -> None:
+    def _raise(path: Path, *, selection: Any = None) -> None:
         raise OcrRequiredError((3, 7))
 
     monkeypatch.setattr("kuroi.cli.run.extract_word_index", _raise)
@@ -1221,3 +1221,161 @@ def test_run_default_path_uses_orchestrator_with_default_policy(
     assert captured["kwargs"]["on_batch_complete"] is None
     assert captured["kwargs"]["pages_per_batch"] == 2  # len(pages)
     assert "Batch 1/" not in result.stdout
+
+
+def test_run_with_pages_processes_only_selected(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    stub_anthropic_client: dict[str, Any],
+) -> None:
+    """--pages restricts the LLM call to selected pages; output retains
+    the full page count; audit header records the selection."""
+    import json as _json
+
+    pdf = make_pdf(["page one alice@example.com", "page two", "page three", "page four"])
+    out = tmp_path / "redacted.pdf"
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "--rules",
+            "pii",
+            "--pages",
+            "1-2",
+            "-o",
+            str(out),
+            "-y",
+            "--backup-dir",
+            str(tmp_path / "backups"),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    # Output PDF retains all four pages.
+    doc = pymupdf.open(str(out))
+    try:
+        assert doc.page_count == 4
+    finally:
+        doc.close()
+
+    # Audit header captures the selection.
+    audit_files = list((tmp_path / "audit").glob("*.jsonl"))
+    assert len(audit_files) == 1
+    header = _json.loads(audit_files[0].read_text().splitlines()[0])
+    assert header["pages_spec"] == "1-2"
+    assert header["pages_resolved"] == [1, 2]
+
+
+def test_run_with_pages_and_batch_chunks_selection_contiguously(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    stub_anthropic_client: dict[str, Any],
+) -> None:
+    """--pages combined with --pages-per-batch produces contiguous
+    batches over the selection (gaps in the selection don't break
+    batches)."""
+    import json as _json
+
+    # 8-page doc — embed a regex-matchable email on page 1 so a finding
+    # always exists (audit file is only created when findings exist).
+    pages_text = ["page 1 alice@example.com"] + [f"page {i}" for i in range(2, 9)]
+    pdf = make_pdf(pages_text)
+    out = tmp_path / "redacted.pdf"
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "--rules",
+            "pii",
+            "--pages",
+            "1-3,6,8",
+            "--pages-per-batch",
+            "2",
+            "-o",
+            str(out),
+            "-y",
+            "--backup-dir",
+            str(tmp_path / "backups"),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+
+    # Each batch becomes one chunk_request event; the union of `pages`
+    # fields must equal the resolved selection, and batches sized 2.
+    audit_files = list((tmp_path / "audit").glob("*.jsonl"))
+    assert len(audit_files) == 1
+    lines = audit_files[0].read_text().splitlines()
+    chunk_events = [_json.loads(ln) for ln in lines if _json.loads(ln)["event"] == "chunk_request"]
+    batches = [tuple(ev["pages"]) for ev in chunk_events]
+    # Selected pages are [1, 2, 3, 6, 8]; with pages-per-batch=2 the
+    # contiguous batches over the selection are:
+    #   [1, 2]  [3, 6]  [8]
+    assert batches == [(1, 2), (3, 6), (8,)]
+
+
+def test_run_rejects_out_of_range_pages(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    stub_anthropic_client: dict[str, Any],
+) -> None:
+    pdf = make_pdf(["one", "two", "three"])
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "--instruct",
+            "redact nothing",
+            "--pages",
+            "1,99",
+            "-y",
+            "--in-place",
+            "--backup-dir",
+            str(tmp_path / "backups"),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "99" in result.stdout
+    assert "1-3" in result.stdout  # references the document page range
+
+
+def test_run_rejects_malformed_pages(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+    stub_anthropic_client: dict[str, Any],
+) -> None:
+    pdf = make_pdf(["one", "two"])
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            str(pdf),
+            "--instruct",
+            "redact nothing",
+            "--pages",
+            "abc",
+            "-y",
+            "--in-place",
+            "--backup-dir",
+            str(tmp_path / "backups"),
+            "--audit-dir",
+            str(tmp_path / "audit"),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "not a number" in result.stdout
