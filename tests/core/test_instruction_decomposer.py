@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 import httpx
 
 from kuroi.core.instruction_decomposer import (
-    DecompositionResult,
     LLM_FALLBACK_THRESHOLD_CHARS,
+    DecompositionResult,
     decompose,
     parse_instruction,
 )
@@ -62,9 +62,7 @@ def test_parser_returns_single_rule_for_prose() -> None:
 def test_parser_ignores_inline_numbers() -> None:
     """Inline numbers like phone digits or ZIPs must not trigger split.
     Anchor `^\\d+\\.` to line start prevents this."""
-    rules = parse_instruction(
-        "Redact ZIPs like 12345 and phone numbers like 555-1234 too."
-    )
+    rules = parse_instruction("Redact ZIPs like 12345 and phone numbers like 555-1234 too.")
     assert rules == ("Redact ZIPs like 12345 and phone numbers like 555-1234 too.",)
 
 
@@ -128,7 +126,9 @@ def test_decompose_returns_parser_result_when_multi_rule() -> None:
     )
     assert result.rules == ("1. Redact emails", "2. Redact phones")
     assert result.source == "parser"
-    assert "2" in result.detail or "two" in result.detail.lower() or "split" in result.detail.lower()
+    assert (
+        "2" in result.detail or "two" in result.detail.lower() or "split" in result.detail.lower()
+    )
 
 
 def test_decompose_short_single_rule_skips_fallback() -> None:

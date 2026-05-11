@@ -980,8 +980,8 @@ def test_run_with_pages_per_batch_prints_progress_per_batch(
     )
 
     assert result.exit_code == 0, result.stdout
-    assert "Batch 1/2 (pages 1–2)" in result.stdout
-    assert "Batch 2/2 (pages 3–4)" in result.stdout
+    assert "Batch 1/2 (pages 1–2)" in result.stdout  # noqa: RUF001
+    assert "Batch 2/2 (pages 3–4)" in result.stdout  # noqa: RUF001
 
 
 def test_run_with_pages_per_batch_aborts_on_batch_error(
@@ -1310,7 +1310,9 @@ def test_run_with_pages_and_batch_chunks_selection_contiguously(
     audit_files = list((tmp_path / "audit").glob("*.jsonl"))
     assert len(audit_files) == 1
     lines = audit_files[0].read_text().splitlines()
-    chunk_events = [_json2.loads(ln) for ln in lines if _json2.loads(ln)["event"] == "chunk_request"]
+    chunk_events = [
+        _json2.loads(ln) for ln in lines if _json2.loads(ln)["event"] == "chunk_request"
+    ]
     batches = [tuple(ev["pages"]) for ev in chunk_events]
     # Selected pages are [1, 2, 3, 6, 8]; with pages-per-batch=2 the
     # contiguous batches over the selection are:

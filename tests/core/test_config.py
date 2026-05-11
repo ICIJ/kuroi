@@ -655,10 +655,10 @@ def test_claude_cli_path_resolved_from_toml(tmp_path) -> None:
     cfg_path.write_text(
         'provider = "claude-cli"\n'
         'model = "claude-opus-4-7"\n'
-        '\n'
-        '[claude_cli]\n'
+        "\n"
+        "[claude_cli]\n"
         'cli_path = "/opt/claude"\n'
-        'timeout_s = 900\n'
+        "timeout_s = 900\n"
     )
     cfg = resolve_config(ConfigOverrides(), env={}, file_path=cfg_path)
     assert cfg.claude_cli_path == "/opt/claude"
@@ -672,13 +672,9 @@ def test_claude_cli_timeout_must_be_positive(tmp_path) -> None:
 
     cfg_path = tmp_path / "config.toml"
     cfg_path.write_text(
-        'provider = "claude-cli"\n'
-        'model = "claude-opus-4-7"\n'
-        '\n'
-        '[claude_cli]\n'
-        'timeout_s = -1\n'
+        'provider = "claude-cli"\nmodel = "claude-opus-4-7"\n\n[claude_cli]\ntimeout_s = -1\n'
     )
-    with pytest.raises(ConfigError, match="claude_cli.timeout_s"):
+    with pytest.raises(ConfigError, match=r"claude_cli\.timeout_s"):
         resolve_config(ConfigOverrides(), env={}, file_path=cfg_path)
 
 
