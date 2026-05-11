@@ -211,3 +211,64 @@ def test_instruction_decomposed_event_serializes(tmp_path: Path) -> None:
     assert decomp["detail"] == "parser split into 5 rules"
     assert decomp["rule_count"] == 5
     assert decomp["rules"] == ["1. A", "2. B", "3. C", "4. D", "5. E"]
+
+
+def test_audit_log_records_page_selection(tmp_path: Path) -> None:
+    """When --pages is in effect, the session_start header captures
+    both the raw flag value and the resolved page set."""
+    from kuroi.core.audit import AuditLog
+
+    path = tmp_path / "audit.jsonl"
+    log = AuditLog.open(
+        path,
+        original=tmp_path / "in.pdf",
+        output=tmp_path / "out.pdf",
+        provider="anthropic",
+        model="claude-opus-4-7",
+        rules=(),
+        session_id="abc",
+        input_sha256="0" * 64,
+        input_pages=5,
+        input_bytes=100,
+        model_version="claude-opus-4-7",
+        pages_spec="1-3,5",
+        pages_resolved=(1, 2, 3, 5),
+    )
+    log.close(verification_passed=True, redaction_count=0)
+
+    lines = path.read_text().splitlines()
+    import json as _json
+
+    header = _json.loads(lines[0])
+    assert header["event"] == "session_start"
+    assert header["pages_spec"] == "1-3,5"
+    assert header["pages_resolved"] == [1, 2, 3, 5]
+
+
+def test_audit_log_omits_page_selection_when_unset(tmp_path: Path) -> None:
+    """Default behavior (no --pages) leaves both fields absent so existing
+    audit consumers see no schema change."""
+    from kuroi.core.audit import AuditLog
+
+    path = tmp_path / "audit.jsonl"
+    log = AuditLog.open(
+        path,
+        original=tmp_path / "in.pdf",
+        output=tmp_path / "out.pdf",
+        provider="anthropic",
+        model="claude-opus-4-7",
+        rules=(),
+        session_id="abc",
+        input_sha256="0" * 64,
+        input_pages=5,
+        input_bytes=100,
+        model_version="claude-opus-4-7",
+    )
+    log.close(verification_passed=True, redaction_count=0)
+
+    lines = path.read_text().splitlines()
+    import json as _json
+
+    header = _json.loads(lines[0])
+    assert "pages_spec" not in header
+    assert "pages_resolved" not in header
