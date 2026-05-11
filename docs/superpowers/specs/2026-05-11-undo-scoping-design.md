@@ -107,7 +107,10 @@ Once a session is selected, its audit log lives at
 given (`--page`, `--kind`, `--words`, or picker), exit 3 with
 `audit log not found for session <ts>; element-level undo requires the audit log`.
 If missing and only a full restore was requested, skip the audit and copy the
-backup over `output_path`.
+backup over `manifest.original_path` — preserving today's behavior when the
+audit log isn't available. (When the audit log *is* present, full restore
+writes to `audit.output_path` instead; in an in-place run those paths are
+the same.)
 
 ## Parsing findings and regenerating
 
