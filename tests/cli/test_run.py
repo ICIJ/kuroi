@@ -1230,8 +1230,6 @@ def test_run_with_pages_processes_only_selected(
 ) -> None:
     """--pages restricts the LLM call to selected pages; output retains
     the full page count; audit header records the selection."""
-    import json as _json
-
     pdf = make_pdf(["page one alice@example.com", "page two", "page three", "page four"])
     out = tmp_path / "redacted.pdf"
 
@@ -1265,7 +1263,7 @@ def test_run_with_pages_processes_only_selected(
     # Audit header captures the selection.
     audit_files = list((tmp_path / "audit").glob("*.jsonl"))
     assert len(audit_files) == 1
-    header = _json.loads(audit_files[0].read_text().splitlines()[0])
+    header = _json2.loads(audit_files[0].read_text().splitlines()[0])
     assert header["pages_spec"] == "1-2"
     assert header["pages_resolved"] == [1, 2]
 
@@ -1278,8 +1276,6 @@ def test_run_with_pages_and_batch_chunks_selection_contiguously(
     """--pages combined with --pages-per-batch produces contiguous
     batches over the selection (gaps in the selection don't break
     batches)."""
-    import json as _json
-
     # 8-page doc — embed a regex-matchable email on page 1 so a finding
     # always exists (audit file is only created when findings exist).
     pages_text = ["page 1 alice@example.com"] + [f"page {i}" for i in range(2, 9)]
@@ -1314,7 +1310,7 @@ def test_run_with_pages_and_batch_chunks_selection_contiguously(
     audit_files = list((tmp_path / "audit").glob("*.jsonl"))
     assert len(audit_files) == 1
     lines = audit_files[0].read_text().splitlines()
-    chunk_events = [_json.loads(ln) for ln in lines if _json.loads(ln)["event"] == "chunk_request"]
+    chunk_events = [_json2.loads(ln) for ln in lines if _json2.loads(ln)["event"] == "chunk_request"]
     batches = [tuple(ev["pages"]) for ev in chunk_events]
     # Selected pages are [1, 2, 3, 6, 8]; with pages-per-batch=2 the
     # contiguous batches over the selection are:

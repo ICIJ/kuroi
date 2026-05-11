@@ -35,11 +35,7 @@ from kuroi.core.output_resolution import (
 from kuroi.core.page_selection import (
     PageSelection,
     PageSelectionError,
-)
-from kuroi.core.page_selection import (
     parse as parse_page_selection,
-)
-from kuroi.core.page_selection import (
     validate as validate_page_selection,
 )
 from kuroi.core.pdf import (
