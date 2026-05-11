@@ -14,6 +14,8 @@ from typing import Any
 
 import pymupdf
 
+from kuroi.core.page_selection import PageSelection
+
 
 @dataclass(frozen=True)
 class Word:
@@ -49,17 +51,23 @@ def _ocr_page_words(page: pymupdf.Page) -> list[Any]:
     return words
 
 
-def extract_word_index(pdf_path: Path) -> ExtractionResult:
-    """Extract every word on every page with its bounding box.
+def extract_word_index(
+    pdf_path: Path,
+    *,
+    selection: PageSelection | None = None,
+) -> ExtractionResult:
+    """Extract every word on every (selected) page with its bounding box.
 
-    Any page with at least one embedded image is treated as a scan candidate
-    so OCR can recover text drawn inside the image — including the common case
-    where a court-stamped header sits on top of a screenshot exhibit. If any
-    scan candidates are found and tesseract is not in PATH, raises
-    OcrRequiredError. Otherwise OCRs scan candidates via PyMuPDF's tesseract
-    bridge; the OCR pass replaces the page's word list, since `full=True` OCR
-    re-extracts the rendered native text alongside the image content. Returns
-    an ExtractionResult whose ocr_page_count reflects how many pages were OCR'd.
+    When ``selection`` is given, only the listed page numbers are
+    extracted, and OCR scan-candidate detection runs only for those
+    pages. The returned ``ExtractionResult.pages`` tuple contains only
+    selected pages (preserving their original 1-indexed ``number``).
+    ``total_pages`` always reflects the full document page count.
+
+    Any selected page with at least one embedded image is treated as a
+    scan candidate so OCR can recover text drawn inside the image. If
+    any scan candidates are found and tesseract is not in PATH, raises
+    OcrRequiredError listing those pages.
     """
     doc = pymupdf.open(str(pdf_path))  # type: ignore[no-untyped-call]
     try:
@@ -67,6 +75,9 @@ def extract_word_index(pdf_path: Path) -> ExtractionResult:
         scan_candidates: list[int] = []  # 1-indexed page numbers
 
         for page_idx in range(doc.page_count):
+            page_num = page_idx + 1
+            if selection is not None and page_num not in selection:
+                continue
             pdf_page = doc[page_idx]
             raw = pdf_page.get_text("words")  # type: ignore[no-untyped-call]
             words = tuple(
@@ -78,13 +89,14 @@ def extract_word_index(pdf_path: Path) -> ExtractionResult:
                 )
                 for i, w in enumerate(raw)
             )
-            pages.append(Page(number=page_idx + 1, words=words))
+            pages.append(Page(number=page_num, words=words))
             if pdf_page.get_images():  # type: ignore[no-untyped-call]
-                scan_candidates.append(page_idx + 1)
+                scan_candidates.append(page_num)
 
         if scan_candidates:
             if shutil.which("tesseract") is None:
                 raise OcrRequiredError(tuple(scan_candidates))
+            slot_by_number = {p.number: idx for idx, p in enumerate(pages)}
             for page_1idx in scan_candidates:
                 pdf_page = doc[page_1idx - 1]
                 raw = _ocr_page_words(pdf_page)
@@ -97,7 +109,7 @@ def extract_word_index(pdf_path: Path) -> ExtractionResult:
                     )
                     for i, w in enumerate(raw)
                 )
-                pages[page_1idx - 1] = Page(number=page_1idx, words=words)
+                pages[slot_by_number[page_1idx]] = Page(number=page_1idx, words=words)
 
         return ExtractionResult(
             pages=tuple(pages),
