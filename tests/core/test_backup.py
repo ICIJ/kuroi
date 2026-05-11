@@ -59,15 +59,13 @@ def test_sweep_backups_removes_expired(tmp_path: Path) -> None:
     root = tmp_path / "backups"
     root.mkdir()
     # Old: 30h ago.
-    old_ts = (datetime.now(UTC) - timedelta(hours=30)).strftime(
-        "%Y-%m-%dT%H-%M-%SZ-aaaaaa"
-    )
+    old_ts = (datetime.now(UTC) - timedelta(hours=30)).strftime("%Y-%m-%dT%H-%M-%SZ-aaaaaa")
     (root / old_ts).mkdir()
-    (root / old_ts / "manifest.json").write_text('{}')
+    (root / old_ts / "manifest.json").write_text("{}")
     # New: just now.
     new_ts = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%SZ-bbbbbb")
     (root / new_ts).mkdir()
-    (root / new_ts / "manifest.json").write_text('{}')
+    (root / new_ts / "manifest.json").write_text("{}")
 
     pruned = sweep_backups(root, retention_hours=24)
 
@@ -79,9 +77,7 @@ def test_sweep_backups_removes_expired(tmp_path: Path) -> None:
 def test_sweep_backups_zero_means_keep_all(tmp_path: Path) -> None:
     root = tmp_path / "backups"
     root.mkdir()
-    very_old = (datetime.now(UTC) - timedelta(days=400)).strftime(
-        "%Y-%m-%dT%H-%M-%SZ-cccccc"
-    )
+    very_old = (datetime.now(UTC) - timedelta(days=400)).strftime("%Y-%m-%dT%H-%M-%SZ-cccccc")
     (root / very_old).mkdir()
 
     pruned = sweep_backups(root, retention_hours=0)

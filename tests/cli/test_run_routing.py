@@ -38,13 +38,13 @@ class _RoutingProvider:
         findings: list[Finding] = []
         if "person_name" in llm_category_ids:
             findings.append(
-                Finding(page=1, start=0, end=1, kind="person_name",
-                        confidence="high", source="llm")
+                Finding(page=1, start=0, end=1, kind="person_name", confidence="high", source="llm")
             )
         if "street_address" in llm_category_ids:
             findings.append(
-                Finding(page=1, start=2, end=3, kind="street_address",
-                        confidence="medium", source="llm")
+                Finding(
+                    page=1, start=2, end=3, kind="street_address", confidence="medium", source="llm"
+                )
             )
         chunk = ChunkRecord(
             chunk_idx=0,

@@ -31,7 +31,9 @@ class _StubResponse:
     def raise_for_status(self) -> None:
         if self.status_code >= 400:
             raise httpx.HTTPStatusError(
-                "boom", request=httpx.Request("POST", "http://x"), response=self  # type: ignore[arg-type]
+                "boom",
+                request=httpx.Request("POST", "http://x"),
+                response=self,  # type: ignore[arg-type]
             )
 
     def json(self) -> Any:
@@ -106,7 +108,9 @@ def test_detect_redactions_round_trips_through_stub_client() -> None:
 def test_detect_redactions_short_circuits_with_no_categories() -> None:
     client = _StubClient(response=_ok_response('{"findings": []}'))
     provider = OllamaProvider(
-        model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
+        model="llama3.1:8b",
+        url="http://localhost:11434",
+        client=client,  # type: ignore[arg-type]
     )
     pages = (_page(1, ["Hello"]),)
 
@@ -120,7 +124,9 @@ def test_detect_redactions_short_circuits_with_no_categories() -> None:
 def test_connect_error_returns_empty_findings() -> None:
     client = _StubClient(raise_exc=httpx.ConnectError("daemon down"))
     provider = OllamaProvider(
-        model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
+        model="llama3.1:8b",
+        url="http://localhost:11434",
+        client=client,  # type: ignore[arg-type]
     )
     pages = (_page(1, ["Hello"]),)
     findings, chunks = provider.detect_redactions(pages, ("person_name",))
@@ -131,7 +137,9 @@ def test_connect_error_returns_empty_findings() -> None:
 def test_timeout_returns_empty_findings() -> None:
     client = _StubClient(raise_exc=httpx.TimeoutException("slow"))
     provider = OllamaProvider(
-        model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
+        model="llama3.1:8b",
+        url="http://localhost:11434",
+        client=client,  # type: ignore[arg-type]
     )
     pages = (_page(1, ["Hello"]),)
     findings, chunks = provider.detect_redactions(pages, ("person_name",))
@@ -142,7 +150,9 @@ def test_timeout_returns_empty_findings() -> None:
 def test_500_response_returns_empty_findings() -> None:
     client = _StubClient(response=_StubResponse(status_code=500, body=""))
     provider = OllamaProvider(
-        model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
+        model="llama3.1:8b",
+        url="http://localhost:11434",
+        client=client,  # type: ignore[arg-type]
     )
     pages = (_page(1, ["Hello"]),)
     findings, chunks = provider.detect_redactions(pages, ("person_name",))
@@ -153,7 +163,9 @@ def test_500_response_returns_empty_findings() -> None:
 def test_non_json_body_returns_empty_findings() -> None:
     client = _StubClient(response=_ok_response("this is not json"))
     provider = OllamaProvider(
-        model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
+        model="llama3.1:8b",
+        url="http://localhost:11434",
+        client=client,  # type: ignore[arg-type]
     )
     pages = (_page(1, ["Hello", "Sarah", "Chen"]),)
     findings, _chunks = provider.detect_redactions(pages, ("person_name",))
@@ -164,7 +176,9 @@ def test_missing_message_content_returns_empty_findings() -> None:
     body = json.dumps({"done": True})
     client = _StubClient(response=_StubResponse(status_code=200, body=body))
     provider = OllamaProvider(
-        model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
+        model="llama3.1:8b",
+        url="http://localhost:11434",
+        client=client,  # type: ignore[arg-type]
     )
     pages = (_page(1, ["Hello"]),)
     findings, _chunks = provider.detect_redactions(pages, ("person_name",))
@@ -174,7 +188,9 @@ def test_missing_message_content_returns_empty_findings() -> None:
 def test_strips_trailing_url_slash() -> None:
     client = _StubClient(response=_ok_response('{"findings": []}'))
     provider = OllamaProvider(
-        model="m", url="http://localhost:11434/", client=client  # type: ignore[arg-type]
+        model="m",
+        url="http://localhost:11434/",
+        client=client,  # type: ignore[arg-type]
     )
     pages = (_page(1, ["Hello"]),)
     provider.detect_redactions(pages, ("person_name",))
@@ -295,7 +311,9 @@ def test_ollama_logs_full_prompt_and_response_at_debug(
     body = '{"findings": []}'
     client = _StubClient(response=_ok_response(body))
     provider = OllamaProvider(
-        model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
+        model="llama3.1:8b",
+        url="http://localhost:11434",
+        client=client,  # type: ignore[arg-type]
     )
     pages = (_page(1, ["Hello", "Sarah", "Chen"]),)
 
@@ -325,7 +343,9 @@ def test_ollama_warns_on_timeout_instead_of_silent_fail(
 ) -> None:
     client = _StubClient(raise_exc=httpx.TimeoutException("read timeout"))
     provider = OllamaProvider(
-        model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
+        model="llama3.1:8b",
+        url="http://localhost:11434",
+        client=client,  # type: ignore[arg-type]
     )
 
     with caplog.at_level(logging.WARNING, logger="kuroi.providers.ollama"):
@@ -341,7 +361,9 @@ def test_ollama_warns_on_http_status_instead_of_silent_fail(
 ) -> None:
     client = _StubClient(response=_StubResponse(status_code=500, body="upstream is sad"))
     provider = OllamaProvider(
-        model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
+        model="llama3.1:8b",
+        url="http://localhost:11434",
+        client=client,  # type: ignore[arg-type]
     )
 
     with caplog.at_level(logging.WARNING, logger="kuroi.providers.ollama"):
@@ -362,7 +384,9 @@ def test_ollama_read_timeout_scales_with_attempt() -> None:
 
     client = _StubClient(response=_ok_response('{"findings": []}'))
     provider = OllamaProvider(
-        model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
+        model="llama3.1:8b",
+        url="http://localhost:11434",
+        client=client,  # type: ignore[arg-type]
     )
     pages = (_page(1, ["Hello"]),)
 
@@ -396,7 +420,9 @@ def test_ollama_timeout_warning_reports_actual_attempt_timeout(
 
     client = _StubClient(raise_exc=httpx.TimeoutException("slow"))
     provider = OllamaProvider(
-        model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
+        model="llama3.1:8b",
+        url="http://localhost:11434",
+        client=client,  # type: ignore[arg-type]
     )
     pages = (_page(1, ["Hello"]),)
 
@@ -413,7 +439,9 @@ def test_ollama_warns_on_non_json_message_content(
 ) -> None:
     client = _StubClient(response=_ok_response("not actually json"))
     provider = OllamaProvider(
-        model="llama3.1:8b", url="http://localhost:11434", client=client  # type: ignore[arg-type]
+        model="llama3.1:8b",
+        url="http://localhost:11434",
+        client=client,  # type: ignore[arg-type]
     )
 
     with caplog.at_level(logging.WARNING, logger="kuroi.providers.ollama"):

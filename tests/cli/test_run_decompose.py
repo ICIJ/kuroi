@@ -54,11 +54,13 @@ class _FakeOllamaProvider:
         layout_aware: bool = False,
         model: str | None = None,
     ) -> tuple[list[Finding], list[ChunkRecord]]:
-        self.detect_calls.append({
-            "model": model,
-            "categories": llm_category_ids,
-            "instructions": instructions,
-        })
+        self.detect_calls.append(
+            {
+                "model": model,
+                "categories": llm_category_ids,
+                "instructions": instructions,
+            }
+        )
         findings = [_make_finding()] if self._call_idx == 0 else []
         self._call_idx += 1
         chunk = ChunkRecord(
@@ -96,19 +98,21 @@ class _FakeAnthropicProvider:
         model: str | None = None,
     ) -> tuple[list[Finding], list[ChunkRecord]]:
         self.detect_calls.append({"instructions": instructions})
-        return [_make_finding()], [ChunkRecord(
-            chunk_idx=0,
-            pages=tuple(p.number for p in pages),
-            temperature=0.0,
-            seed_requested=None,
-            seed_honored=False,
-            system_fingerprint=None,
-            prompt_sha256="a" * 64,
-            response_sha256="b" * 64,
-            tokens_in=10,
-            tokens_out=2,
-            duration_ms=50,
-        )]
+        return [_make_finding()], [
+            ChunkRecord(
+                chunk_idx=0,
+                pages=tuple(p.number for p in pages),
+                temperature=0.0,
+                seed_requested=None,
+                seed_honored=False,
+                system_fingerprint=None,
+                prompt_sha256="a" * 64,
+                response_sha256="b" * 64,
+                tokens_in=10,
+                tokens_out=2,
+                duration_ms=50,
+            )
+        ]
 
 
 def _read_audit_events(audit_dir: Path) -> list[dict]:
@@ -167,17 +171,25 @@ def test_ollama_multirule_instruct_decomposes_and_dispatches_per_rule(
         [
             "run",
             str(tiny_pdf),
-            "--instruct", instruct,
-            "-o", str(tmp_path / "out.pdf"),
+            "--instruct",
+            instruct,
+            "-o",
+            str(tmp_path / "out.pdf"),
             "--overwrite",
             "-y",
             "--no-backup",
-            "--audit-dir", str(audit_dir),
-            "--provider", "ollama",
-            "--model", "llama3.1:8b",
-            "--ollama-url", "http://localhost:11434",
-            "--pages-per-batch", "1",
-            "--max-retries", "0",
+            "--audit-dir",
+            str(audit_dir),
+            "--provider",
+            "ollama",
+            "--model",
+            "llama3.1:8b",
+            "--ollama-url",
+            "http://localhost:11434",
+            "--pages-per-batch",
+            "1",
+            "--max-retries",
+            "0",
         ],
     )
 
@@ -223,16 +235,23 @@ def test_anthropic_multirule_instruct_does_not_decompose(
         [
             "run",
             str(tiny_pdf),
-            "--instruct", instruct,
-            "-o", str(tmp_path / "out.pdf"),
+            "--instruct",
+            instruct,
+            "-o",
+            str(tmp_path / "out.pdf"),
             "--overwrite",
             "-y",
             "--no-backup",
-            "--audit-dir", str(audit_dir),
-            "--provider", "anthropic",
-            "--model", "claude-opus-4-7",
-            "--pages-per-batch", "1",
-            "--max-retries", "0",
+            "--audit-dir",
+            str(audit_dir),
+            "--provider",
+            "anthropic",
+            "--model",
+            "claude-opus-4-7",
+            "--pages-per-batch",
+            "1",
+            "--max-retries",
+            "0",
         ],
     )
 
@@ -266,17 +285,25 @@ def test_run_ollama_no_instruct_does_not_decompose(
         [
             "run",
             str(tiny_pdf),
-            "--rules", "pii-en",
-            "-o", str(tmp_path / "out.pdf"),
+            "--rules",
+            "pii-en",
+            "-o",
+            str(tmp_path / "out.pdf"),
             "--overwrite",
             "-y",
             "--no-backup",
-            "--audit-dir", str(audit_dir),
-            "--provider", "ollama",
-            "--model", "llama3.1:8b",
-            "--ollama-url", "http://localhost:11434",
-            "--pages-per-batch", "1",
-            "--max-retries", "0",
+            "--audit-dir",
+            str(audit_dir),
+            "--provider",
+            "ollama",
+            "--model",
+            "llama3.1:8b",
+            "--ollama-url",
+            "http://localhost:11434",
+            "--pages-per-batch",
+            "1",
+            "--max-retries",
+            "0",
         ],
     )
 

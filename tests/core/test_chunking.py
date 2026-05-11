@@ -285,9 +285,7 @@ def test_chunked_call_aborts_after_max_attempts(
     )
 
     with pytest.raises(BatchError) as excinfo:
-        detect_redactions_chunked(
-            provider, pages, ("x",), pages_per_batch=1, retry_policy=policy
-        )
+        detect_redactions_chunked(provider, pages, ("x",), pages_per_batch=1, retry_policy=policy)
 
     assert excinfo.value.batch_idx == 1
     assert excinfo.value.page_numbers == (2,)
@@ -310,9 +308,7 @@ def test_chunked_call_uses_policy_schedule_between_retries(
     provider = _RecordingProvider(scripts=[([], []) for _ in range(total_attempts)])
 
     with pytest.raises(BatchError):
-        detect_redactions_chunked(
-            provider, pages, ("x",), pages_per_batch=1, retry_policy=policy
-        )
+        detect_redactions_chunked(provider, pages, ("x",), pages_per_batch=1, retry_policy=policy)
 
     # one sleep per retry; no sleep after the final attempt before raising
     assert sleeps == [1.0, 3.0, 9.0]
@@ -439,9 +435,7 @@ def test_chunked_call_with_zero_retries_aborts_on_first_hard_failure(
     policy = RetryPolicy(max_retries=0, backoff=2.0, backoff_multiplier=2.0)
 
     with pytest.raises(BatchError) as excinfo:
-        detect_redactions_chunked(
-            provider, pages, ("x",), pages_per_batch=1, retry_policy=policy
-        )
+        detect_redactions_chunked(provider, pages, ("x",), pages_per_batch=1, retry_policy=policy)
 
     assert len(provider.calls) == 1
     assert excinfo.value.attempts == 1
@@ -462,9 +456,7 @@ def test_chunked_call_attempts_in_batch_error_match_policy(
     provider = _RecordingProvider(scripts=[([], []) for _ in range(total_attempts)])
 
     with pytest.raises(BatchError) as excinfo:
-        detect_redactions_chunked(
-            provider, pages, ("x",), pages_per_batch=1, retry_policy=policy
-        )
+        detect_redactions_chunked(provider, pages, ("x",), pages_per_batch=1, retry_policy=policy)
 
     assert excinfo.value.attempts == total_attempts
     assert provider.attempts == list(range(total_attempts))

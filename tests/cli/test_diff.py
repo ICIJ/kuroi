@@ -45,9 +45,18 @@ def test_diff_json_format_emits_ndjson(tmp_path: Path):
 def test_diff_html_format_writes_self_contained_file(tmp_path: Path):
     orig, red = _make_pair(tmp_path, "Sarah Chen was here", "         was here")
     out = tmp_path / "diff.html"
-    result = runner.invoke(app, [
-        "diff", str(orig), str(red), "--format", "html", "-o", str(out),
-    ])
+    result = runner.invoke(
+        app,
+        [
+            "diff",
+            str(orig),
+            str(red),
+            "--format",
+            "html",
+            "-o",
+            str(out),
+        ],
+    )
     assert result.exit_code == 0
     body = out.read_text()
     assert "<html" in body

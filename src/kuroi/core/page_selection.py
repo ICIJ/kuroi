@@ -95,9 +95,7 @@ def validate(selection: PageSelection, *, page_count: int) -> PageSelection:
     if bad:
         bad_str = _format_pages(bad)
         label = "pages" if len(bad) > 1 else "page"
-        raise PageSelectionError(
-            f"{label} {bad_str} not in document (1-{page_count})"
-        )
+        raise PageSelectionError(f"{label} {bad_str} not in document (1-{page_count})")
     return selection
 
 

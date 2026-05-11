@@ -105,9 +105,12 @@ def test_run_cli_flags_reach_resolve_config(
         app,
         [
             *_common_args(pdf, out, tmp_path),
-            "--provider", "ollama",
-            "--model", "llama3.1:8b",
-            "--ollama-url", "http://example:11434",
+            "--provider",
+            "ollama",
+            "--model",
+            "llama3.1:8b",
+            "--ollama-url",
+            "http://example:11434",
         ],
     )
     assert result.exit_code == 0, result.stdout
@@ -148,9 +151,7 @@ def test_run_cli_flag_layout_aware_propagates_to_config(
     pdf = make_pdf(["alice@example.com"])
     out = tmp_path / "out.pdf"
 
-    result = CliRunner().invoke(
-        app, [*_common_args(pdf, out, tmp_path), "--layout-aware"]
-    )
+    result = CliRunner().invoke(app, [*_common_args(pdf, out, tmp_path), "--layout-aware"])
     assert result.exit_code == 0, result.stdout
     assert captured["config"].layout_aware is True
 
@@ -163,9 +164,7 @@ def test_run_no_layout_aware_flag_overrides_config_true(
     cfg_dir = tmp_path / "cfg"
     cfg_dir.mkdir()
     (cfg_dir / "kuroi").mkdir()
-    (cfg_dir / "kuroi" / "config.toml").write_text(
-        "[prompt]\nlayout_aware = true\n"
-    )
+    (cfg_dir / "kuroi" / "config.toml").write_text("[prompt]\nlayout_aware = true\n")
     monkeypatch.setenv("XDG_CONFIG_HOME", str(cfg_dir))
 
     captured: dict[str, Config] = {}
@@ -179,9 +178,7 @@ def test_run_no_layout_aware_flag_overrides_config_true(
     pdf = make_pdf(["alice@example.com"])
     out = tmp_path / "out.pdf"
 
-    result = CliRunner().invoke(
-        app, [*_common_args(pdf, out, tmp_path), "--no-layout-aware"]
-    )
+    result = CliRunner().invoke(app, [*_common_args(pdf, out, tmp_path), "--no-layout-aware"])
     assert result.exit_code == 0, result.stdout
     assert captured["config"].layout_aware is False
 
@@ -231,16 +228,12 @@ def test_run_layout_aware_flag_reaches_provider(
                 )
             ]
 
-    monkeypatch.setattr(
-        "kuroi.cli.run.make_provider", lambda cfg: _SpyProvider(model=cfg.model)
-    )
+    monkeypatch.setattr("kuroi.cli.run.make_provider", lambda cfg: _SpyProvider(model=cfg.model))
 
     pdf = make_pdf(["alice@example.com"])
     out = tmp_path / "out.pdf"
 
-    result = CliRunner().invoke(
-        app, [*_common_args(pdf, out, tmp_path), "--layout-aware"]
-    )
+    result = CliRunner().invoke(app, [*_common_args(pdf, out, tmp_path), "--layout-aware"])
     assert result.exit_code == 0, result.stdout
     assert captured["layout_aware"] is True
 
@@ -267,7 +260,8 @@ def test_run_logs_block_count_when_layout_aware(
         [
             *_common_args(pdf, out, tmp_path),
             "--layout-aware",
-            "--pages-per-batch", "1",
+            "--pages-per-batch",
+            "1",
         ],
     )
     assert result.exit_code == 0, result.stdout
@@ -291,7 +285,8 @@ def test_run_does_not_log_block_count_without_layout_aware(
         app,
         [
             *_common_args(pdf, out, tmp_path),
-            "--pages-per-batch", "1",  # no --layout-aware
+            "--pages-per-batch",
+            "1",  # no --layout-aware
         ],
     )
     assert result.exit_code == 0, result.stdout
