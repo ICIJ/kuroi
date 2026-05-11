@@ -12,6 +12,26 @@ from kuroi.core.page_selection import parse
 from kuroi.core.pdf import OcrRequiredError, extract_word_index
 
 
+@pytest.fixture
+def mixed_text_and_image_pdf(tmp_path: Path) -> Path:
+    """Build a 2-page PDF: page 1 has native text, page 2 has an image only.
+
+    Used by tests that need to verify OCR scan-candidate detection runs
+    only on selected pages.
+    """
+    doc = pymupdf.open()
+    page1 = doc.new_page()
+    page1.insert_text((72, 72), "Hello world", fontsize=11)
+    page2 = doc.new_page()
+    pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 128, 128))
+    pix.clear_with(200)
+    page2.insert_image(pymupdf.Rect(72, 72, 200, 200), pixmap=pix)
+    path = tmp_path / "mixed.pdf"
+    doc.save(str(path))
+    doc.close()
+    return path
+
+
 def test_extract_word_index_filters_to_selection(
     make_pdf: Callable[..., Path],
 ) -> None:
@@ -42,27 +62,13 @@ def test_extract_word_index_preserves_word_indices_under_selection(
 
 
 def test_extract_word_index_skips_ocr_check_on_unselected_pages(
-    tmp_path: Path,
+    mixed_text_and_image_pdf: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Build a 2-page PDF: page 1 native text, page 2 image-only.
-    doc = pymupdf.open()
-    page1 = doc.new_page()
-    page1.insert_text((72, 72), "Hello world", fontsize=11)
-    page2 = doc.new_page()
-    pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 128, 128))
-    pix.clear_with(200)
-    page2.insert_image(pymupdf.Rect(72, 72, 200, 200), pixmap=pix)
-    pdf = tmp_path / "mixed.pdf"
-    doc.save(str(pdf))
-    doc.close()
-
-    # Tesseract is unavailable.
     monkeypatch.setattr("kuroi.core.pdf.shutil.which", lambda name: None)
     selection = parse("1")
 
-    # No OcrRequiredError because page 2 (the scan candidate) was not selected.
-    result = extract_word_index(pdf, selection=selection)
+    result = extract_word_index(mixed_text_and_image_pdf, selection=selection)
 
     assert tuple(p.number for p in result.pages) == (1,)
     assert result.ocr_page_count == 0
@@ -70,26 +76,14 @@ def test_extract_word_index_skips_ocr_check_on_unselected_pages(
 
 
 def test_extract_word_index_raises_ocr_when_selected_page_needs_ocr(
-    tmp_path: Path,
+    mixed_text_and_image_pdf: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Same 2-page fixture as above, but select page 2 → must raise.
-    doc = pymupdf.open()
-    page1 = doc.new_page()
-    page1.insert_text((72, 72), "Hello world", fontsize=11)
-    page2 = doc.new_page()
-    pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 128, 128))
-    pix.clear_with(200)
-    page2.insert_image(pymupdf.Rect(72, 72, 200, 200), pixmap=pix)
-    pdf = tmp_path / "mixed.pdf"
-    doc.save(str(pdf))
-    doc.close()
-
     monkeypatch.setattr("kuroi.core.pdf.shutil.which", lambda name: None)
     selection = parse("2")
 
     with pytest.raises(OcrRequiredError) as exc_info:
-        extract_word_index(pdf, selection=selection)
+        extract_word_index(mixed_text_and_image_pdf, selection=selection)
 
     assert exc_info.value.page_numbers == (2,)
 
