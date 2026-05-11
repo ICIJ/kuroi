@@ -44,9 +44,7 @@ def stub_provider(monkeypatch):
         self._max_tokens = max_tokens
         self._client = client or _Client()
 
-    monkeypatch.setattr(
-        "kuroi.providers.anthropic.AnthropicProvider.__init__", _fake_init
-    )
+    monkeypatch.setattr("kuroi.providers.anthropic.AnthropicProvider.__init__", _fake_init)
 
 
 def test_full_run_then_verify_then_undo(
@@ -71,12 +69,17 @@ def test_full_run_then_verify_then_undo(
     result = runner.invoke(
         app,
         [
-            "run", str(pdf),
-            "--rules", "pii",
-            "-o", str(out),
+            "run",
+            str(pdf),
+            "--rules",
+            "pii",
+            "-o",
+            str(out),
             "-y",
-            "--backup-dir", str(backup_dir),
-            "--audit-dir", str(audit_dir),
+            "--backup-dir",
+            str(backup_dir),
+            "--audit-dir",
+            str(audit_dir),
         ],
     )
     assert result.exit_code == 0, result.stdout
@@ -129,9 +132,7 @@ def stub_ollama_client(monkeypatch: pytest.MonkeyPatch) -> None:
         self._url = url.rstrip("/")
         self._client = _C()
 
-    monkeypatch.setattr(
-        "kuroi.providers.ollama.OllamaProvider.__init__", _fake_init
-    )
+    monkeypatch.setattr("kuroi.providers.ollama.OllamaProvider.__init__", _fake_init)
 
 
 def test_full_run_then_verify_then_undo_ollama(
@@ -156,14 +157,21 @@ def test_full_run_then_verify_then_undo_ollama(
     result = runner.invoke(
         app,
         [
-            "run", str(pdf),
-            "--rules", "pii",
-            "-o", str(out),
+            "run",
+            str(pdf),
+            "--rules",
+            "pii",
+            "-o",
+            str(out),
             "-y",
-            "--backup-dir", str(backup_dir),
-            "--audit-dir", str(audit_dir),
-            "--provider", "ollama",
-            "--model", "llama3.1:8b",
+            "--backup-dir",
+            str(backup_dir),
+            "--audit-dir",
+            str(audit_dir),
+            "--provider",
+            "ollama",
+            "--model",
+            "llama3.1:8b",
         ],
     )
     assert result.exit_code == 0, result.stdout

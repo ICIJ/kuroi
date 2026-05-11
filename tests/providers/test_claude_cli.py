@@ -119,9 +119,7 @@ def test_per_call_model_override_replaces_provider_default() -> None:
     provider = ClaudeCliProvider(model="claude-opus-4-7", query_fn=qfn)
     pages = (_page(1, ["Hello"]),)
 
-    provider.detect_redactions(
-        pages, ("person_name",), model="claude-haiku-4-5-20251001"
-    )
+    provider.detect_redactions(pages, ("person_name",), model="claude-haiku-4-5-20251001")
 
     options = captured["options"]
     assert options.model == "claude-haiku-4-5-20251001"
@@ -150,10 +148,10 @@ def test_markdown_fenced_json_response_is_parsed() -> None:
     # even when the system prompt forbids extra text. Strip the fence so
     # the response still produces findings instead of failing the batch.
     fenced = (
-        '```json\n'
+        "```json\n"
         '{"findings": [{"page": 1, "start": 1, "end": 2, '
         '"kind": "person_name", "confidence": "high"}]}\n'
-        '```'
+        "```"
     )
     qfn = _make_query_fn(
         [
@@ -270,9 +268,7 @@ def test_cli_json_decode_error_returns_empty_findings_with_chunk() -> None:
     mod._cli_json_decode_error_class = lambda: _FakeJSONDecodeError  # type: ignore[assignment]
     try:
         provider = ClaudeCliProvider(query_fn=qfn)
-        findings, chunks = provider.detect_redactions(
-            (_page(1, ["Hi"]),), ("person_name",)
-        )
+        findings, chunks = provider.detect_redactions((_page(1, ["Hi"]),), ("person_name",))
         assert findings == []
         assert len(chunks) == 1
     finally:
@@ -293,9 +289,7 @@ def test_cli_connection_error_returns_empty_findings_with_chunk() -> None:
     mod._cli_connection_error_class = lambda: _FakeConnectionError  # type: ignore[assignment]
     try:
         provider = ClaudeCliProvider(query_fn=qfn)
-        findings, chunks = provider.detect_redactions(
-            (_page(1, ["Hi"]),), ("person_name",)
-        )
+        findings, chunks = provider.detect_redactions((_page(1, ["Hi"]),), ("person_name",))
         assert findings == []
         assert len(chunks) == 1
     finally:
@@ -316,9 +310,7 @@ def test_process_error_without_auth_marker_returns_empty_findings() -> None:
     mod._process_error_class = lambda: _FakeProcessError  # type: ignore[assignment]
     try:
         provider = ClaudeCliProvider(query_fn=qfn)
-        findings, chunks = provider.detect_redactions(
-            (_page(1, ["Hi"]),), ("person_name",)
-        )
+        findings, chunks = provider.detect_redactions((_page(1, ["Hi"]),), ("person_name",))
         assert findings == []
         assert len(chunks) == 1
     finally:
@@ -449,9 +441,7 @@ def test_token_counts_zero_when_usage_missing() -> None:
         ]
     )
     provider = ClaudeCliProvider(query_fn=qfn)
-    findings, chunks = provider.detect_redactions(
-        (_page(1, ["Hello"]),), ("person_name",)
-    )
+    findings, chunks = provider.detect_redactions((_page(1, ["Hello"]),), ("person_name",))
 
     assert findings == []
     assert chunks[0].tokens_in == 0

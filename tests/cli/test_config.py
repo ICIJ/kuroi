@@ -12,15 +12,19 @@ def test_config_refresh_pricing_writes_user_file(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg-data"))
 
     src = tmp_path / "new-pricing.json"
-    src.write_text(json.dumps({
-        "schema_version": 1,
-        "updated_at": "2026-05-01",
-        "providers": {
-            "anthropic": {
-                "claude-opus-4-7": {"input_per_million": 99.0, "output_per_million": 199.0}
+    src.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "updated_at": "2026-05-01",
+                "providers": {
+                    "anthropic": {
+                        "claude-opus-4-7": {"input_per_million": 99.0, "output_per_million": 199.0}
+                    }
+                },
             }
-        },
-    }))
+        )
+    )
 
     result = runner.invoke(app, ["config", "refresh-pricing", "--from", str(src)])
 

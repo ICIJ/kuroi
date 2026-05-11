@@ -42,7 +42,7 @@ class OcrRequiredError(Exception):
 class ExtractionResult:
     pages: tuple[Page, ...]
     ocr_page_count: int  # 0 if no OCR was needed
-    total_pages: int     # doc.page_count, regardless of any --pages selection
+    total_pages: int  # doc.page_count, regardless of any --pages selection
 
 
 def _ocr_page_words(page: pymupdf.Page) -> list[Any]:

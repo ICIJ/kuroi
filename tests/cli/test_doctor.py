@@ -30,6 +30,7 @@ def test_doctor_reports_resolved_provider_and_model(monkeypatch: pytest.MonkeyPa
 
     # Stub the reachability probe to "reachable" so this test focuses on display.
     from kuroi.cli import doctor as doctor_module
+
     monkeypatch.setattr(doctor_module, "probe_ollama_models", lambda url: ["llama3.1:8b"])
 
     result = CliRunner().invoke(app, ["doctor"])
@@ -44,6 +45,7 @@ def test_doctor_reports_ollama_unreachable(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setenv("KUROI_OLLAMA_URL", "http://localhost:11434")
 
     from kuroi.cli import doctor as doctor_module
+
     monkeypatch.setattr(doctor_module, "probe_ollama_models", lambda url: None)
 
     result = CliRunner().invoke(app, ["doctor"])
@@ -54,6 +56,11 @@ def test_doctor_reports_ollama_unreachable(monkeypatch: pytest.MonkeyPatch) -> N
 
 def test_doctor_tesseract_detail_when_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     from kuroi.cli import doctor as doctor_module
-    monkeypatch.setattr(doctor_module.shutil, "which", lambda name: None if name == "tesseract" else f"/usr/bin/{name}")
+
+    monkeypatch.setattr(
+        doctor_module.shutil,
+        "which",
+        lambda name: None if name == "tesseract" else f"/usr/bin/{name}",
+    )
     result = CliRunner().invoke(app, ["doctor"])
     assert "required for scanned PDFs" in result.stdout

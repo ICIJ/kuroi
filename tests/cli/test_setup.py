@@ -156,7 +156,10 @@ def test_probe_ollama_models_returns_names_on_success(monkeypatch: pytest.Monkey
         return _R()
 
     monkeypatch.setattr("httpx.get", _good_get)
-    assert setup_module.probe_ollama_models("http://localhost:11434") == ["llama3.1:8b", "mistral:7b"]
+    assert setup_module.probe_ollama_models("http://localhost:11434") == [
+        "llama3.1:8b",
+        "mistral:7b",
+    ]
 
 
 def test_setup_offers_claude_cli_option(monkeypatch, tmp_path) -> None:

@@ -157,9 +157,7 @@ def test_single_page_halves_with_overlap_text_visible_in_both_halves() -> None:
     boundary_texts = {f"p7_w{i}" for i in range(100 - OVERLAP_WORDS, 100 + OVERLAP_WORDS)}
     for prompt in success_prompts:
         for text in boundary_texts:
-            assert text in prompt, (
-                f"boundary word {text!r} missing from one half's prompt"
-            )
+            assert text in prompt, f"boundary word {text!r} missing from one half's prompt"
 
 
 def test_overlap_dedupes_boundary_findings() -> None:
