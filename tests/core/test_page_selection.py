@@ -128,7 +128,12 @@ def test_validate_rejects_out_of_range_partial_range() -> None:
     assert "1-10" in msg
 
 
-def test_validate_message_includes_document_size() -> None:
-    selection = parse("99")
-    with pytest.raises(PageSelectionError, match=r"1-10"):
+def test_validate_rejects_non_contiguous_out_of_range() -> None:
+    # Exercises _format_pages on a non-contiguous bad list: [11, 13] → "11, 13"
+    selection = parse("1-3,11,13")
+    with pytest.raises(PageSelectionError) as exc_info:
         validate(selection, page_count=10)
+    msg = str(exc_info.value)
+    assert "11" in msg
+    assert "13" in msg
+    assert "1-10" in msg
