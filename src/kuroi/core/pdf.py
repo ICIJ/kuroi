@@ -68,6 +68,10 @@ def extract_word_index(
     scan candidate so OCR can recover text drawn inside the image. If
     any scan candidates are found and tesseract is not in PATH, raises
     OcrRequiredError listing those pages.
+
+    The OCR pass (``full=True``) re-extracts the rendered native text
+    alongside image content, so it replaces rather than augments the
+    page's word list.
     """
     doc = pymupdf.open(str(pdf_path))  # type: ignore[no-untyped-call]
     try:
