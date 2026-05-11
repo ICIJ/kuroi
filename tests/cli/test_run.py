@@ -1253,6 +1253,10 @@ def test_run_with_pages_processes_only_selected(
     )
 
     assert result.exit_code == 0, result.stdout
+    # Cost-line footer surfaces the selection to the user. The Rich console
+    # may wrap the cost line, so collapse whitespace before substring matching.
+    stdout_collapsed = " ".join(result.stdout.split())
+    assert "pages 1-2 of 4" in stdout_collapsed
     # Output PDF retains all four pages.
     doc = pymupdf.open(str(out))
     try:

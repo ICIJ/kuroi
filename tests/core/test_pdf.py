@@ -408,7 +408,7 @@ def test_extract_word_index_reports_total_pages(make_pdf: Callable[..., Path]) -
     result = extract_word_index(pdf)
     assert result.total_pages == 3
     # No selection: total_pages must equal the returned page count.
-    # Task 4 will introduce the case where these diverge.
+    # See test_pdf_selection.py for the divergent case under --pages.
     assert result.total_pages == len(result.pages)
 
 

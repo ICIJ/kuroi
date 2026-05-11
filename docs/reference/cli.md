@@ -107,6 +107,9 @@ Options:
                                   Split LLM analysis into batches of N pages. 0
                                   (default) keeps the current single-call behavior.
                                   [default: 0; x>=0]
+  --pages TEXT                    Process only the listed pages. Comma-separated list of
+                                  page numbers and/or inclusive ranges (e.g. `1`,
+                                  `1,2,14`, `1-5`, `1,3-5,10`). Default: all pages.
   --layout-aware / --no-layout-aware
                                   Wrap the LLM prompt with PyMuPDF block tags so the
                                   model can see paragraph and other layout boundaries.
