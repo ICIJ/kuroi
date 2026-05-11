@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, cast
 
 Confidence = Literal["high", "medium", "low"]
 
@@ -41,7 +41,7 @@ def load_session(audit_path: Path) -> ReplayableSession:
     events are skipped. Unknown fields are tolerated for forward compat.
     Raises `ValueError` on missing `session_start` or a malformed JSON line.
     """
-    session_start: dict | None = None
+    session_start: dict[str, object] | None = None
     findings: list[ReplayableFinding] = []
 
     with audit_path.open("r", encoding="utf-8") as fh:
@@ -59,16 +59,20 @@ def load_session(audit_path: Path) -> ReplayableSession:
                 session_start = obj
             elif event == "finding" and obj.get("decision") == "applied":
                 bbox_raw = obj.get("bbox")
-                bbox = tuple(bbox_raw) if bbox_raw is not None else None
+                bbox: tuple[float, float, float, float] | None = (
+                    cast("tuple[float, float, float, float]", tuple(bbox_raw))
+                    if bbox_raw is not None
+                    else None
+                )
                 findings.append(
                     ReplayableFinding(
                         page=int(obj["page"]),
                         word_start=int(obj["word_start"]),
                         word_end=int(obj["word_end"]),
                         kind=str(obj["kind"]),
-                        confidence=obj["confidence"],
+                        confidence=cast("Any", obj["confidence"]),
                         source=str(obj["source"]),
-                        bbox=bbox,  # type: ignore[arg-type]
+                        bbox=bbox,
                     )
                 )
 
@@ -77,8 +81,8 @@ def load_session(audit_path: Path) -> ReplayableSession:
 
     return ReplayableSession(
         session_id=str(session_start["session_id"]),
-        input_path=Path(session_start["input_path"]),
-        output_path=Path(session_start["output_path"]),
+        input_path=Path(str(session_start["input_path"])),
+        output_path=Path(str(session_start["output_path"])),
         findings=tuple(findings),
     )
 

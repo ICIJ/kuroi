@@ -40,7 +40,7 @@ class UndoAuditLog:
         selector: dict[str, Any],
         findings_total: int,
         findings_excluded: int,
-    ) -> "UndoAuditLog":
+    ) -> UndoAuditLog:
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(str(path.parent), 0o700)
         fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)

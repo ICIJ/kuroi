@@ -7,8 +7,6 @@ import os
 import stat
 from pathlib import Path
 
-import pytest
-
 from kuroi.core.audit_replay import ReplayableFinding
 from kuroi.core.undo_audit import UndoAuditLog
 
@@ -80,7 +78,7 @@ def test_undo_audit_write_undo_finding(tmp_path: Path) -> None:
     )
 
     lines = _read_lines(audit_path)
-    finding_line = [ln for ln in lines if ln["event"] == "undo_finding"][0]
+    finding_line = next(ln for ln in lines if ln["event"] == "undo_finding")
     assert finding_line["page"] == 3
     assert finding_line["word_start"] == 12
     assert finding_line["word_end"] == 14

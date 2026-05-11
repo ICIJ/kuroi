@@ -8,9 +8,9 @@ from typing import Any
 import pytest
 
 from kuroi.cli.undo_picker import (
+    PageSentinel,
     _build_choices,
     _expand_page_sentinels,
-    PageSentinel,
     pick_findings,
 )
 from kuroi.core.audit_replay import ReplayableFinding, ReplayableSession
@@ -22,10 +22,10 @@ def _session() -> ReplayableSession:
         input_path=Path("/i"),
         output_path=Path("/o"),
         findings=(
-            ReplayableFinding(3, 12, 14, "email", "high", "llm", None),     # 0
-            ReplayableFinding(3, 20, 21, "person", "medium", "rules", None),# 1
-            ReplayableFinding(5, 0, 2, "person", "high", "llm", None),      # 2
-            ReplayableFinding(7, 4, 6, "email", "high", "llm", None),       # 3
+            ReplayableFinding(3, 12, 14, "email", "high", "llm", None),  # 0
+            ReplayableFinding(3, 20, 21, "person", "medium", "rules", None),  # 1
+            ReplayableFinding(5, 0, 2, "person", "high", "llm", None),  # 2
+            ReplayableFinding(7, 4, 6, "email", "high", "llm", None),  # 3
         ),
     )
 
@@ -39,7 +39,7 @@ def test_build_choices_groups_by_page_with_headers() -> None:
     assert len(choices) == 7
     titles = [c.title for c in choices]
     assert "Page 3" in titles[0]
-    assert "Page 5" in [t for t in titles if "Page 5" in t][0]
+    assert "Page 5" in next(t for t in titles if "Page 5" in t)
 
 
 def test_build_choices_pages_filter_drops_other_pages() -> None:
