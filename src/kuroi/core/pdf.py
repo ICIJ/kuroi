@@ -42,9 +42,10 @@ class ExtractionResult:
     ocr_page_count: int  # 0 if no OCR was needed
 
 
-def _ocr_page_words(page: pymupdf.Page) -> list[Any]:  # type: ignore[type-arg]
+def _ocr_page_words(page: pymupdf.Page) -> list[Any]:
     tp = page.get_textpage_ocr(full=True, language="eng", dpi=300)  # type: ignore[no-untyped-call]
-    return page.get_text("words", textpage=tp)  # type: ignore[no-untyped-call]
+    words: list[Any] = page.get_text("words", textpage=tp)  # type: ignore[no-untyped-call]
+    return words
 
 
 def extract_word_index(pdf_path: Path) -> ExtractionResult:

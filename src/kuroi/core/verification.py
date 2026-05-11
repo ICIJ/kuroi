@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import pymupdf
 
@@ -92,7 +92,7 @@ def _is_redaction_fill(fill: object) -> bool:
     if fill is None:
         return False
     try:
-        rgb = tuple(fill)[:3]  # type: ignore[arg-type]
+        rgb: tuple[Any, ...] = tuple(fill)[:3]  # type: ignore[arg-type]
     except TypeError:
         return False
     if not rgb:
