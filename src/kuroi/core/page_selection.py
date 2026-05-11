@@ -81,3 +81,36 @@ def _parse_int(token: str) -> int:
     if n < 1:
         raise PageSelectionError(f"page numbers must be >= 1, got {n}")
     return n
+
+
+def validate(selection: PageSelection, *, page_count: int) -> PageSelection:
+    """Ensure every page in ``selection`` falls in ``[1, page_count]``.
+
+    Raises ``PageSelectionError`` listing the out-of-range pages if any
+    exist. Out-of-range is always a hard error — there is no silent trim.
+
+    Returns the same selection (for fluent use at call sites).
+    """
+    bad = [p for p in selection.pages if p > page_count]
+    if bad:
+        bad_str = _format_pages(bad)
+        raise PageSelectionError(
+            f"page(s) {bad_str} not in document (1-{page_count})"
+        )
+    return selection
+
+
+def _format_pages(pages: list[int]) -> str:
+    """Compact representation of a sorted page list: contiguous runs as ranges."""
+    if not pages:
+        return ""
+    runs: list[str] = []
+    start = prev = pages[0]
+    for p in pages[1:]:
+        if p == prev + 1:
+            prev = p
+            continue
+        runs.append(str(start) if start == prev else f"{start}-{prev}")
+        start = prev = p
+    runs.append(str(start) if start == prev else f"{start}-{prev}")
+    return ",".join(runs)

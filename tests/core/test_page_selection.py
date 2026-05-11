@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from kuroi.core.page_selection import PageSelectionError, parse
+from kuroi.core.page_selection import PageSelectionError, parse, validate
 
 
 def test_parse_single() -> None:
@@ -94,3 +94,41 @@ def test_page_selection_len_and_iter() -> None:
     selection = parse("1,3-5,10")
     assert len(selection) == 5
     assert list(selection) == [1, 3, 4, 5, 10]
+
+
+def test_validate_passes_when_in_range() -> None:
+    selection = parse("1,5,10")
+    # Returns the same selection unchanged.
+    result = validate(selection, page_count=10)
+    assert result is selection
+
+
+def test_validate_rejects_out_of_range_single() -> None:
+    selection = parse("99")
+    with pytest.raises(PageSelectionError, match="99 not in document"):
+        validate(selection, page_count=10)
+
+
+def test_validate_rejects_out_of_range_partial() -> None:
+    # No silent trim — even if 1 and 2 are valid, the presence of 99
+    # is a hard error.
+    selection = parse("1,2,99")
+    with pytest.raises(PageSelectionError, match="99 not in document"):
+        validate(selection, page_count=10)
+
+
+def test_validate_rejects_out_of_range_partial_range() -> None:
+    selection = parse("1-15")
+    with pytest.raises(PageSelectionError) as exc_info:
+        validate(selection, page_count=10)
+    # Message names the out-of-range pages and the document size
+    msg = str(exc_info.value)
+    assert "11" in msg
+    assert "15" in msg
+    assert "1-10" in msg
+
+
+def test_validate_message_includes_document_size() -> None:
+    selection = parse("99")
+    with pytest.raises(PageSelectionError, match=r"1-10"):
+        validate(selection, page_count=10)
