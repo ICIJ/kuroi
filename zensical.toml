@@ -101,6 +101,13 @@ accent = "red"
 permalink = true
 
 [project.markdown_extensions.pymdownx.details]
+
+[project.markdown_extensions.pymdownx.emoji]
+# Render :material-*:, :fontawesome-*:, etc. as inline SVG icons.
+# String values are resolved to Python callables by Zensical.
+emoji_generator = "zensical.extensions.emoji.to_svg"
+emoji_index = "zensical.extensions.emoji.twemoji"
+
 [project.markdown_extensions.pymdownx.inlinehilite]
 [project.markdown_extensions.pymdownx.keys]
 
