@@ -13,6 +13,8 @@ src/kuroi/
 │   ├── rules.py      RuleSet / Category dataclasses + YAML loader
 │   ├── findings.py   The Finding dataclass — what every detector emits
 │   ├── redaction.py  Apply Findings to a PDF (true PyMuPDF redaction)
+│   ├── chunking.py   Per-batch orchestrator over Provider calls (retry, progress)
+│   ├── instruction_decomposer.py  Split multi-rule --instruct strings (Ollama path)
 │   ├── audit.py      Per-run audit JSONL writer
 │   ├── audit_records.py  Audit record dataclasses
 │   ├── backup.py     Pre-redaction backup + retention
@@ -27,12 +29,13 @@ src/kuroi/
 ├── providers/        LLM client implementations
 │   ├── base.py       Provider Protocol
 │   ├── factory.py    Resolve config → Provider instance
-│   ├── anthropic.py  Anthropic client
+│   ├── anthropic.py  Anthropic API client
+│   ├── claude_cli.py Claude CLI client (claude-agent-sdk subscription billing)
 │   ├── ollama.py     Ollama client (httpx → /api/chat)
 │   └── _shared.py    parse_findings_payload helper
 ├── rules/            Built-in YAML rule packs
 │   └── pii-en.yaml
-└── data/             Static assets (e.g., word lists)
+└── data/             Static assets (pricing.json)
 ```
 
 The directional rule: `cli/` may import from `core/` and `providers/`,
