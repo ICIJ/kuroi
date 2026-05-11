@@ -32,6 +32,7 @@ def strip_code_fence(text: str) -> str:
     match = _FENCE_RE.match(stripped)
     return match.group(1) if match else stripped
 
+
 SYSTEM_PROMPT = (
     "You are a redaction-assistant for kuroi, a CLI for stripping sensitive data "
     "from PDFs.\n\n"

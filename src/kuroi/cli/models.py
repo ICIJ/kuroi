@@ -80,10 +80,7 @@ def models(
             elif rates.input_per_million == 0.0 and rates.output_per_million == 0.0:
                 cost = "free"
             else:
-                cost = (
-                    f"${rates.input_per_million:.2f} / "
-                    f"${rates.output_per_million:.2f} per Mtok"
-                )
+                cost = f"${rates.input_per_million:.2f} / ${rates.output_per_million:.2f} per Mtok"
             console.print(f"  {model_name:<22} {default_marker or install_marker:<11} {cost}")
         console.print(f"  seed support: {SEED_SUPPORT.get(prov_name, 'unknown')}")
 

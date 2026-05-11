@@ -66,9 +66,8 @@ def _is_unknown_model(exc: object) -> bool:
     if not isinstance(message, str):
         return False
     msg_lower = message.lower()
-    return (
-        "model" in msg_lower
-        and ("not found" in msg_lower or "does not exist" in msg_lower or "unknown" in msg_lower)
+    return "model" in msg_lower and (
+        "not found" in msg_lower or "does not exist" in msg_lower or "unknown" in msg_lower
     )
 
 
@@ -129,11 +128,11 @@ class AnthropicProvider:
         static_prefix = build_user_static_prefix(llm_category_ids, instructions)
         document_block = build_user_document_block(pages, layout_aware=layout_aware)
         # Hash the joined prompt for audit-log continuity with prior runs.
-        prompt_sha = hashlib.sha256(
-            (static_prefix + document_block).encode("utf-8")
-        ).hexdigest()
+        prompt_sha = hashlib.sha256((static_prefix + document_block).encode("utf-8")).hexdigest()
 
-        extra: dict[str, Any] = {} if effective_model in _NO_TEMPERATURE_MODELS else {"temperature": 0}
+        extra: dict[str, Any] = (
+            {} if effective_model in _NO_TEMPERATURE_MODELS else {"temperature": 0}
+        )
 
         logger.debug(
             "anthropic request model=%s max_tokens=%d prompt_chars=%d prompt_sha=%s\n"
@@ -196,12 +195,8 @@ class AnthropicProvider:
         usage = getattr(response, "usage", None)
         tokens_in = int(getattr(usage, "input_tokens", 0)) if usage else 0
         tokens_out = int(getattr(usage, "output_tokens", 0)) if usage else 0
-        cache_create = (
-            int(getattr(usage, "cache_creation_input_tokens", 0)) if usage else 0
-        )
-        cache_read = (
-            int(getattr(usage, "cache_read_input_tokens", 0)) if usage else 0
-        )
+        cache_create = int(getattr(usage, "cache_creation_input_tokens", 0)) if usage else 0
+        cache_read = int(getattr(usage, "cache_read_input_tokens", 0)) if usage else 0
 
         if cache_create == 0 and cache_read == 0 and llm_category_ids:
             # Per-batch silent cache miss: structured-blocks request was sent

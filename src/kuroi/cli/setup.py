@@ -200,9 +200,7 @@ def setup() -> None:
             )
             raise typer.Exit(code=2)
         default_model = (
-            cur_model
-            if cur_model in CURATED_ANTHROPIC_MODELS
-            else CURATED_ANTHROPIC_MODELS[0]
+            cur_model if cur_model in CURATED_ANTHROPIC_MODELS else CURATED_ANTHROPIC_MODELS[0]
         )
         model = _prompt_anthropic_model(default_model)
         ollama_url = cur_ollama_url

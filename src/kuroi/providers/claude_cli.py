@@ -178,19 +178,13 @@ class ClaudeCliProvider:
                     "to log in with your subscription account. (SDK said: "
                     f"{exc})"
                 ) from exc
-            logger.warning(
-                "claude-cli ProcessError (will subdivide): %s", exc
-            )
+            logger.warning("claude-cli ProcessError (will subdivide): %s", exc)
             return [], _empty_chunk(pages, prompt_sha, seed)
         except _cli_json_decode_error_class() as exc:
-            logger.warning(
-                "claude-cli CLIJSONDecodeError (will subdivide): %s", exc
-            )
+            logger.warning("claude-cli CLIJSONDecodeError (will subdivide): %s", exc)
             return [], _empty_chunk(pages, prompt_sha, seed)
         except _cli_connection_error_class() as exc:
-            logger.warning(
-                "claude-cli CLIConnectionError (will subdivide): %s", exc
-            )
+            logger.warning("claude-cli CLIConnectionError (will subdivide): %s", exc)
             return [], _empty_chunk(pages, prompt_sha, seed)
         except TimeoutError as exc:
             logger.warning(
@@ -203,8 +197,7 @@ class ClaudeCliProvider:
         response_sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
 
         logger.info(
-            "claude-cli response duration_ms=%d tokens_in=%d tokens_out=%d "
-            "response_chars=%d",
+            "claude-cli response duration_ms=%d tokens_in=%d tokens_out=%d response_chars=%d",
             duration_ms,
             tokens_in,
             tokens_out,
@@ -231,8 +224,7 @@ class ClaudeCliProvider:
             payload = json.loads(strip_code_fence(text))
         except json.JSONDecodeError as exc:
             logger.warning(
-                "claude-cli returned non-JSON response (%s; will subdivide). "
-                "First 500 chars: %r",
+                "claude-cli returned non-JSON response (%s; will subdivide). First 500 chars: %r",
                 exc,
                 text[:500],
             )
@@ -299,10 +291,6 @@ class ClaudeCliProvider:
                 if usage is not None:
                     tokens_in = _read_usage(usage, "input_tokens") or tokens_in
                     tokens_out = _read_usage(usage, "output_tokens") or tokens_out
-                    cache_create = (
-                        _read_usage(usage, "cache_creation_input_tokens") or cache_create
-                    )
-                    cache_read = (
-                        _read_usage(usage, "cache_read_input_tokens") or cache_read
-                    )
+                    cache_create = _read_usage(usage, "cache_creation_input_tokens") or cache_create
+                    cache_read = _read_usage(usage, "cache_read_input_tokens") or cache_read
         return result_text, tokens_in, tokens_out, cache_create, cache_read

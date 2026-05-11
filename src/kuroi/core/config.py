@@ -373,22 +373,17 @@ def resolve_config(
     # claude_cli table
     claude_cli_table = file_data.get("claude_cli", {})
     if not isinstance(claude_cli_table, dict):
-        raise ConfigError(
-            f"Expected table for `claude_cli`, got {type(claude_cli_table).__name__}"
-        )
+        raise ConfigError(f"Expected table for `claude_cli`, got {type(claude_cli_table).__name__}")
 
-    claude_cli_path: str | None = (
-        overrides.claude_cli_path
-        or _read_string(file_data, "claude_cli.cli_path")
+    claude_cli_path: str | None = overrides.claude_cli_path or _read_string(
+        file_data, "claude_cli.cli_path"
     )
 
     claude_cli_timeout_s: int = 300
     if "timeout_s" in claude_cli_table:
         raw = claude_cli_table["timeout_s"]
         if not isinstance(raw, int) or isinstance(raw, bool) or raw <= 0:
-            raise ConfigError(
-                f"Expected positive integer for `claude_cli.timeout_s`, got {raw!r}"
-            )
+            raise ConfigError(f"Expected positive integer for `claude_cli.timeout_s`, got {raw!r}")
         claude_cli_timeout_s = raw
     if overrides.claude_cli_timeout_s is not None:
         if overrides.claude_cli_timeout_s <= 0:

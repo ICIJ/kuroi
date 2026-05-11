@@ -340,9 +340,7 @@ def detect_redactions_chunked(
     # model. When `categories` is empty (legacy callers haven't been updated),
     # fall back to a single default-model bucket containing all category ids.
     if categories:
-        groups_by_model = _partition_categories_by_model(
-            categories, default_model=provider.model
-        )
+        groups_by_model = _partition_categories_by_model(categories, default_model=provider.model)
         # Restrict to ids the caller actually activated.
         active = set(llm_category_ids)
         groups = {
@@ -393,12 +391,18 @@ def detect_redactions_chunked(
                     # Emit one submission per rule
                     for rule in instructions:
                         submissions.append(
-                            _Submission(model=provider.model, category_ids=default_cat_ids, instructions=(rule,))
+                            _Submission(
+                                model=provider.model,
+                                category_ids=default_cat_ids,
+                                instructions=(rule,),
+                            )
                         )
                 else:
                     # No instructions: emit categories-only submission if groups exist
                     submissions.append(
-                        _Submission(model=provider.model, category_ids=default_cat_ids, instructions=())
+                        _Submission(
+                            model=provider.model, category_ids=default_cat_ids, instructions=()
+                        )
                     )
 
         if not submissions:
