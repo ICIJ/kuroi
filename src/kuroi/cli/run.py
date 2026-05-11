@@ -32,7 +32,22 @@ from kuroi.core.output_resolution import (
     OutputResolutionError,
     resolve_output_path,
 )
-from kuroi.core.pdf import OcrRequiredError, extract_word_index, serialize_for_llm
+from kuroi.core.page_selection import (
+    PageSelection,
+    PageSelectionError,
+)
+from kuroi.core.page_selection import (
+    parse as parse_page_selection,
+)
+from kuroi.core.page_selection import (
+    validate as validate_page_selection,
+)
+from kuroi.core.pdf import (
+    OcrRequiredError,
+    extract_word_index,
+    index_by_number,
+    serialize_for_llm,
+)
 from kuroi.core.pricing import Pricing, count_tokens, estimate_cost, load_pricing
 from kuroi.core.redaction import apply_redactions
 from kuroi.core.rules import Category, apply_regex_rules, llm_categories, load_rule_set
@@ -155,6 +170,15 @@ def run(
         ),
         min=0,
     ),
+    pages_spec: str | None = typer.Option(
+        None,
+        "--pages",
+        help=(
+            "Process only the listed pages. Comma-separated list of "
+            "page numbers and/or inclusive ranges (e.g. `1`, `1,2,14`, "
+            "`1-5`, `1,3-5,10`). Default: all pages."
+        ),
+    ),
     layout_aware: bool | None = typer.Option(
         None,
         "--layout-aware/--no-layout-aware",
@@ -166,6 +190,14 @@ def run(
     ),
 ) -> None:
     """Redact a PDF using rules and/or instructions, with verification gating."""
+    selection: PageSelection | None = None
+    if pages_spec is not None:
+        try:
+            selection = parse_page_selection(pages_spec)
+        except PageSelectionError as exc:
+            console.print(f"  [red]{exc}[/]")
+            raise typer.Exit(code=2) from exc
+
     if backup_dir is None:
         backup_dir = xdg_data_home() / "kuroi" / "backups"
     if audit_dir is None:
@@ -241,7 +273,7 @@ def run(
                 sweep_backups(backup_dir, retention_hours=config.backup_retention_hours)
 
             try:
-                result = extract_word_index(pdf)
+                result = extract_word_index(pdf, selection=selection)
             except OcrRequiredError as exc:
                 pages_str = ", ".join(str(p) for p in exc.page_numbers)
                 console.print(
@@ -255,14 +287,31 @@ def run(
             if result.ocr_page_count > 0:
                 console.print(f"  OCR applied to {result.ocr_page_count} scanned page(s).")
 
+            if selection is not None:
+                try:
+                    selection = validate_page_selection(
+                        selection, page_count=result.total_pages
+                    )
+                except PageSelectionError as exc:
+                    console.print(f"  [red]{exc}[/]")
+                    raise typer.Exit(code=2) from exc
+
+            pages_by_number = index_by_number(pages)
+
             pricing = load_pricing()
             input_tokens = count_tokens(serialize_for_llm(pages))
             estimated_cost = estimate_cost(
                 pricing, config.provider, config.model, input_tokens=input_tokens
             )
+            selection_note = (
+                f", pages {selection.raw} of {result.total_pages}"
+                if selection is not None
+                else ""
+            )
             console.print(
                 f"  Estimated cost: ${estimated_cost:.4f}  "
-                f"({input_tokens} input tokens, {config.provider}/{config.model})"
+                f"({input_tokens} input tokens, {config.provider}/{config.model}"
+                f"{selection_note})"
             )
 
             findings: list[Finding] = []
@@ -305,7 +354,7 @@ def run(
                 extra = ""
                 if config.layout_aware:
                     block_total = sum(
-                        len({w.block_id for w in pages[pn - 1].words})
+                        len({w.block_id for w in pages_by_number[pn].words})
                         for pn in summary.page_numbers
                     )
                     extra = f" blocks={block_total}"
@@ -383,6 +432,8 @@ def run(
                 model_version=getattr(provider, "model_version", provider.model),
                 instructions=({"text": instruct},) if instruct else (),
                 config_resolved_from=(),
+                pages_spec=selection.raw if selection is not None else None,
+                pages_resolved=selection.pages if selection is not None else (),
             )
 
             if decomp_result is not None:
@@ -403,7 +454,7 @@ def run(
             moved = False
             try:
                 for f in findings:
-                    page = pages[f.page - 1]
+                    page = pages_by_number[f.page]
                     words = page.words[f.start : f.end + 1]
                     bbox = bbox_union(w.bbox for w in words) if words else None
                     redacted_text = " ".join(w.text for w in words)
