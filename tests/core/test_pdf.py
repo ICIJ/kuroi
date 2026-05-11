@@ -399,3 +399,23 @@ def test_serialize_for_llm_layout_aware_split_block_across_pages() -> None:
     assert text.count('<block id="2">') == 2
     assert '<page n="1">\n<block id="2">[0]a</block>\n</page>' in text
     assert '<page n="2">\n<block id="2">[0]b</block>\n</page>' in text
+
+
+def test_extract_word_index_reports_total_pages(make_pdf: Callable[..., Path]) -> None:
+    pdf = make_pdf(["page one", "page two", "page three"])
+    result = extract_word_index(pdf)
+    assert result.total_pages == 3
+
+
+def test_index_by_number_maps_pages_by_1indexed_number(
+    make_pdf: Callable[..., Path],
+) -> None:
+    from kuroi.core.pdf import index_by_number
+
+    pdf = make_pdf(["one", "two", "three"])
+    result = extract_word_index(pdf)
+    lookup = index_by_number(result.pages)
+
+    assert set(lookup.keys()) == {1, 2, 3}
+    for num, page in lookup.items():
+        assert page.number == num

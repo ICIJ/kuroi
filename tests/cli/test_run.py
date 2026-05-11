@@ -641,7 +641,7 @@ def test_run_prints_ocr_notice_when_scanned_pages_found(
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
     monkeypatch.setattr(
         "kuroi.cli.run.extract_word_index",
-        lambda path: ExtractionResult(pages=(Page(number=1, words=()),), ocr_page_count=2),
+        lambda path: ExtractionResult(pages=(Page(number=1, words=()),), ocr_page_count=2, total_pages=1),
     )
 
     result = runner.invoke(
