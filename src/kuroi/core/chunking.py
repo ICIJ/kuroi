@@ -412,7 +412,7 @@ def detect_redactions_chunked(
         # returns first.
         max_workers = min(len(submissions), MAX_CONCURRENT_GROUPS)
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures: list[Future] = [
+            futures: list[Future[tuple[list[Finding], list[ChunkRecord]]]] = [
                 executor.submit(
                     _try_or_subdivide,
                     _WorkItem.from_pages(batch),

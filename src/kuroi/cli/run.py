@@ -15,7 +15,6 @@ from rich.console import Console
 
 from kuroi.core.audit import AuditLog
 from kuroi.core.audit_records import ChunkRecord
-from kuroi.core.instruction_decomposer import DecompositionResult, decompose
 from kuroi.core.backup import create_backup, session_timestamp, sweep_backups
 from kuroi.core.chunking import BatchError, BatchSummary, detect_redactions_chunked
 from kuroi.core.config import (
@@ -26,6 +25,7 @@ from kuroi.core.config import (
     xdg_data_home,
 )
 from kuroi.core.findings import Finding, bbox_union
+from kuroi.core.instruction_decomposer import DecompositionResult, decompose
 from kuroi.core.locks import LockHeldError, output_lock
 from kuroi.core.output_resolution import (
     OutputCollisionError,
