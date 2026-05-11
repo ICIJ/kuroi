@@ -91,9 +91,7 @@ def pick_findings(
     Returns an empty tuple on confirmed empty selection. Raises
     `KeyboardInterrupt` if the user cancels (Ctrl-C).
     """
-    choices = _build_choices(
-        session, text_by_index=text_by_index, pages_filter=pages_filter
-    )
+    choices = _build_choices(session, text_by_index=text_by_index, pages_filter=pages_filter)
     header = (
         f"Session {session.session_id} — {session.input_path.name}\n"
         "Use ↑/↓ to move, Space to toggle, Enter to confirm, Ctrl-C to cancel."

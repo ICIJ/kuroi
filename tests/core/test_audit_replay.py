@@ -10,6 +10,7 @@ import pytest
 from kuroi.core.audit_replay import (
     ReplayableFinding,
     ReplayableSession,
+    build_exclusion_set,
     load_session,
 )
 
@@ -180,16 +181,13 @@ def test_load_session_malformed_line_raises(tmp_path: Path) -> None:
         load_session(log)
 
 
-from kuroi.core.audit_replay import build_exclusion_set
-
-
 def _make_findings() -> tuple[ReplayableFinding, ...]:
     return (
-        ReplayableFinding(3, 12, 14, "email", "high", "llm", None),       # idx 0
+        ReplayableFinding(3, 12, 14, "email", "high", "llm", None),  # idx 0
         ReplayableFinding(3, 20, 21, "person", "medium", "rules", None),  # idx 1
-        ReplayableFinding(5, 0, 2, "person", "high", "llm", None),        # idx 2
-        ReplayableFinding(5, 8, 8, "date", "low", "llm", None),           # idx 3
-        ReplayableFinding(7, 4, 6, "email", "high", "llm", None),         # idx 4
+        ReplayableFinding(5, 0, 2, "person", "high", "llm", None),  # idx 2
+        ReplayableFinding(5, 8, 8, "date", "low", "llm", None),  # idx 3
+        ReplayableFinding(7, 4, 6, "email", "high", "llm", None),  # idx 4
     )
 
 

@@ -217,9 +217,12 @@ def test_undo_regenerates_with_page_filter(
         Finding(page=1, start=2, end=2, kind="person", confidence="high", source="llm"),
         Finding(page=2, start=1, end=1, kind="email", confidence="high", source="llm"),
     ]
-    audit_path, ts = _seed_run(
-        tmp_path, pdf,
-        findings=findings, backup_root=backup_root, audit_dir=audit_dir,
+    _seed_run(
+        tmp_path,
+        pdf,
+        findings=findings,
+        backup_root=backup_root,
+        audit_dir=audit_dir,
     )
 
     runner = CliRunner()
@@ -244,10 +247,10 @@ def test_undo_regenerates_with_page_filter(
     # An undo log was written
     undo_logs = list(audit_dir.glob("*.undo.jsonl"))
     assert len(undo_logs) == 1
-    lines = [json.loads(l) for l in undo_logs[0].read_text().splitlines() if l]
+    lines = [json.loads(line) for line in undo_logs[0].read_text().splitlines() if line]
     assert lines[0]["event"] == "undo_start"
     assert lines[0]["findings_excluded"] == 1
-    finding_events = [l for l in lines if l["event"] == "undo_finding"]
+    finding_events = [line for line in lines if line["event"] == "undo_finding"]
     assert len(finding_events) == 1
     assert finding_events[0]["page"] == 1
     assert finding_events[0]["kind"] == "email"
@@ -266,8 +269,11 @@ def test_undo_empty_exclusion_set_exits_6(
         Finding(page=1, start=0, end=0, kind="email", confidence="high", source="llm"),
     ]
     _seed_run(
-        tmp_path, pdf,
-        findings=findings, backup_root=backup_root, audit_dir=audit_dir,
+        tmp_path,
+        pdf,
+        findings=findings,
+        backup_root=backup_root,
+        audit_dir=audit_dir,
     )
 
     runner = CliRunner()
@@ -302,8 +308,11 @@ def test_undo_backup_hash_mismatch_exits_1(
         Finding(page=1, start=0, end=0, kind="email", confidence="high", source="llm"),
     ]
     _seed_run(
-        tmp_path, pdf,
-        findings=findings, backup_root=backup_root, audit_dir=audit_dir,
+        tmp_path,
+        pdf,
+        findings=findings,
+        backup_root=backup_root,
+        audit_dir=audit_dir,
     )
     # tamper with the backup
     sessions = list(backup_root.iterdir())
@@ -343,8 +352,11 @@ def test_undo_output_lock_held_exits_5(
         Finding(page=1, start=0, end=0, kind="email", confidence="high", source="llm"),
     ]
     _seed_run(
-        tmp_path, pdf,
-        findings=findings, backup_root=backup_root, audit_dir=audit_dir,
+        tmp_path,
+        pdf,
+        findings=findings,
+        backup_root=backup_root,
+        audit_dir=audit_dir,
     )
     # Pre-create the lock file
     lock = pdf.with_suffix(pdf.suffix + ".kuroi.lock")
@@ -382,8 +394,11 @@ def test_undo_verification_failure_exits_4(
         Finding(page=1, start=0, end=0, kind="email", confidence="high", source="llm"),
     ]
     _seed_run(
-        tmp_path, pdf,
-        findings=findings, backup_root=backup_root, audit_dir=audit_dir,
+        tmp_path,
+        pdf,
+        findings=findings,
+        backup_root=backup_root,
+        audit_dir=audit_dir,
     )
 
     from kuroi.core.verification import Leak, VerificationReport
@@ -391,7 +406,9 @@ def test_undo_verification_failure_exits_4(
     def fake_verify(_p):
         return VerificationReport(
             passed=False,
-            leaks=(Leak(page=1, kind="text_under_overlay", bbox=None, recovered_text="x", detail="x"),),
+            leaks=(
+                Leak(page=1, kind="text_under_overlay", bbox=None, recovered_text="x", detail="x"),
+            ),
         )
 
     monkeypatch.setattr("kuroi.cli.undo.verify_pdf", fake_verify)
@@ -430,8 +447,11 @@ def test_undo_invokes_picker_when_tty_and_no_element_selectors(
         Finding(page=1, start=1, end=1, kind="person", confidence="high", source="llm"),
     ]
     _seed_run(
-        tmp_path, pdf,
-        findings=findings, backup_root=backup_root, audit_dir=audit_dir,
+        tmp_path,
+        pdf,
+        findings=findings,
+        backup_root=backup_root,
+        audit_dir=audit_dir,
     )
 
     monkeypatch.setattr("kuroi.cli.undo._stdin_isatty", lambda: True)
@@ -456,7 +476,7 @@ def test_undo_invokes_picker_when_tty_and_no_element_selectors(
     assert result.exit_code == 0, result.stdout
     undo_logs = list(audit_dir.glob("*.undo.jsonl"))
     assert len(undo_logs) == 1
-    lines = [json.loads(l) for l in undo_logs[0].read_text().splitlines() if l]
+    lines = [json.loads(line) for line in undo_logs[0].read_text().splitlines() if line]
     assert lines[0]["findings_excluded"] == 1
     assert lines[0]["selector"]["interactive"] is True
 
@@ -473,8 +493,11 @@ def test_undo_non_tty_no_selector_falls_back_to_full_restore(
         Finding(page=1, start=0, end=0, kind="email", confidence="high", source="llm"),
     ]
     _seed_run(
-        tmp_path, pdf,
-        findings=findings, backup_root=backup_root, audit_dir=audit_dir,
+        tmp_path,
+        pdf,
+        findings=findings,
+        backup_root=backup_root,
+        audit_dir=audit_dir,
     )
     monkeypatch.setattr("kuroi.cli.undo._stdin_isatty", lambda: False)
 
@@ -502,3 +525,105 @@ def test_undo_non_tty_no_selector_falls_back_to_full_restore(
     sessions = list(backup_root.iterdir())
     backup_pdf = next(p for p in sessions[0].iterdir() if p.suffix == ".pdf")
     assert pdf.read_bytes() == backup_pdf.read_bytes()
+
+
+def test_undo_dry_run_writes_nothing(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+) -> None:
+    pdf = make_pdf(["alpha bravo"], filename="doc.pdf")
+    backup_root = tmp_path / "backups"
+    audit_dir = tmp_path / "audit"
+    findings = [
+        Finding(page=1, start=0, end=0, kind="email", confidence="high", source="llm"),
+    ]
+    _seed_run(
+        tmp_path,
+        pdf,
+        findings=findings,
+        backup_root=backup_root,
+        audit_dir=audit_dir,
+    )
+
+    before_mtime = pdf.stat().st_mtime_ns
+    before_bytes = pdf.read_bytes()
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "undo",
+            str(pdf),
+            "-y",
+            "--page",
+            "1",
+            "--kind",
+            "email",
+            "--dry-run",
+            "--backup-dir",
+            str(backup_root),
+            "--audit-dir",
+            str(audit_dir),
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert pdf.stat().st_mtime_ns == before_mtime
+    assert pdf.read_bytes() == before_bytes
+    assert list(audit_dir.glob("*.undo.jsonl")) == []
+
+
+def test_undo_exclude_all_short_circuits_to_backup_copy(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+) -> None:
+    pdf = make_pdf(["alpha bravo"], filename="doc.pdf")
+    backup_root = tmp_path / "backups"
+    audit_dir = tmp_path / "audit"
+    findings = [
+        Finding(page=1, start=0, end=0, kind="email", confidence="high", source="llm"),
+        Finding(page=1, start=1, end=1, kind="person", confidence="high", source="llm"),
+    ]
+    _seed_run(
+        tmp_path,
+        pdf,
+        findings=findings,
+        backup_root=backup_root,
+        audit_dir=audit_dir,
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "undo",
+            str(pdf),
+            "-y",
+            "--page",
+            "1",
+            "--backup-dir",
+            str(backup_root),
+            "--audit-dir",
+            str(audit_dir),
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    sessions = list(backup_root.iterdir())
+    backup_pdf = next(p for p in sessions[0].iterdir() if p.suffix == ".pdf")
+    assert pdf.read_bytes() == backup_pdf.read_bytes()
+
+
+def test_undo_no_backup_message_mentions_no_backup_flag(
+    make_pdf: Callable[..., Path],
+    tmp_path: Path,
+) -> None:
+    pdf = make_pdf(["x"], filename="doc.pdf")
+    backup_root = tmp_path / "backups"
+    backup_root.mkdir()
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["undo", str(pdf), "-y", "--backup-dir", str(backup_root)],
+    )
+    assert result.exit_code == 1
+    assert "--no-backup" in result.stdout
