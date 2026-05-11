@@ -112,3 +112,60 @@ def sweep_backups(root: Path, *, retention_hours: int) -> int:
             shutil.rmtree(child)
             pruned += 1
     return pruned
+
+
+def find_session_by_path(backup_root: Path, target: Path) -> Backup | None:
+    """Return the most recent backup whose original_path matches `target`.
+
+    Path matching uses `Path.resolve(strict=False)` on both sides so symlinks
+    and relative-vs-absolute spellings reconcile.
+    """
+    if not backup_root.is_dir():
+        return None
+    target_resolved = target.resolve(strict=False)
+    candidates: list[tuple[str, Backup]] = []
+    for session_dir in backup_root.iterdir():
+        if not session_dir.is_dir():
+            continue
+        manifest_path = session_dir / "manifest.json"
+        if not manifest_path.is_file():
+            continue
+        try:
+            data = json.loads(manifest_path.read_text())
+        except json.JSONDecodeError:
+            continue
+        orig = Path(data["original_path"]).resolve(strict=False)
+        if orig == target_resolved:
+            candidates.append(
+                (
+                    session_dir.name,
+                    Backup(
+                        timestamp=data["timestamp"],
+                        copy_path=Path(data["copy_path"]),
+                        manifest_path=manifest_path,
+                        original_path=Path(data["original_path"]),
+                    ),
+                )
+            )
+    if not candidates:
+        return None
+    candidates.sort(key=lambda t: t[0])
+    return candidates[-1][1]
+
+
+def find_session_by_timestamp(backup_root: Path, ts: str) -> Backup | None:
+    """Return the backup whose session directory matches `ts` exactly."""
+    session_dir = backup_root / ts
+    manifest_path = session_dir / "manifest.json"
+    if not manifest_path.is_file():
+        return None
+    try:
+        data = json.loads(manifest_path.read_text())
+    except json.JSONDecodeError:
+        return None
+    return Backup(
+        timestamp=data["timestamp"],
+        copy_path=Path(data["copy_path"]),
+        manifest_path=manifest_path,
+        original_path=Path(data["original_path"]),
+    )
