@@ -94,7 +94,7 @@ worth the round-trip.
 
 _SPLIT_SYSTEM_PROMPT = (
     "You are a parser. Split the following redaction instruction into "
-    "atomic rules. Return JSON only: {\"rules\": [\"rule 1\", \"rule 2\", ...]}. "
+    'atomic rules. Return JSON only: {"rules": ["rule 1", "rule 2", ...]}. '
     "Each rule must be self-contained — a person reading just that rule "
     "should know what to redact. Do not add rules that aren't in the input."
 )
@@ -196,9 +196,7 @@ def _llm_split(
         pool=READ_TIMEOUT_SECONDS,
     )
     try:
-        response = provider._client.post(
-            f"{provider._url}/api/chat", json=body, timeout=timeout
-        )
+        response = provider._client.post(f"{provider._url}/api/chat", json=body, timeout=timeout)
         response.raise_for_status()
         envelope = response.json()
     except httpx.TimeoutException as exc:
@@ -238,9 +236,7 @@ def _llm_split(
         return None, msg
 
     rules = tuple(
-        rule.strip()
-        for rule in payload["rules"]
-        if isinstance(rule, str) and rule.strip()
+        rule.strip() for rule in payload["rules"] if isinstance(rule, str) and rule.strip()
     )
     if len(rules) < 2:
         msg = f"llm fallback: only {len(rules)} valid rule(s) returned"

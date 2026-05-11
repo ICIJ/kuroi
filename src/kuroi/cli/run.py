@@ -120,10 +120,7 @@ def run(
     claude_cli_timeout: int | None = typer.Option(
         None,
         "--claude-cli-timeout",
-        help=(
-            "Per-call timeout in seconds for the claude-cli provider. "
-            "Default 300."
-        ),
+        help=("Per-call timeout in seconds for the claude-cli provider. Default 300."),
         min=1,
     ),
     seed: int | None = typer.Option(
