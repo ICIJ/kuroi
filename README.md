@@ -2,8 +2,6 @@
 
 Strip sensitive data from PDFs with LLM assistance.
 
-**Documentation:** https://icij.github.io/kuroi/
-
 ## Quick start
 
 ```sh
@@ -19,8 +17,3 @@ for the end-to-end walkthrough, including the diff/verify/undo cycle.
 
 AGPL-3.0-or-later. See [LICENSE](LICENSE).
 
-## Maintainers
-
-- One-time setup for the docs site: in `Settings → Pages → Build and
-  deployment`, set **Source** to **GitHub Actions**. The workflow at
-  `.github/workflows/docs.yml` does the rest on every push to `main`.
