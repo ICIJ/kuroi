@@ -178,3 +178,94 @@ def test_load_session_malformed_line_raises(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="line 2"):
         load_session(log)
+
+
+from kuroi.core.audit_replay import build_exclusion_set
+
+
+def _make_findings() -> tuple[ReplayableFinding, ...]:
+    return (
+        ReplayableFinding(3, 12, 14, "email", "high", "llm", None),       # idx 0
+        ReplayableFinding(3, 20, 21, "person", "medium", "rules", None),  # idx 1
+        ReplayableFinding(5, 0, 2, "person", "high", "llm", None),        # idx 2
+        ReplayableFinding(5, 8, 8, "date", "low", "llm", None),           # idx 3
+        ReplayableFinding(7, 4, 6, "email", "high", "llm", None),         # idx 4
+    )
+
+
+def test_build_exclusion_set_by_pages() -> None:
+    findings = _make_findings()
+    result = build_exclusion_set(
+        findings,
+        pages=(3, 5),
+        page=None,
+        kind=None,
+        words=None,
+        picker_indices=(),
+    )
+    assert result == frozenset({0, 1, 2, 3})
+
+
+def test_build_exclusion_set_by_page_and_kind() -> None:
+    findings = _make_findings()
+    result = build_exclusion_set(
+        findings,
+        pages=None,
+        page=3,
+        kind="email",
+        words=None,
+        picker_indices=(),
+    )
+    assert result == frozenset({0})
+
+
+def test_build_exclusion_set_by_page_and_words_exact_range() -> None:
+    findings = _make_findings()
+    result = build_exclusion_set(
+        findings,
+        pages=None,
+        page=5,
+        kind=None,
+        words=(0, 2),
+        picker_indices=(),
+    )
+    assert result == frozenset({2})
+
+
+def test_build_exclusion_set_empty_when_filters_match_nothing() -> None:
+    findings = _make_findings()
+    result = build_exclusion_set(
+        findings,
+        pages=None,
+        page=3,
+        kind="iban",
+        words=None,
+        picker_indices=(),
+    )
+    assert result == frozenset()
+
+
+def test_build_exclusion_set_picker_indices_union() -> None:
+    findings = _make_findings()
+    result = build_exclusion_set(
+        findings,
+        pages=None,
+        page=3,
+        kind="email",
+        words=None,
+        picker_indices=(2, 4),
+    )
+    assert result == frozenset({0, 2, 4})
+
+
+def test_build_exclusion_set_no_filters_returns_empty() -> None:
+    findings = _make_findings()
+    result = build_exclusion_set(
+        findings,
+        pages=None,
+        page=None,
+        kind=None,
+        words=None,
+        picker_indices=(),
+    )
+    assert result == frozenset()

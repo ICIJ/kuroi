@@ -81,3 +81,39 @@ def load_session(audit_path: Path) -> ReplayableSession:
         output_path=Path(session_start["output_path"]),
         findings=tuple(findings),
     )
+
+
+def build_exclusion_set(
+    findings: tuple[ReplayableFinding, ...],
+    *,
+    pages: tuple[int, ...] | None,
+    page: int | None,
+    kind: str | None,
+    words: tuple[int, int] | None,
+    picker_indices: tuple[int, ...],
+) -> frozenset[int]:
+    """Return finding indices to exclude (i.e., un-redact) based on filters.
+
+    --pages, --page, --kind, --words are AND-composed inside the flag-derived
+    set. Picker indices are union'd on top. If no filters or picker indices
+    are given, returns an empty set — the CLI layer turns that into exit 6
+    (or the no-selector full-restore path, depending on context).
+    """
+    flag_filters_present = (
+        pages is not None or page is not None or kind is not None or words is not None
+    )
+
+    flag_set: set[int] = set()
+    if flag_filters_present:
+        for idx, f in enumerate(findings):
+            if pages is not None and f.page not in pages:
+                continue
+            if page is not None and f.page != page:
+                continue
+            if kind is not None and f.kind != kind:
+                continue
+            if words is not None and (f.word_start, f.word_end) != words:
+                continue
+            flag_set.add(idx)
+
+    return frozenset(flag_set | set(picker_indices))
