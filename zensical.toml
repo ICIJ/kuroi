@@ -62,7 +62,8 @@ link = "https://pypi.org/project/kuroi/"
 # ---------------------------------------------------------------------------
 [project.theme]
 language = "en"
-favicon = "assets/favicon.svg"
+favicon = "assets/icon-512.png"
+logo = "assets/logo.svg"
 features = [
   "announce.dismiss",
   "navigation.tabs",
