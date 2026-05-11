@@ -6,11 +6,13 @@ import hashlib
 import json
 import os
 import shutil
+import sys
 from pathlib import Path
 
 import typer
 from rich.console import Console
 
+from kuroi.cli.undo_picker import pick_findings
 from kuroi.core.audit_replay import (
     ReplayableFinding,
     ReplayableSession,
@@ -40,6 +42,16 @@ from kuroi.core.undo_audit import UndoAuditLog
 from kuroi.core.verification import verify_pdf
 
 console = Console()
+
+
+def _stdin_isatty() -> bool:
+    """Return True if stdin is an interactive TTY.
+
+    Isolated as a module-level callable so tests can monkeypatch
+    ``kuroi.cli.undo._stdin_isatty`` independently of Click/CliRunner's
+    stdin replacement.
+    """
+    return sys.stdin.isatty()
 
 
 def _parse_words(spec: str | None) -> tuple[int, int] | None:
@@ -73,6 +85,23 @@ def _replayable_to_finding(rf: ReplayableFinding) -> Finding:
         confidence=rf.confidence,
         source=rf.source,
     )
+
+
+def _reconstruct_text(
+    backup_pdf: Path,
+    findings: tuple[ReplayableFinding, ...],
+) -> dict[int, str]:
+    """Re-extract words from the backup so the picker can show real text."""
+    pages_by_number = {p.number: p for p in extract_word_index(backup_pdf).pages}
+    text_by_index: dict[int, str] = {}
+    for idx, f in enumerate(findings):
+        page = pages_by_number.get(f.page)
+        if page is None:
+            text_by_index[idx] = ""
+            continue
+        words = page.words[f.word_start : f.word_end + 1]
+        text_by_index[idx] = " ".join(w.text for w in words)
+    return text_by_index
 
 
 def _legacy_full_restore(
@@ -211,15 +240,37 @@ def undo(
         )
         raise typer.Exit(code=1)
 
-    # ---- Build exclusion set (flag path only; picker added in Task 10)
-    excluded = build_exclusion_set(
-        session_obj.findings,
-        pages=pages_tuple,
-        page=page,
-        kind=kind,
-        words=words_tuple,
-        picker_indices=(),
+    # ---- Decide whether to open the picker
+    open_picker = (
+        _stdin_isatty()
+        and not has_element_selector
     )
+    picker_indices: tuple[int, ...] = ()
+    selector_interactive = False
+    if open_picker:
+        text_by_index = _reconstruct_text(bak.copy_path, session_obj.findings)
+        try:
+            picker_indices = pick_findings(
+                session_obj,
+                text_by_index=text_by_index,
+                pages_filter=pages_tuple,
+            )
+        except KeyboardInterrupt:
+            raise typer.Exit(code=130) from None
+        selector_interactive = True
+
+    # No selectors AND picker was skipped (non-TTY or no findings) → treat as "exclude every finding".
+    if not has_element_selector and pages_tuple is None and not picker_indices and not selector_interactive:
+        excluded = frozenset(range(len(session_obj.findings)))
+    else:
+        excluded = build_exclusion_set(
+            session_obj.findings,
+            pages=pages_tuple,
+            page=page,
+            kind=kind,
+            words=words_tuple,
+            picker_indices=picker_indices,
+        )
 
     if not excluded:
         console.print("  Nothing to undo (filters matched no findings).")
@@ -249,7 +300,7 @@ def undo(
     ]
 
     selector_payload = {
-        "interactive": False,
+        "interactive": selector_interactive,
         "pages": pages,
         "page": page,
         "kind": kind,
