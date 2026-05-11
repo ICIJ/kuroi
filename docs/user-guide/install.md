@@ -11,6 +11,16 @@ matches your workflow.
     pip install kuroi
     ```
 
+=== "pipx"
+
+    ```sh
+    pipx install kuroi
+    ```
+
+    `pipx` installs `kuroi` into a dedicated virtual environment and
+    exposes it on your PATH, keeping it isolated from your system Python
+    and other projects.
+
 === "uv (recommended for end users)"
 
     ```sh
@@ -33,9 +43,7 @@ matches your workflow.
 - **Python 3.12 or newer.** Earlier versions are not supported.
 - **An LLM provider.** One of:
     - An Anthropic API key (cloud, per-token).
-    - A Claude Code subscription (cloud, flat-rate). Install
-      `claude-agent-sdk` (`pip install claude-agent-sdk`) or the
-      `@anthropic-ai/claude-code` npm package and run `claude /login` once.
+    - A Claude Code subscription (cloud, flat-rate).
     - A running [Ollama](https://ollama.ai) instance (local, free).
 
     See [LLM providers](providers.md) for setup details.
