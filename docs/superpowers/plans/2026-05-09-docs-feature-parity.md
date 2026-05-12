@@ -245,7 +245,7 @@ The current text only mentions per-rule `model:` overrides inside the Claude CLI
 
 - [ ] **Step 4: Inside the `=== "Claude CLI"` tab (around line 72), append CLI-flag examples after the persistent-config block**
 
-After the existing `[claude_cli]` TOML block (line 85), add:
+After the existing `claude_cli` TOML block (line 85), add:
 
 ````markdown
 
@@ -443,7 +443,7 @@ Persist by adding the export to your shell rc file. Or switch providers:
 
 Insert before the `## "PDF is too large to extract"` heading:
 
-```markdown
+````markdown
 ## Claude CLI errors
 
 The `claude-cli` provider shells out to the `claude` binary (bundled by
@@ -511,7 +511,7 @@ it with `--claude-cli-timeout`, or persist via:
 [claude_cli]
 timeout_s = 600
 ```
-```
+````
 
 - [ ] **Step 3: Build and verify**
 
