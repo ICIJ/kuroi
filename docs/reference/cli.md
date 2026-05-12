@@ -120,13 +120,23 @@ Options:
 ## `kuroi undo`
 
 ```
-Usage: kuroi undo [OPTIONS]
+Usage: kuroi undo [OPTIONS] [INPUT]
 
   Restore the most recent backup.
+
+Arguments:
+  [INPUT]  PDF whose backup should be restored. Default: most recent backup overall.
 
 Options:
   -y                 Skip the restore confirmation.
   --backup-dir PATH  Backup directory [default: $XDG_DATA_HOME/kuroi/backups].
+  --audit-dir PATH   Audit directory [default: $XDG_DATA_HOME/kuroi/audit].
+  --session TEXT     Exact backup-session timestamp to undo.
+  --pages TEXT       Restrict undo to a page range (same syntax as `kuroi run --pages`).
+  --page INTEGER     Single page filter.
+  --kind TEXT        Finding kind filter.
+  --words TEXT       Word range filter START-END (requires --page).
+  --dry-run          Print plan, write nothing.
   --help             Show this message and exit.
 ```
 
