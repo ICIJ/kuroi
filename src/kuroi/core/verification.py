@@ -159,17 +159,22 @@ def scan_metadata(pdf_path: Path) -> list[Leak]:
                     )
                 )
         # XMP metadata is a separate stream; non-empty XMP is worth surfacing.
-        xmp = doc.xref_xml_metadata()  # type: ignore[no-untyped-call]
-        if xmp:
-            leaks.append(
-                Leak(
-                    page=0,
-                    kind="metadata",
-                    bbox=None,
-                    recovered_text=xmp[:200],
-                    detail="XMP metadata stream is non-empty",
+        # xref_xml_metadata() returns the *xref* (an int) of the /Metadata
+        # object, not its content — fetch the stream separately and decode.
+        xmp_xref = doc.xref_xml_metadata()  # type: ignore[no-untyped-call]
+        if xmp_xref:
+            xmp_stream = doc.xref_stream(xmp_xref) or b""  # type: ignore[no-untyped-call]
+            xmp_text = xmp_stream.decode("utf-8", errors="replace").strip()
+            if xmp_text:
+                leaks.append(
+                    Leak(
+                        page=0,
+                        kind="metadata",
+                        bbox=None,
+                        recovered_text=xmp_text[:200],
+                        detail="XMP metadata stream is non-empty",
+                    )
                 )
-            )
     finally:
         doc.close()  # type: ignore[no-untyped-call]
     return leaks
