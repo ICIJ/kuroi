@@ -114,6 +114,27 @@ def test_scan_metadata_clean(make_pdf: Callable[..., Path]) -> None:
     assert leaks == []
 
 
+def test_scan_metadata_flags_xmp_stream(tmp_path: Path) -> None:
+    doc = pymupdf.open()  # type: ignore[no-untyped-call]
+    page = doc.new_page()  # type: ignore[no-untyped-call]
+    page.insert_text((72, 72), "innocuous body", fontsize=11)  # type: ignore[no-untyped-call]
+    xmp_payload = (
+        '<?xpacket begin=""?><x:xmpmeta xmlns:x="adobe:ns:meta/">'
+        "<dc:creator>Sarah Chen</dc:creator>"
+        '</x:xmpmeta><?xpacket end="w"?>'
+    )
+    doc.set_xml_metadata(xmp_payload)  # type: ignore[no-untyped-call]
+    out = tmp_path / "with_xmp.pdf"
+    doc.save(str(out))  # type: ignore[no-untyped-call]
+    doc.close()  # type: ignore[no-untyped-call]
+
+    leaks = scan_metadata(out)
+
+    assert any(
+        leak.kind == "metadata" and "Sarah Chen" in leak.recovered_text for leak in leaks
+    )
+
+
 def test_verify_pdf_clean(make_pdf: Callable[..., Path]) -> None:
     pdf = make_pdf(["body text"])
     report = verify_pdf(pdf)
