@@ -33,14 +33,18 @@ Apply redactions? [Y/n]: y
 
 - :material-download: __[Install](user-guide/install.md)__
 
-    Get kuroi onto your machine in under a minute.
+    Install via `pip`, `pipx`, or `uv` on Python 3.12+. Takes under a minute on a clean machine.
 
 - :material-rocket-launch: __[Quick start](user-guide/quickstart.md)__
 
-    Redact your first PDF end-to-end.
+    Pick a provider, redact your first PDF end-to-end, and learn the core `run` / `diff` / `undo` loop.
 
 - :material-book-open-variant: __[Use as a library](developer-guide/library-usage.md)__
 
-    Integrate kuroi into your own Python pipeline.
+    Drop kuroi into a Python pipeline with the stable public API — detectors, findings, and the redaction writer.
+
+- :material-backup-restore: __[Audit & undo](user-guide/audit-and-undo.md)__
+
+    Every run writes a JSONL audit log and a full backup, so you can diff, verify, and roll back at any time.
 
 </div>
