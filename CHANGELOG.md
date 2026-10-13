@@ -6,6 +6,29 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- version list -->
 
+## v0.1.3 (2026-10-13)
+
+### Bug Fixes
+
+- **sdist**: Ship the archive without superpowers docs
+  ([`3962dbf`](https://github.com/ICIJ/kuroi/commit/3962dbfd7fb2069edee8a8f659725a902357cb83))
+
+### Build System
+
+- **sdist**: Leave superpowers specs and plans out of the source archive
+  ([`a29c4b7`](https://github.com/ICIJ/kuroi/commit/a29c4b76b81c7db4e5b04b5e8b1ab46f513a1377))
+
+### Chores
+
+- **release**: Release automatically on every push to main
+  ([`42f34c5`](https://github.com/ICIJ/kuroi/commit/42f34c51dc6ee9d7af3d28c078abaa0289f21214))
+
+### Documentation
+
+- Use a generic workload in specs, plans and test fixtures
+  ([`9eec17c`](https://github.com/ICIJ/kuroi/commit/9eec17c1e5a0768ec2f0265dc14c6713900c8296))
+
+
 ## [Unreleased]
 
 ### Added
