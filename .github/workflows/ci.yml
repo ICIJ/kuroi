@@ -5,8 +5,6 @@ on:
     branches: ['*']
   pull_request:
     branches: ['*']
-  release:
-    types: [published]
 
 jobs:
   lint:
@@ -64,25 +62,3 @@ jobs:
       - name: Run tests
         run: python -m pytest tests -v
 
-  publish:
-    needs: [lint, typecheck, test]
-    if: github.event_name == 'release'
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install build tools
-        run: pip install build
-
-      - name: Build package
-        run: python -m build
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1

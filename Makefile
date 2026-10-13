@@ -1,4 +1,4 @@
-.PHONY: help test lint format typecheck clean install setup doctor run verify models backups coverage build bump-patch bump-minor bump-major _check-uv _bump-success docs docs-build docs-gen
+.PHONY: help test lint format typecheck clean install setup doctor run verify models backups coverage build release-dry _check-uv docs docs-build docs-gen
 
 SRC := src/kuroi
 
@@ -27,9 +27,7 @@ help:
 	@echo ""
 	@echo "Release:"
 	@echo "  make build          Build sdist and wheel into dist/"
-	@echo "  make bump-patch     Bump patch version (0.1.0 -> 0.1.1)"
-	@echo "  make bump-minor     Bump minor version (0.1.0 -> 0.2.0)"
-	@echo "  make bump-major     Bump major version (0.1.0 -> 1.0.0)"
+	@echo "  make release-dry    Preview the next semantic-release version"
 
 _check-uv:
 	@command -v uv >/dev/null 2>&1 || { \
@@ -99,28 +97,8 @@ build: _check-uv
 	@echo "Built artifacts:"
 	@ls -1 dist
 
-_bump-success:
-	@NEW_TAG=$$(git describe --tags --abbrev=0); \
-	echo ""; \
-	echo "✓ Version bumped to $$NEW_TAG"; \
-	echo ""; \
-	echo "Next steps:"; \
-	echo "  1. Push the commit and tag:"; \
-	echo "       git push --follow-tags"; \
-	echo "  2. Create a GitHub release for $$NEW_TAG:"; \
-	echo "       gh release create $$NEW_TAG --generate-notes"
-
-bump-patch: _check-uv
-	@uvx bump-my-version bump patch
-	@$(MAKE) --no-print-directory _bump-success
-
-bump-minor: _check-uv
-	@uvx bump-my-version bump minor
-	@$(MAKE) --no-print-directory _bump-success
-
-bump-major: _check-uv
-	@uvx bump-my-version bump major
-	@$(MAKE) --no-print-directory _bump-success
+release-dry: _check-uv
+	@uvx --from python-semantic-release semantic-release version --print
 
 docs: _check-uv docs-gen
 	@uv run zensical serve
