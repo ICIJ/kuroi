@@ -37,7 +37,7 @@ The deterministic half of the decomposer. Pure function, no I/O. Unblocks every 
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `/home/dev/Repositories/kuroi/tests/core/test_instruction_decomposer.py`:
+Create `tests/core/test_instruction_decomposer.py`:
 
 ```python
 """Tests for the instruction decomposer module."""
@@ -129,14 +129,14 @@ def test_parser_handles_a_numbered_five_rule_instruction() -> None:
 - [ ] **Step 2: Run test to verify failure**
 
 ```bash
-cd /home/dev/Repositories/kuroi && source venv/bin/activate && python -m pytest tests/core/test_instruction_decomposer.py -v
+source venv/bin/activate && python -m pytest tests/core/test_instruction_decomposer.py -v
 ```
 
 Expected: ImportError — `parse_instruction` doesn't exist.
 
 - [ ] **Step 3: Implement the parser**
 
-Create `/home/dev/Repositories/kuroi/src/kuroi/core/instruction_decomposer.py`:
+Create `src/kuroi/core/instruction_decomposer.py`:
 
 ```python
 """Decompose multi-rule --instruct strings into atomic sub-rules.
@@ -211,7 +211,7 @@ def _split_by_line_prefix(text: str, matcher: re.Pattern[str]) -> tuple[str, ...
 - [ ] **Step 4: Run tests to verify pass**
 
 ```bash
-cd /home/dev/Repositories/kuroi && source venv/bin/activate && python -m pytest tests/core/test_instruction_decomposer.py -v
+source venv/bin/activate && python -m pytest tests/core/test_instruction_decomposer.py -v
 ```
 
 Expected: 11 passed.
@@ -219,7 +219,7 @@ Expected: 11 passed.
 - [ ] **Step 5: Run full suite to confirm no regressions**
 
 ```bash
-cd /home/dev/Repositories/kuroi && source venv/bin/activate && python -m pytest
+source venv/bin/activate && python -m pytest
 ```
 
 Expected: all green (375 baseline + 11 new = 386).
@@ -255,7 +255,7 @@ Add `DecompositionResult` and `decompose()` with the parser path wired up. The L
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `/home/dev/Repositories/kuroi/tests/core/test_instruction_decomposer.py`:
+Append to `tests/core/test_instruction_decomposer.py`:
 
 ```python
 from kuroi.core.instruction_decomposer import (
@@ -340,14 +340,14 @@ class _MockOllamaProvider:
 - [ ] **Step 2: Run to verify failure**
 
 ```bash
-cd /home/dev/Repositories/kuroi && source venv/bin/activate && python -m pytest tests/core/test_instruction_decomposer.py -v
+source venv/bin/activate && python -m pytest tests/core/test_instruction_decomposer.py -v
 ```
 
 Expected: ImportError on `DecompositionResult`, `LLM_FALLBACK_THRESHOLD_CHARS`, `decompose`.
 
 - [ ] **Step 3: Add the dataclass, threshold, and skeleton decompose function**
 
-Append to `/home/dev/Repositories/kuroi/src/kuroi/core/instruction_decomposer.py`:
+Append to `src/kuroi/core/instruction_decomposer.py`:
 
 ```python
 from dataclasses import dataclass
@@ -428,7 +428,7 @@ def decompose(
 - [ ] **Step 4: Run decomposer tests**
 
 ```bash
-cd /home/dev/Repositories/kuroi && source venv/bin/activate && python -m pytest tests/core/test_instruction_decomposer.py -v
+source venv/bin/activate && python -m pytest tests/core/test_instruction_decomposer.py -v
 ```
 
 Expected: 15 passed (11 parser + 4 new decomposer).
@@ -436,7 +436,7 @@ Expected: 15 passed (11 parser + 4 new decomposer).
 - [ ] **Step 5: Run full suite**
 
 ```bash
-cd /home/dev/Repositories/kuroi && source venv/bin/activate && python -m pytest
+source venv/bin/activate && python -m pytest
 ```
 
 Expected: all green.
@@ -471,7 +471,7 @@ Wire in the actual LLM fallback. The decomposer dispatches one POST to the Ollam
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `/home/dev/Repositories/kuroi/tests/core/test_instruction_decomposer.py`:
+Append to `tests/core/test_instruction_decomposer.py`:
 
 ```python
 import json
@@ -634,14 +634,14 @@ def test_decompose_uses_ollama_read_timeout() -> None:
 - [ ] **Step 2: Run to verify failure**
 
 ```bash
-cd /home/dev/Repositories/kuroi && source venv/bin/activate && python -m pytest tests/core/test_instruction_decomposer.py -k "llm_fallback or http_error or malformed or missing or single_rule or empty_rules or read_timeout or chat_endpoint" -v
+source venv/bin/activate && python -m pytest tests/core/test_instruction_decomposer.py -k "llm_fallback or http_error or malformed or missing or single_rule or empty_rules or read_timeout or chat_endpoint" -v
 ```
 
 Expected: most fail — the stub still returns `source="original"`.
 
 - [ ] **Step 3: Implement the LLM fallback**
 
-Replace the stubbed `decompose` body in `/home/dev/Repositories/kuroi/src/kuroi/core/instruction_decomposer.py` with a working LLM fallback. Add the imports at the top of the file:
+Replace the stubbed `decompose` body in `src/kuroi/core/instruction_decomposer.py` with a working LLM fallback. Add the imports at the top of the file:
 
 ```python
 import json
@@ -800,7 +800,7 @@ def _llm_split(
 - [ ] **Step 4: Run the LLM fallback tests**
 
 ```bash
-cd /home/dev/Repositories/kuroi && source venv/bin/activate && python -m pytest tests/core/test_instruction_decomposer.py -v
+source venv/bin/activate && python -m pytest tests/core/test_instruction_decomposer.py -v
 ```
 
 Expected: all 24 tests pass (11 parser + 4 threshold + 9 fallback).
@@ -808,7 +808,7 @@ Expected: all 24 tests pass (11 parser + 4 threshold + 9 fallback).
 - [ ] **Step 5: Run full suite**
 
 ```bash
-cd /home/dev/Repositories/kuroi && source venv/bin/activate && python -m pytest
+source venv/bin/activate && python -m pytest
 ```
 
 Expected: all green.
@@ -846,7 +846,7 @@ Two-line change in the chunker's submission-builder so each instruction in the t
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `/home/dev/Repositories/kuroi/tests/core/test_chunking_routing.py`:
+Append to `tests/core/test_chunking_routing.py`:
 
 ```python
 def test_per_rule_submissions_emitted_for_multi_rule_instructions() -> None:
@@ -951,14 +951,14 @@ def test_single_rule_instructions_keeps_one_submission() -> None:
 - [ ] **Step 2: Run to verify failure**
 
 ```bash
-cd /home/dev/Repositories/kuroi && source venv/bin/activate && python -m pytest tests/core/test_chunking_routing.py::test_per_rule_submissions_emitted_for_multi_rule_instructions -v
+source venv/bin/activate && python -m pytest tests/core/test_chunking_routing.py::test_per_rule_submissions_emitted_for_multi_rule_instructions -v
 ```
 
 Expected: FAIL — current chunker emits a single submission carrying the full instructions tuple, so `len(provider.calls) == 1`.
 
 - [ ] **Step 3: Update the chunker submission builder**
 
-In `/home/dev/Repositories/kuroi/src/kuroi/core/chunking.py`, find the submission-builder block in `detect_redactions_chunked`. The current code is:
+In `src/kuroi/core/chunking.py`, find the submission-builder block in `detect_redactions_chunked`. The current code is:
 
 ```python
         if instructions:
@@ -989,7 +989,7 @@ Empty tuple → zero submissions appended (today's behavior). Length-1 → one s
 - [ ] **Step 4: Run the new chunker tests**
 
 ```bash
-cd /home/dev/Repositories/kuroi && source venv/bin/activate && python -m pytest tests/core/test_chunking_routing.py -v
+source venv/bin/activate && python -m pytest tests/core/test_chunking_routing.py -v
 ```
 
 Expected: green (existing routing tests + 2 new instruction tests).
@@ -997,7 +997,7 @@ Expected: green (existing routing tests + 2 new instruction tests).
 - [ ] **Step 5: Run full suite**
 
 ```bash
-cd /home/dev/Repositories/kuroi && source venv/bin/activate && python -m pytest
+source venv/bin/activate && python -m pytest
 ```
 
 Expected: all green. Existing chunker / cli tests pass single-rule tuples that still produce one submission per batch — unchanged behavior.
@@ -1034,7 +1034,7 @@ Wire the decomposer into `cli/run.py`. Decompose runs once per session before th
 - [ ] **Step 1: Read current run.py to find insertion points**
 
 ```bash
-cd /home/dev/Repositories/kuroi && grep -n "instruction_tuple\|audit = AuditLog.open\|for chunk in chunks" src/kuroi/cli/run.py
+grep -n "instruction_tuple\|audit = AuditLog.open\|for chunk in chunks" src/kuroi/cli/run.py
 ```
 
 Expected output includes:
@@ -1046,7 +1046,7 @@ These are the three reference points. The decomposer call goes near the `instruc
 
 - [ ] **Step 2: Write the failing CLI tests**
 
-Create `/home/dev/Repositories/kuroi/tests/cli/test_run_decompose.py`:
+Create `tests/cli/test_run_decompose.py`:
 
 ```python
 """End-to-end CLI tests for instruction decomposition (project 2).
@@ -1272,14 +1272,14 @@ Note: The CLI's `run` function may have a different exact set of kwargs than the
 - [ ] **Step 3: Run to verify failure**
 
 ```bash
-cd /home/dev/Repositories/kuroi && source venv/bin/activate && python -m pytest tests/cli/test_run_decompose.py -v
+source venv/bin/activate && python -m pytest tests/cli/test_run_decompose.py -v
 ```
 
 Expected: FAIL — both the multi-call assertion and the audit event lookup. The CLI doesn't decompose yet.
 
 - [ ] **Step 4: Add the decomposition gate to `cli/run.py`**
 
-Update `/home/dev/Repositories/kuroi/src/kuroi/cli/run.py`. Add the import at the top with the other `kuroi.core` imports:
+Update `src/kuroi/cli/run.py`. Add the import at the top with the other `kuroi.core` imports:
 
 ```python
 from kuroi.core.instruction_decomposer import DecompositionResult, decompose
@@ -1342,7 +1342,7 @@ Insert the decomposition event write between them:
 - [ ] **Step 5: Run the CLI tests**
 
 ```bash
-cd /home/dev/Repositories/kuroi && source venv/bin/activate && python -m pytest tests/cli/test_run_decompose.py -v
+source venv/bin/activate && python -m pytest tests/cli/test_run_decompose.py -v
 ```
 
 Expected: green. (Both tests pass.)
@@ -1352,7 +1352,7 @@ If the test fails because of `run` kwargs mismatch, look at the actual `run()` s
 - [ ] **Step 6: Run full suite**
 
 ```bash
-cd /home/dev/Repositories/kuroi && source venv/bin/activate && python -m pytest
+source venv/bin/activate && python -m pytest
 ```
 
 Expected: all green. The existing CLI tests don't pass `--instruct` with multiple rules, or use the Anthropic provider (which is gated out), so they're unaffected.
@@ -1387,7 +1387,7 @@ A focused test that locks the JSONL line-shape for `instruction_decomposed`. Che
 - [ ] **Step 1: Locate the existing audit test file (if any)**
 
 ```bash
-cd /home/dev/Repositories/kuroi && ls tests/core/test_audit*.py
+ls tests/core/test_audit*.py
 ```
 
 Likely already exists from project 1 (`test_audit_records.py`). If a `test_audit.py` exists, append there. If only `test_audit_records.py` exists, append there instead.
@@ -1443,7 +1443,7 @@ def test_instruction_decomposed_event_serializes(tmp_path) -> None:
 - [ ] **Step 3: Run to verify**
 
 ```bash
-cd /home/dev/Repositories/kuroi && source venv/bin/activate && python -m pytest tests/core/test_audit_records.py -k "instruction_decomposed_event" -v
+source venv/bin/activate && python -m pytest tests/core/test_audit_records.py -k "instruction_decomposed_event" -v
 ```
 
 Expected: green. This test exercises the existing `AuditLog.write_event` plumbing, which already supports arbitrary kwargs — no production code change needed.
@@ -1451,7 +1451,7 @@ Expected: green. This test exercises the existing `AuditLog.write_event` plumbin
 - [ ] **Step 4: Run full suite**
 
 ```bash
-cd /home/dev/Repositories/kuroi && source venv/bin/activate && python -m pytest
+source venv/bin/activate && python -m pytest
 ```
 
 Expected: all green.

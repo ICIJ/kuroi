@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-30
 **Status:** Approved (brainstorming phase)
-**Owner:** ICIJ / Pierre Romera
+**Owner:** ICIJ
 
 ## Problem
 

@@ -48,7 +48,7 @@ Foundation — additive, no behavior change. Other tasks depend on these fields 
 - [ ] **Step 1: Locate or create the test file**
 
 ```bash
-ls /home/dev/Repositories/kuroi/tests/core/test_audit*.py
+ls tests/core/test_audit*.py
 ```
 
 If `test_audit_records.py` doesn't exist, create it. If it does, append to it.

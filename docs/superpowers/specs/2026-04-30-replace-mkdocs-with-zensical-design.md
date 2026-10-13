@@ -2,7 +2,7 @@
 
 **Status:** Draft  
 **Date:** 2026-04-30  
-**Author:** pirhoo + assistant  
+**Author:** ICIJ  
 **Predecessor spec:** [2026-04-30-mkdocs-documentation-design.md](2026-04-30-mkdocs-documentation-design.md)
 
 ## Summary
