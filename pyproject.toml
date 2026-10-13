@@ -45,6 +45,9 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/kuroi"]
 
+[tool.hatch.build.targets.sdist]
+exclude = ["docs/superpowers"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
